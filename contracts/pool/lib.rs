@@ -4,21 +4,35 @@
 #[openbrush::contract]
 pub mod contract {
     use logics::impls::pool::*;
-    use openbrush::traits::Storage;
+    use openbrush::{
+        contracts::psp22::{
+            extensions::metadata,
+            psp22,
+        },
+        traits::Storage,
+    };
 
     #[ink(storage)]
-    #[derive(Storage)]
+    #[derive(Default, Storage)]
     pub struct PoolContract {
         #[storage_field]
         pool: Data,
+        #[storage_field]
+        psp22: psp22::Data,
+        #[storage_field]
+        metadata: metadata::Data,
     }
 
     impl Pool for PoolContract {}
 
+    impl psp22::PSP22 for PoolContract {}
+
+    impl metadata::PSP22Metadata for PoolContract {}
+
     impl PoolContract {
         #[ink(constructor)]
         pub fn new() -> Self {
-            Self { pool: Data {} }
+            Self::default()
         }
     }
 

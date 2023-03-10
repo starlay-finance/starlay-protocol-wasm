@@ -13,6 +13,12 @@ pub struct Data {
     // TODO
 }
 
+impl Default for Data {
+    fn default() -> Self {
+        Data {}
+    }
+}
+
 pub trait Internal {
     fn _accrue_interest(&mut self);
     fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()>;
