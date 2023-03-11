@@ -6,10 +6,16 @@ pub mod contract {
     use logics::impls::pool::*;
     use openbrush::{
         contracts::psp22::{
-            extensions::metadata,
+            extensions::metadata::{
+                self,
+                PSP22MetadataRef,
+            },
             psp22,
         },
-        traits::Storage,
+        traits::{
+            Storage,
+            String,
+        },
     };
 
     #[ink(storage)]
@@ -31,10 +37,39 @@ pub mod contract {
 
     impl PoolContract {
         #[ink(constructor)]
-        pub fn new(underlying: AccountId) -> Self {
+        pub fn new(underlying: AccountId, name: String, symbol: String, decimals: u8) -> Self {
             let mut instance = Self::default();
-            instance.pool.underlying = underlying;
+            instance._initialize(underlying, name, symbol, decimals);
             instance
+        }
+
+        #[ink(constructor)]
+        pub fn new_from_asset(underlying: AccountId) -> Self {
+            let base_name = PSP22MetadataRef::token_name(&underlying);
+            let base_symbol = PSP22MetadataRef::token_symbol(&underlying);
+            let decimals = PSP22MetadataRef::token_decimals(&underlying);
+
+            let mut name = "Starlay ".as_bytes().to_vec();
+            name.append(&mut base_name.unwrap());
+            let mut symbol = "s".as_bytes().to_vec();
+            symbol.append(&mut base_symbol.unwrap());
+
+            let mut instance = Self::default();
+            instance._initialize(underlying, name, symbol, decimals);
+            instance
+        }
+
+        fn _initialize(
+            &mut self,
+            underlying: AccountId,
+            name: String,
+            symbol: String,
+            decimals: u8,
+        ) {
+            self.pool.underlying = underlying;
+            self.metadata.name = Some(name);
+            self.metadata.symbol = Some(symbol);
+            self.metadata.decimals = decimals;
         }
     }
 
@@ -61,9 +96,14 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let arg_id = AccountId::from([0x01; 32]);
-            let contract = PoolContract::new(arg_id);
-            assert_eq!(contract.underlying(), arg_id);
+            let underlying = AccountId::from([0x01; 32]);
+            let contract = PoolContract::new(
+                underlying,
+                String::from("Token Name"),
+                String::from("symbol"),
+                8,
+            );
+            assert_eq!(contract.underlying(), underlying);
         }
     }
 }
