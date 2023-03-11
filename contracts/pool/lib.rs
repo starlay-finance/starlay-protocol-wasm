@@ -31,8 +31,10 @@ pub mod contract {
 
     impl PoolContract {
         #[ink(constructor)]
-        pub fn new() -> Self {
-            Self::default()
+        pub fn new(underlying: AccountId) -> Self {
+            let mut instance = Self::default();
+            instance.pool.underlying = underlying;
+            instance
         }
     }
 
@@ -59,7 +61,9 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let _contract = PoolContract::new();
+            let arg_id = AccountId::from([0x01; 32]);
+            let contract = PoolContract::new(arg_id);
+            assert_eq!(contract.underlying(), arg_id);
         }
     }
 }
