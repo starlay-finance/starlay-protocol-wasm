@@ -57,24 +57,23 @@ impl Data {
         multiplier_per_year_slope_2: WrappedU256,
         kink: WrappedU256,
     ) -> Self {
+        let to_seconds_func = |val: WrappedU256| -> WrappedU256 {
+            WrappedU256::from(U256::from(val).div(seconds_per_year()))
+        };
         Self {
-            multiplier_per_second_slope_1: WrappedU256::from(
-                U256::from(multiplier_per_year_slope_1).div(seconds_per_year()),
-            ),
-            multiplier_per_second_slope_2: WrappedU256::from(
-                U256::from(multiplier_per_year_slope_2).div(seconds_per_year()),
-            ),
-            base_rate_per_second: WrappedU256::from(
-                U256::from(base_rate_per_year).div(seconds_per_year()),
-            ),
+            multiplier_per_second_slope_1: to_seconds_func(multiplier_per_year_slope_1),
+            multiplier_per_second_slope_2: to_seconds_func(multiplier_per_year_slope_2),
+            base_rate_per_second: to_seconds_func(base_rate_per_year),
             kink,
         }
     }
 
     fn utilization_rate(&self, cash: Balance, borrows: Balance, reserves: Balance) -> U256 {
-        let _cash = u256_from_balance(cash);
-        let _borrows = u256_from_balance(borrows);
-        let _reserves = u256_from_balance(reserves);
+        let (_cash, _borrows, _reserves) = (
+            u256_from_balance(cash),
+            u256_from_balance(borrows),
+            u256_from_balance(reserves),
+        );
         if _borrows.eq(&U256::zero()) {
             return U256::zero()
         }
