@@ -12,12 +12,14 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
     pub underlying: AccountId,
+    pub controller: AccountId,
 }
 
 impl Default for Data {
     fn default() -> Self {
         Data {
             underlying: ZERO_ADDRESS.into(),
+            controller: ZERO_ADDRESS.into(),
         }
     }
 }
@@ -54,6 +56,7 @@ pub trait Internal {
     ) -> AccountId;
 
     fn _underlying(&self) -> AccountId;
+    fn _controller(&self) -> AccountId;
 }
 
 impl<T: Storage<Data>> Pool for T {
@@ -114,6 +117,10 @@ impl<T: Storage<Data>> Pool for T {
     fn underlying(&self) -> AccountId {
         self._underlying()
     }
+
+    fn controller(&self) -> AccountId {
+        self._controller()
+    }
 }
 
 impl<T: Storage<Data>> Internal for T {
@@ -163,5 +170,9 @@ impl<T: Storage<Data>> Internal for T {
 
     fn _underlying(&self) -> AccountId {
         self.data().underlying
+    }
+
+    fn _controller(&self) -> AccountId {
+        self.data().controller
     }
 }

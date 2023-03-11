@@ -37,14 +37,20 @@ pub mod contract {
 
     impl PoolContract {
         #[ink(constructor)]
-        pub fn new(underlying: AccountId, name: String, symbol: String, decimals: u8) -> Self {
+        pub fn new(
+            underlying: AccountId,
+            controller: AccountId,
+            name: String,
+            symbol: String,
+            decimals: u8,
+        ) -> Self {
             let mut instance = Self::default();
-            instance._initialize(underlying, name, symbol, decimals);
+            instance._initialize(underlying, controller, name, symbol, decimals);
             instance
         }
 
         #[ink(constructor)]
-        pub fn new_from_asset(underlying: AccountId) -> Self {
+        pub fn new_from_asset(underlying: AccountId, controller: AccountId) -> Self {
             let base_name = PSP22MetadataRef::token_name(&underlying);
             let base_symbol = PSP22MetadataRef::token_symbol(&underlying);
             let decimals = PSP22MetadataRef::token_decimals(&underlying);
@@ -55,18 +61,20 @@ pub mod contract {
             symbol.append(&mut base_symbol.unwrap());
 
             let mut instance = Self::default();
-            instance._initialize(underlying, name, symbol, decimals);
+            instance._initialize(underlying, controller, name, symbol, decimals);
             instance
         }
 
         fn _initialize(
             &mut self,
             underlying: AccountId,
+            controller: AccountId,
             name: String,
             symbol: String,
             decimals: u8,
         ) {
             self.pool.underlying = underlying;
+            self.pool.controller = controller;
             self.metadata.name = Some(name);
             self.metadata.symbol = Some(symbol);
             self.metadata.decimals = decimals;
@@ -97,8 +105,10 @@ pub mod contract {
             set_caller(accounts.bob);
 
             let underlying = AccountId::from([0x01; 32]);
+            let controller = AccountId::from([0x02; 32]);
             let contract = PoolContract::new(
                 underlying,
+                controller,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
