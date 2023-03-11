@@ -117,6 +117,8 @@ pub trait Internal {
         pool_collateral: AccountId,
         repay_amount: Balance,
     ) -> Result<Balance>;
+    fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
+    fn _support_market(&mut self, c_token: AccountId) -> Result<()>;
 }
 
 impl<T: Storage<Data>> Controller for T {
@@ -296,6 +298,14 @@ impl<T: Storage<Data>> Controller for T {
     ) -> Result<Balance> {
         self._liquidate_calculate_seize_tokens(pool_borrowed, pool_collateral, repay_amount)
     }
+
+    default fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
+        self._set_price_oracle(new_oracle)
+    }
+
+    default fn support_market(&mut self, c_token: AccountId) -> Result<()> {
+        self._support_market(c_token)
+    }
 }
 
 impl<T: Storage<Data>> Internal for T {
@@ -434,6 +444,12 @@ impl<T: Storage<Data>> Internal for T {
         _pool_collateral: AccountId,
         _repay_amount: Balance,
     ) -> Result<Balance> {
+        todo!()
+    }
+    default fn _set_price_oracle(&mut self, _new_oracle: AccountId) -> Result<()> {
+        todo!()
+    }
+    default fn _support_market(&mut self, _c_token: AccountId) -> Result<()> {
         todo!()
     }
 }

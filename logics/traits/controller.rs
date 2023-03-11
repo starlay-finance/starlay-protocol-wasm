@@ -139,6 +139,13 @@ pub trait Controller {
         pool_collateral: AccountId,
         repay_amount: Balance,
     ) -> Result<Balance>;
+
+    // Admin Functions
+    #[ink(message)]
+    fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
+
+    #[ink(message)]
+    fn support_market(&mut self, c_token: AccountId) -> Result<()>;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
