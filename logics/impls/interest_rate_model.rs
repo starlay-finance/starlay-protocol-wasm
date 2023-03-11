@@ -14,7 +14,9 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
-    // TODO
+    multiplier_per_second: WrappedU256,
+    base_rate_per_second: WrappedU256,
+    kink: WrappedU256,
 }
 
 fn base() -> U256 {
@@ -33,6 +35,20 @@ pub trait Internal {
         borrows: Balance,
         reserve_factor_mantissa: Balance,
     ) -> WrappedU256;
+}
+
+impl Data {
+    pub fn new(
+        multiplier_per_second: WrappedU256,
+        base_rate_per_second: WrappedU256,
+        kink: WrappedU256,
+    ) -> Self {
+        Self {
+            multiplier_per_second,
+            base_rate_per_second,
+            kink,
+        }
+    }
 }
 
 impl<T: Storage<Data>> InterestRateModel for T {

@@ -3,7 +3,10 @@
 
 #[openbrush::contract]
 pub mod contract {
-    use logics::impls::interest_rate_model::*;
+    use logics::{
+        impls::interest_rate_model::*,
+        traits::types::WrappedU256,
+    };
     use openbrush::traits::Storage;
 
     #[ink(storage)]
@@ -18,7 +21,13 @@ pub mod contract {
     impl DefaultInterestRateModelContract {
         #[ink(constructor)]
         pub fn new() -> Self {
-            Self { model: Data {} }
+            Self {
+                model: Data::new(
+                    WrappedU256::from(0),
+                    WrappedU256::from(0),
+                    WrappedU256::from(0),
+                ),
+            }
         }
     }
 
