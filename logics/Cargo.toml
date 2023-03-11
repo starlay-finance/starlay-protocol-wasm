@@ -18,6 +18,8 @@ openbrush = { git = "https://github.com/727-Ventures/openbrush-contracts", versi
     "psp22",
 ] }
 ethnum = "1"
+ink_metadata = "4.0.1"
+primitive-types = "0.12.1"
 
 [lib]
 path = "lib.rs"
@@ -25,4 +27,4 @@ crate-type = ["rlib"]
 
 [features]
 default = ["std"]
-std = ["ink/std", "scale/std", "scale-info/std", "openbrush/std"]
+std = ["ink/std", "scale/std", "scale-info/std", "openbrush/std", "openbrush/std", "primitive-types/std","primitive-types/scale-info"]
