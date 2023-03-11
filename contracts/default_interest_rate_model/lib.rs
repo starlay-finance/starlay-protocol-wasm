@@ -26,6 +26,7 @@ pub mod contract {
                     WrappedU256::from(0),
                     WrappedU256::from(0),
                     WrappedU256::from(0),
+                    WrappedU256::from(0),
                 ),
             }
         }

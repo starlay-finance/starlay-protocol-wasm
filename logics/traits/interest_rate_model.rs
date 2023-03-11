@@ -15,6 +15,7 @@ pub trait InterestRateModel {
         &self,
         cash: Balance,
         borrows: Balance,
+        reserves: Balance,
         reserve_factor_mantissa: Balance,
     ) -> WrappedU256;
 }
