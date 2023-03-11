@@ -17,7 +17,6 @@ scale-info = { version = "2.3", default-features = false, features = [
 openbrush = { git = "https://github.com/727-Ventures/openbrush-contracts", version = "3.0.0", default-features = false, features = [
     "psp22",
 ] }
-ethnum = "1"
 ink_metadata = "4.0.1"
 primitive-types = "0.12.1"
 
