@@ -28,6 +28,7 @@ pub struct Data {
 }
 
 fn base() -> U256 {
+    // 1e18
     U256::from_dec_str("1000000000000000000").unwrap()
 }
 
@@ -77,9 +78,7 @@ impl Data {
         if _borrows.eq(&U256::zero()) {
             return U256::zero()
         }
-        _borrows
-            .mul(base())
-            .div((_cash.add(_borrows).sub(_reserves)))
+        _borrows.mul(base()).div(_cash.add(_borrows).sub(_reserves))
     }
 }
 
