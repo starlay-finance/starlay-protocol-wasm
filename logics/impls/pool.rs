@@ -3,6 +3,7 @@ use openbrush::traits::{
     AccountId,
     Balance,
     Storage,
+    ZERO_ADDRESS,
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
@@ -10,12 +11,16 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
-    // TODO
+    pub underlying: AccountId,
+    pub controller: AccountId,
 }
 
 impl Default for Data {
     fn default() -> Self {
-        Data {}
+        Data {
+            underlying: ZERO_ADDRESS.into(),
+            controller: ZERO_ADDRESS.into(),
+        }
     }
 }
 
@@ -49,6 +54,9 @@ pub trait Internal {
         borrower: AccountId,
         seize_tokens: AccountId,
     ) -> AccountId;
+
+    fn _underlying(&self) -> AccountId;
+    fn _controller(&self) -> AccountId;
 }
 
 impl<T: Storage<Data>> Pool for T {
@@ -105,6 +113,14 @@ impl<T: Storage<Data>> Pool for T {
         self._accrue_interest();
         self._seize(Self::env().caller(), liquidator, borrower, seize_tokens)
     }
+
+    fn underlying(&self) -> AccountId {
+        self._underlying()
+    }
+
+    fn controller(&self) -> AccountId {
+        self._controller()
+    }
 }
 
 impl<T: Storage<Data>> Internal for T {
@@ -150,5 +166,13 @@ impl<T: Storage<Data>> Internal for T {
         _seize_tokens: AccountId,
     ) -> AccountId {
         todo!()
+    }
+
+    fn _underlying(&self) -> AccountId {
+        self.data().underlying
+    }
+
+    fn _controller(&self) -> AccountId {
+        self.data().controller
     }
 }

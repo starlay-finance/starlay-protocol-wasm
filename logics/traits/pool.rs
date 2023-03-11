@@ -44,6 +44,11 @@ pub trait Pool {
         borrower: AccountId,
         seize_tokens: AccountId,
     ) -> AccountId;
+
+    #[ink(message)]
+    fn underlying(&self) -> AccountId;
+    #[ink(message)]
+    fn controller(&self) -> AccountId;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
