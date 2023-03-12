@@ -145,7 +145,11 @@ pub trait Controller {
     fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
 
     #[ink(message)]
-    fn support_market(&mut self, c_token: AccountId) -> Result<()>;
+    fn support_market(&mut self, pool: AccountId) -> Result<()>;
+
+    // View function
+    #[ink(message)]
+    fn markets(&self) -> Vec<AccountId>;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]

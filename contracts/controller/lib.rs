@@ -19,7 +19,9 @@ pub mod contract {
         #[ink(constructor)]
         pub fn new() -> Self {
             Self {
-                controller: Data {},
+                controller: Data {
+                    markets: Default::default(),
+                },
             }
         }
     }
@@ -47,7 +49,8 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let _contract = ControllerContract::new();
+            let contract = ControllerContract::new();
+            assert_eq!(contract.markets(), []);
         }
     }
 }

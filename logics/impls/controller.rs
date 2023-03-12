@@ -10,7 +10,7 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
-    // TODO
+    pub markets: Vec<AccountId>,
 }
 
 pub trait Internal {
@@ -118,7 +118,9 @@ pub trait Internal {
         repay_amount: Balance,
     ) -> Result<Balance>;
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
-    fn _support_market(&mut self, c_token: AccountId) -> Result<()>;
+    fn _support_market(&mut self, pool: AccountId) -> Result<()>;
+
+    fn _markets(&self) -> Vec<AccountId>;
 }
 
 impl<T: Storage<Data>> Controller for T {
@@ -303,8 +305,12 @@ impl<T: Storage<Data>> Controller for T {
         self._set_price_oracle(new_oracle)
     }
 
-    default fn support_market(&mut self, c_token: AccountId) -> Result<()> {
-        self._support_market(c_token)
+    default fn support_market(&mut self, pool: AccountId) -> Result<()> {
+        self._support_market(pool)
+    }
+
+    default fn markets(&self) -> Vec<AccountId> {
+        self._markets()
     }
 }
 
@@ -449,7 +455,11 @@ impl<T: Storage<Data>> Internal for T {
     default fn _set_price_oracle(&mut self, _new_oracle: AccountId) -> Result<()> {
         todo!()
     }
-    default fn _support_market(&mut self, _c_token: AccountId) -> Result<()> {
+    default fn _support_market(&mut self, _pool: AccountId) -> Result<()> {
         todo!()
+    }
+
+    default fn _markets(&self) -> Vec<AccountId> {
+        self.data().markets.clone()
     }
 }
