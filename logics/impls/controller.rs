@@ -120,7 +120,11 @@ pub trait Internal {
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
     fn _support_market(&mut self, pool: &AccountId) -> Result<()>;
 
+    // view function
     fn _markets(&self) -> Vec<AccountId>;
+
+    // event emission
+    fn _emit_market_listed_event(&self, pool: AccountId);
 }
 
 impl<T: Storage<Data>> Controller for T {
@@ -307,8 +311,9 @@ impl<T: Storage<Data>> Controller for T {
 
     default fn support_market(&mut self, pool: AccountId) -> Result<()> {
         // TODO: assertion check - ownership
-        self._support_market(&pool)
-        // TODO: event
+        self._support_market(&pool)?;
+        self._emit_market_listed_event(pool);
+        Ok(())
     }
 
     default fn markets(&self) -> Vec<AccountId> {
@@ -465,4 +470,6 @@ impl<T: Storage<Data>> Internal for T {
     default fn _markets(&self) -> Vec<AccountId> {
         self.data().markets.clone()
     }
+
+    default fn _emit_market_listed_event(&self, _pool: AccountId) {}
 }

@@ -140,14 +140,14 @@ pub trait Controller {
         repay_amount: Balance,
     ) -> Result<Balance>;
 
-    // Admin Functions
+    // admin functions
     #[ink(message)]
     fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
 
     #[ink(message)]
     fn support_market(&mut self, pool: AccountId) -> Result<()>;
 
-    // View function
+    // view function
     #[ink(message)]
     fn markets(&self) -> Vec<AccountId>;
 }
