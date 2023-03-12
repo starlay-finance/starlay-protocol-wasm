@@ -118,7 +118,7 @@ pub trait Internal {
         repay_amount: Balance,
     ) -> Result<Balance>;
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
-    fn _support_market(&mut self, pool: AccountId) -> Result<()>;
+    fn _support_market(&mut self, pool: &AccountId) -> Result<()>;
 
     fn _markets(&self) -> Vec<AccountId>;
 }
@@ -306,7 +306,9 @@ impl<T: Storage<Data>> Controller for T {
     }
 
     default fn support_market(&mut self, pool: AccountId) -> Result<()> {
-        self._support_market(pool)
+        // TODO: assertion check - ownership
+        self._support_market(&pool)
+        // TODO: event
     }
 
     default fn markets(&self) -> Vec<AccountId> {
@@ -455,8 +457,9 @@ impl<T: Storage<Data>> Internal for T {
     default fn _set_price_oracle(&mut self, _new_oracle: AccountId) -> Result<()> {
         todo!()
     }
-    default fn _support_market(&mut self, _pool: AccountId) -> Result<()> {
-        todo!()
+    default fn _support_market(&mut self, pool: &AccountId) -> Result<()> {
+        self.data().markets.push(*pool);
+        Ok(())
     }
 
     default fn _markets(&self) -> Vec<AccountId> {

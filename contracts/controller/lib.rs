@@ -52,5 +52,18 @@ pub mod contract {
             let contract = ControllerContract::new();
             assert_eq!(contract.markets(), []);
         }
+
+        #[ink::test]
+        fn support_market_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ControllerContract::new();
+            let p1 = AccountId::from([0x01; 32]);
+            let p2 = AccountId::from([0x02; 32]);
+            assert!(contract.support_market(p1).is_ok());
+            assert!(contract.support_market(p2).is_ok());
+            assert_eq!(contract.markets(), [p1, p2]);
+        }
     }
 }
