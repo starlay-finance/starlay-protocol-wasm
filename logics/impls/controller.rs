@@ -329,7 +329,10 @@ impl<T: Storage<Data>> Internal for T {
         _minter: AccountId,
         _mint_amount: Balance,
     ) -> Result<()> {
-        todo!()
+        // TODO: assertion check - paused status
+        // TODO: keep the flywheel moving
+
+        Ok(())
     }
     default fn _mint_verify(
         &self,
@@ -338,7 +341,7 @@ impl<T: Storage<Data>> Internal for T {
         _mint_amount: Balance,
         _mint_tokens: Balance,
     ) -> Result<()> {
-        todo!()
+        Ok(())
     }
     default fn _redeem_allowed(
         &self,

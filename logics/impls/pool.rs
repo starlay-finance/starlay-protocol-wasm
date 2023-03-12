@@ -1,9 +1,20 @@
-pub use crate::traits::pool::*;
-use openbrush::traits::{
-    AccountId,
-    Balance,
-    Storage,
-    ZERO_ADDRESS,
+pub use crate::traits::{
+    controller::ControllerRef,
+    pool::*,
+};
+use ink::prelude::vec::Vec;
+use openbrush::{
+    contracts::psp22::{
+        self,
+        Internal as PSP22Internal,
+        PSP22Ref,
+    },
+    traits::{
+        AccountId,
+        Balance,
+        Storage,
+        ZERO_ADDRESS,
+    },
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
@@ -59,10 +70,12 @@ pub trait Internal {
     fn _controller(&self) -> AccountId;
 }
 
-impl<T: Storage<Data>> Pool for T {
+impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
     default fn mint(&mut self, mint_amount: Balance) -> Result<()> {
         self._accrue_interest();
-        self._mint(Self::env().caller(), mint_amount)
+        self._mint(Self::env().caller(), mint_amount)?;
+        // TODO: event emission
+        Ok(())
     }
 
     default fn redeem(&mut self, redeem_tokens: Balance) -> Result<()> {
@@ -123,12 +136,29 @@ impl<T: Storage<Data>> Pool for T {
     }
 }
 
-impl<T: Storage<Data>> Internal for T {
+impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     default fn _accrue_interest(&mut self) {
-        todo!()
+        // todo!()
     }
-    default fn _mint(&mut self, _minter: AccountId, _mint_amount: Balance) -> Result<()> {
-        todo!()
+    default fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()> {
+        let contract_addr = Self::env().account_id();
+        ControllerRef::mint_allowed(&self._controller(), contract_addr, minter, mint_amount)
+            .unwrap();
+        // TODO: assertion check - compare current block number with accrual block number
+
+        // TODO: calculate exchange rate & mint amount
+        let actual_mint_amount = mint_amount;
+        // PSP22Ref::transfer_from(
+        //     &self._underlying(),
+        //     minter,
+        //     minter,
+        //     mint_amount,
+        //     Vec::<u8>::new(),
+        // )
+        // .unwrap(); // TODO
+        self._mint_to(minter, actual_mint_amount).unwrap();
+
+        Ok(())
     }
     default fn _redeem(
         &mut self,
@@ -169,10 +199,10 @@ impl<T: Storage<Data>> Internal for T {
     }
 
     fn _underlying(&self) -> AccountId {
-        self.data().underlying
+        self.data::<Data>().underlying
     }
 
     fn _controller(&self) -> AccountId {
-        self.data().controller
+        self.data::<Data>().controller
     }
 }

@@ -1,5 +1,8 @@
 use openbrush::{
-    contracts::psp22::PSP22Error,
+    contracts::{
+        psp22::PSP22Error,
+        traits::psp22::*,
+    },
     traits::{
         AccountId,
         Balance,
@@ -7,10 +10,10 @@ use openbrush::{
 };
 
 #[openbrush::wrapper]
-pub type PoolRef = dyn Pool;
+pub type PoolRef = dyn Pool + PSP22;
 
 #[openbrush::trait_definition]
-pub trait Pool {
+pub trait Pool: PSP22 {
     #[ink(message)]
     fn mint(&mut self, mint_amount: Balance) -> Result<()>;
 
@@ -54,6 +57,7 @@ pub trait Pool {
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {
+    NotImplemented,
     PSP22(PSP22Error),
 }
 
