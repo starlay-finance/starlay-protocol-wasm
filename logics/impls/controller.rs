@@ -1,4 +1,5 @@
 pub use crate::traits::controller::*;
+use ink::prelude::vec::Vec;
 use openbrush::traits::{
     AccountId,
     Balance,

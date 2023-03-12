@@ -1,3 +1,4 @@
+use ink::prelude::vec::Vec;
 use openbrush::traits::{
     AccountId,
     Balance,
