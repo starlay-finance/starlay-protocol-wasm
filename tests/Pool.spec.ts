@@ -70,13 +70,18 @@ describe('Pool spec', () => {
     })
 
     it('execute', async () => {
-      await token.tx.approve(pool.address, 2_500)
-      // const { value } = await token.query.allowance(
-      //   deployer.address,
-      //   pool.address,
-      // )
-      // console.log(value.ok.toNumber())
-      await pool.query.mint(1_000)
+      await token.tx.approve(pool.address, 3_000)
+      await pool.tx.mint(3_000)
+
+      expect(
+        (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(7000)
+      expect(
+        (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
+      ).toEqual(3000)
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(3000)
     })
   })
 })
