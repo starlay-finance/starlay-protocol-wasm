@@ -1,9 +1,12 @@
-import { encodeAddress } from '@polkadot/keyring'
-import { deployPSP22Token } from './testContractsHelper'
+import type { KeyringPair } from '@polkadot/keyring/types'
+import { deployController, deployPSP22Token } from './testContractsHelper'
 import { hexToUtf8, zeroAddress } from './testHelpers'
 
 import Pool_factory from '../types/constructors/pool'
 import Pool from '../types/contracts/pool'
+
+import Controller from '../types/contracts/controller'
+import PSP22Token from '../types/contracts/psp22_token'
 
 describe('Pool spec', () => {
   const setup = async () => {
@@ -13,38 +16,67 @@ describe('Pool spec', () => {
       api,
       signer: deployer,
       args: [
-        1_000_000,
+        0,
         'Dai Stablecoin' as unknown as string[],
         'DAI' as unknown as string[],
         8,
       ],
     })
 
-    const controllerAddress = encodeAddress(
-      '0x0000000000000000000000000000000000000000000000000000000000000002',
-    )
+    const controller = await deployController({
+      api,
+      signer: deployer,
+      args: [],
+    })
 
     const poolFactory = new Pool_factory(api, deployer)
     const pool = new Pool(
       (
-        await poolFactory.newFromAsset(token.address, controllerAddress)
+        await poolFactory.newFromAsset(token.address, controller.address)
       ).address,
       deployer,
       api,
     )
 
-    return { token, pool, controllerAddress }
+    return { deployer, token, pool, controller }
   }
 
   it('instantiate', async () => {
-    const { token, pool, controllerAddress } = await setup()
+    const { token, pool, controller } = await setup()
     expect(pool.address).not.toBe(zeroAddress)
     expect((await pool.query.underlying()).value.ok).toEqual(token.address)
-    expect((await pool.query.controller()).value.ok).toEqual(controllerAddress)
+    expect((await pool.query.controller()).value.ok).toEqual(controller.address)
     expect(hexToUtf8((await pool.query.tokenName()).value.ok)).toEqual(
       'Starlay Dai Stablecoin',
     )
     expect(hexToUtf8((await pool.query.tokenSymbol()).value.ok)).toEqual('sDAI')
     expect((await pool.query.tokenDecimals()).value.ok).toEqual(8)
+  })
+
+  describe('.mint', () => {
+    let deployer: KeyringPair
+    let token: PSP22Token
+    let pool: Pool
+    let controller: Controller
+
+    beforeAll(async () => {
+      ;({ deployer, token, pool, controller } = await setup())
+    })
+
+    it('preparations', async () => {
+      await token.tx.mint(deployer.address, 10_000)
+      const { value } = await token.query.balanceOf(deployer.address)
+      expect(value.ok.toNumber()).toEqual(10_000)
+    })
+
+    it('execute', async () => {
+      await token.tx.approve(pool.address, 2_500)
+      // const { value } = await token.query.allowance(
+      //   deployer.address,
+      //   pool.address,
+      // )
+      // console.log(value.ok.toNumber())
+      await pool.query.mint(1_000)
+    })
   })
 })
