@@ -1,3 +1,4 @@
+use ink::LangError;
 use openbrush::{
     contracts::{
         psp22::PSP22Error,
@@ -59,6 +60,19 @@ pub trait Pool: PSP22 {
 pub enum Error {
     NotImplemented,
     PSP22(PSP22Error),
+    Lang(LangError),
+}
+
+impl From<PSP22Error> for Error {
+    fn from(error: PSP22Error) -> Self {
+        Error::PSP22(error)
+    }
+}
+
+impl From<LangError> for Error {
+    fn from(error: LangError) -> Self {
+        Error::Lang(error)
+    }
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

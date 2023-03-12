@@ -2,7 +2,10 @@ pub use crate::traits::{
     controller::ControllerRef,
     pool::*,
 };
-use ink::prelude::vec::Vec;
+use ink::{
+    prelude::vec::Vec,
+    LangError,
+};
 use openbrush::{
     contracts::psp22::{
         self,
@@ -72,10 +75,8 @@ pub trait Internal {
 
 impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
     default fn mint(&mut self, mint_amount: Balance) -> Result<()> {
-        self._accrue_interest();
-        self._mint(Self::env().caller(), mint_amount)?;
-        // TODO: event emission
-        Ok(())
+        let minter = Self::env().caller();
+        self._mint(minter, mint_amount)
     }
 
     default fn redeem(&mut self, redeem_tokens: Balance) -> Result<()> {
@@ -141,22 +142,30 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         // todo!()
     }
     default fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()> {
+        self._accrue_interest();
+
         let contract_addr = Self::env().account_id();
         ControllerRef::mint_allowed(&self._controller(), contract_addr, minter, mint_amount)
             .unwrap();
         // TODO: assertion check - compare current block number with accrual block number
 
         // TODO: calculate exchange rate & mint amount
-        let actual_mint_amount = mint_amount;
-        // PSP22Ref::transfer_from(
-        //     &self._underlying(),
-        //     minter,
-        //     minter,
-        //     mint_amount,
-        //     Vec::<u8>::new(),
-        // )
-        // .unwrap(); // TODO
-        self._mint_to(minter, actual_mint_amount).unwrap();
+        // let actual_mint_amount = mint_amount;
+        PSP22Ref::transfer_from_builder(
+            &self._underlying(),
+            minter,
+            contract_addr,
+            mint_amount,
+            Vec::<u8>::new(),
+        )
+        .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
+        .try_invoke()
+        .unwrap()
+        .unwrap()
+        .unwrap();
+        self._mint_to(minter, mint_amount).unwrap();
+
+        // TODO: event emission
 
         Ok(())
     }
@@ -205,4 +214,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     fn _controller(&self) -> AccountId {
         self.data::<Data>().controller
     }
+}
+
+pub fn to_psp22_error(e: psp22::PSP22Error) -> Error {
+    Error::PSP22(e)
+}
+
+pub fn to_lang_error(e: LangError) -> Error {
+    Error::Lang(e)
 }
