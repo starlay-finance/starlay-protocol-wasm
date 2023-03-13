@@ -3,7 +3,14 @@
 
 #[openbrush::contract]
 pub mod contract {
-    use logics::impls::pool::*;
+    use ink::codegen::{
+        EmitEvent,
+        Env,
+    };
+    use logics::impls::pool::{
+        Internal,
+        *,
+    };
     use openbrush::{
         contracts::psp22::{
             extensions::metadata::{
@@ -30,7 +37,41 @@ pub mod contract {
         metadata: metadata::Data,
     }
 
+    #[ink(event)]
+    pub struct Mint {
+        minter: AccountId,
+        mint_amount: Balance,
+        mint_tokens: Balance,
+    }
+    #[ink(event)]
+    pub struct Redeem {
+        redeemer: AccountId,
+        redeem_amount: Balance,
+        redeem_tokens: Balance,
+    }
+
     impl Pool for PoolContract {}
+    impl Internal for PoolContract {
+        fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance) {
+            self.env().emit_event(Mint {
+                minter,
+                mint_amount,
+                mint_tokens,
+            })
+        }
+        fn _emit_redeem_event(
+            &self,
+            redeemer: AccountId,
+            redeem_amount: Balance,
+            redeem_tokens: Balance,
+        ) {
+            self.env().emit_event(Redeem {
+                redeemer,
+                redeem_amount,
+                redeem_tokens,
+            })
+        }
+    }
 
     impl psp22::PSP22 for PoolContract {}
 
