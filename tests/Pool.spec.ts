@@ -84,4 +84,41 @@ describe('Pool spec', () => {
       ).toEqual(3000)
     })
   })
+
+  describe('.redeem', () => {
+    let deployer: KeyringPair
+    let token: PSP22Token
+    let pool: Pool
+    let controller: Controller
+
+    beforeAll(async () => {
+      ;({ deployer, token, pool, controller } = await setup())
+    })
+
+    it('preparations', async () => {
+      await token.tx.mint(deployer.address, 10_000)
+      const { value } = await token.query.balanceOf(deployer.address)
+      expect(value.ok.toNumber()).toEqual(10_000)
+
+      await token.tx.approve(pool.address, 10_000)
+      await pool.tx.mint(10_000)
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(10_000)
+    })
+
+    it('execute', async () => {
+      await pool.tx.redeem(3_000)
+
+      expect(
+        (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(3000)
+      expect(
+        (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
+      ).toEqual(7000)
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(7000)
+    })
+  })
 })

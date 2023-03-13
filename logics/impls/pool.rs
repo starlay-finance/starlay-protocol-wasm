@@ -80,12 +80,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
     }
 
     default fn redeem(&mut self, redeem_tokens: Balance) -> Result<()> {
-        self._accrue_interest();
         self._redeem(Self::env().caller(), redeem_tokens, 0)
     }
 
     default fn redeem_underlying(&mut self, redeem_amount: Balance) -> Result<()> {
-        self._accrue_interest();
         self._redeem(Self::env().caller(), 0, redeem_amount)
     }
 
@@ -171,11 +169,37 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
     default fn _redeem(
         &mut self,
-        _redeemer: AccountId,
-        _redeem_tokens: Balance,
-        _redeem_amount: Balance,
+        redeemer: AccountId,
+        redeem_tokens_in: Balance,
+        redeem_amount_in: Balance,
     ) -> Result<()> {
-        todo!()
+        self._accrue_interest();
+
+        let exchange_rate = 1; // TODO: calculate exchange rate & redeem amount
+        let (redeem_tokens, redeem_amount) = match (redeem_tokens_in, redeem_amount_in) {
+            (tokens, _) if tokens > 0 => (tokens, tokens * exchange_rate),
+            (_, amount) if amount > 0 => (amount / exchange_rate, amount),
+            _ => return Err(Error::InvalidParameter),
+        };
+
+        let contract_addr = Self::env().account_id();
+        ControllerRef::redeem_allowed(&self._controller(), contract_addr, redeemer, redeem_tokens)
+            .unwrap();
+
+        // TODO: assertion check - check current cash
+
+        self._burn_from(redeemer, redeem_tokens).unwrap();
+        PSP22Ref::transfer(
+            &self._underlying(),
+            redeemer,
+            redeem_amount,
+            Vec::<u8>::new(),
+        )
+        .unwrap();
+
+        // TODO: event emission
+
+        Ok(())
     }
     default fn _borrow(&mut self, _borrower: AccountId, _borrow_amount: Balance) -> Result<()> {
         todo!()

@@ -341,7 +341,7 @@ impl<T: Storage<Data>> Internal for T {
         _mint_amount: Balance,
         _mint_tokens: Balance,
     ) -> Result<()> {
-        Ok(())
+        todo!()
     }
     default fn _redeem_allowed(
         &self,
@@ -349,7 +349,9 @@ impl<T: Storage<Data>> Internal for T {
         _redeemer: AccountId,
         _redeem_amount: Balance,
     ) -> Result<()> {
-        todo!()
+        // TODO: assertion check - liquidity check to guard against shortfall
+
+        Ok(())
     }
     default fn _redeem_verify(
         &self,
