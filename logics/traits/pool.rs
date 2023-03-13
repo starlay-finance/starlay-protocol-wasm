@@ -59,6 +59,7 @@ pub trait Pool: PSP22 {
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {
     NotImplemented,
+    InvalidParameter,
     PSP22(PSP22Error),
     Lang(LangError),
 }
