@@ -286,7 +286,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         )
         .unwrap();
 
-        self._emit_borrow_event(borrower, 0, 0, 0);
+        self._emit_borrow_event(
+            borrower,
+            borrow_amount,
+            account_borrows_new,
+            total_borrows_new,
+        );
 
         Ok(())
     }

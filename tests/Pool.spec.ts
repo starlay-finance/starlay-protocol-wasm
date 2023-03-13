@@ -9,7 +9,7 @@ import PSP22Token from '../types/contracts/psp22_token'
 
 describe('Pool spec', () => {
   const setup = async () => {
-    const { api, alice: deployer } = globalThis.setup
+    const { api, alice: deployer, bob, charlie } = globalThis.setup
 
     const token = await deployPSP22Token({
       api,
@@ -36,8 +36,9 @@ describe('Pool spec', () => {
       deployer,
       api,
     )
+    const users = [bob, charlie]
 
-    return { deployer, token, pool, controller }
+    return { deployer, token, pool, controller, users }
   }
 
   it('instantiate', async () => {
@@ -127,6 +128,79 @@ describe('Pool spec', () => {
       expect(event.args.redeemer).toEqual(deployer.address)
       expect(event.args.redeemAmount.toNumber()).toEqual(3_000)
       expect(event.args.redeemTokens.toNumber()).toEqual(3_000)
+    })
+  })
+
+  describe('.borrow', () => {
+    let deployer: KeyringPair
+    let token: PSP22Token
+    let pool: Pool
+    let users: KeyringPair[]
+
+    beforeAll(async () => {
+      ;({ deployer, token, pool, users } = await setup())
+    })
+
+    it('preparations', async () => {
+      await token.tx.mint(deployer.address, 10_000)
+      await token.tx.approve(pool.address, 10_000)
+      await pool.tx.mint(10_000)
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(10_000)
+    })
+
+    it('execute', async () => {
+      const [user1, user2] = users
+      const { events: events1 } = await pool.withSigner(user1).tx.borrow(3_000)
+
+      expect(
+        (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(0)
+      expect(
+        (await token.query.balanceOf(user1.address)).value.ok.toNumber(),
+      ).toEqual(3_000)
+      expect(
+        (await token.query.balanceOf(user2.address)).value.ok.toNumber(),
+      ).toEqual(0)
+      expect(
+        (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
+      ).toEqual(7_000)
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(10_000)
+      const event1 = events1[0]
+      expect(event1.name).toEqual('Borrow')
+      expect(event1.args.borrower).toEqual(user1.address)
+      // TODO: check // console.log(event1)
+      // expect(event1.args.borrowAmount.toNumber()).toEqual(3_000)
+      // expect(event1.args.accountBorrows.toNumber()).toEqual(3_000)
+      // expect(event1.args.totalBorrows.toNumber()).toEqual(3_000)
+
+      const { events: events2 } = await pool.withSigner(user2).tx.borrow(2_500)
+
+      expect(
+        (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(0)
+      expect(
+        (await token.query.balanceOf(user1.address)).value.ok.toNumber(),
+      ).toEqual(3_000)
+      expect(
+        (await token.query.balanceOf(user2.address)).value.ok.toNumber(),
+      ).toEqual(2_500)
+      expect(
+        (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
+      ).toEqual(4_500)
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(10_000)
+      const event2 = events2[0]
+      expect(event2.name).toEqual('Borrow')
+      expect(event2.args.borrower).toEqual(user2.address)
+      // TODO: check // console.log(event2)
+      // expect(event2.args.borrowAmount.toNumber()).toEqual(2_500)
+      // expect(event2.args.accountBorrows.toNumber()).toEqual(2_500)
+      // expect(event2.args.totalBorrows.toNumber()).toEqual(4_500)
     })
   })
 })
