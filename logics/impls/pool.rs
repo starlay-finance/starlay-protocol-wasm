@@ -44,8 +44,8 @@ pub trait Internal {
     fn _redeem(
         &mut self,
         redeemer: AccountId,
-        redeem_tokens: Balance,
-        redeem_amount: Balance,
+        redeem_tokens_in: Balance,
+        redeem_amount_in: Balance,
     ) -> Result<()>;
     fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()>;
     fn _repay_borrow(
@@ -75,15 +75,17 @@ pub trait Internal {
 
 impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
     default fn mint(&mut self, mint_amount: Balance) -> Result<()> {
-        let minter = Self::env().caller();
-        self._mint(minter, mint_amount)
+        self._accrue_interest();
+        self._mint(Self::env().caller(), mint_amount)
     }
 
     default fn redeem(&mut self, redeem_tokens: Balance) -> Result<()> {
+        self._accrue_interest();
         self._redeem(Self::env().caller(), redeem_tokens, 0)
     }
 
     default fn redeem_underlying(&mut self, redeem_amount: Balance) -> Result<()> {
+        self._accrue_interest();
         self._redeem(Self::env().caller(), 0, redeem_amount)
     }
 
@@ -140,8 +142,6 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         // todo!()
     }
     default fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()> {
-        self._accrue_interest();
-
         let contract_addr = Self::env().account_id();
         ControllerRef::mint_allowed(&self._controller(), contract_addr, minter, mint_amount)
             .unwrap();
@@ -173,8 +173,6 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         redeem_tokens_in: Balance,
         redeem_amount_in: Balance,
     ) -> Result<()> {
-        self._accrue_interest();
-
         let exchange_rate = 1; // TODO: calculate exchange rate & redeem amount
         let (redeem_tokens, redeem_amount) = match (redeem_tokens_in, redeem_amount_in) {
             (tokens, _) if tokens > 0 => (tokens, tokens * exchange_rate),
