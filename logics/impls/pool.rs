@@ -295,6 +295,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
         Ok(())
     }
+    // NOTE: not working
     default fn _repay_borrow(
         &mut self,
         payer: AccountId,
