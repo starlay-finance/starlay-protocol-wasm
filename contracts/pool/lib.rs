@@ -56,6 +56,14 @@ pub mod contract {
         account_borrows: Balance,
         total_borrows: Balance,
     }
+    #[ink(event)]
+    pub struct RepayBorrow {
+        payer: AccountId,
+        borrower: AccountId,
+        repay_amount: Balance,
+        account_borrows: Balance,
+        total_borrows: Balance,
+    }
 
     impl Pool for PoolContract {}
     impl Internal for PoolContract {
@@ -88,6 +96,22 @@ pub mod contract {
             self.env().emit_event(Borrow {
                 borrower,
                 borrow_amount,
+                account_borrows,
+                total_borrows,
+            })
+        }
+        fn _emit_repay_borrow_event(
+            &self,
+            payer: AccountId,
+            borrower: AccountId,
+            repay_amount: Balance,
+            account_borrows: Balance,
+            total_borrows: Balance,
+        ) {
+            self.env().emit_event(RepayBorrow {
+                payer,
+                borrower,
+                repay_amount,
                 account_borrows,
                 total_borrows,
             })
