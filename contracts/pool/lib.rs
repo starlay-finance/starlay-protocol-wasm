@@ -191,6 +191,8 @@ pub mod contract {
                 8,
             );
             assert_eq!(contract.underlying(), underlying);
+            assert_eq!(contract.controller(), controller);
+            assert_eq!(contract.total_borrows(), 0);
         }
 
         #[ink::test]

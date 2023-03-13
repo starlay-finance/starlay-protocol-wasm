@@ -12,6 +12,7 @@ use openbrush::{
         Internal as PSP22Internal,
         PSP22Ref,
     },
+    storage::Mapping,
     traits::{
         AccountId,
         Balance,
@@ -22,11 +23,23 @@ use openbrush::{
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 
+#[derive(Debug, scale::Decode, scale::Encode)]
+#[cfg_attr(
+    feature = "std",
+    derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout)
+)]
+pub struct BorrowSnapshot {
+    principal: Balance,
+    interest_index: u128,
+}
+
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
     pub underlying: AccountId,
     pub controller: AccountId,
+    pub total_borrows: Balance,
+    pub account_borrows: Mapping<AccountId, BorrowSnapshot>,
 }
 
 impl Default for Data {
@@ -34,6 +47,8 @@ impl Default for Data {
         Data {
             underlying: ZERO_ADDRESS.into(),
             controller: ZERO_ADDRESS.into(),
+            total_borrows: Default::default(),
+            account_borrows: Default::default(),
         }
     }
 }
@@ -71,6 +86,8 @@ pub trait Internal {
 
     fn _underlying(&self) -> AccountId;
     fn _controller(&self) -> AccountId;
+    fn _total_borrows(&self) -> Balance;
+    fn _borrow_balance_stored(&self, id: AccountId) -> Balance;
 
     // event emission
     // fn _emit_accrue_interest_event(&self);
@@ -161,12 +178,20 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         self._seize(Self::env().caller(), liquidator, borrower, seize_tokens)
     }
 
-    fn underlying(&self) -> AccountId {
+    default fn underlying(&self) -> AccountId {
         self._underlying()
     }
 
-    fn controller(&self) -> AccountId {
+    default fn controller(&self) -> AccountId {
         self._controller()
+    }
+
+    default fn total_borrows(&self) -> Balance {
+        self._total_borrows()
+    }
+
+    default fn borrow_balance_stored(&self, account: AccountId) -> Balance {
+        self._borrow_balance_stored(account)
     }
 }
 
@@ -288,6 +313,19 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
     default fn _controller(&self) -> AccountId {
         self.data::<Data>().controller
+    }
+
+    default fn _total_borrows(&self) -> Balance {
+        self.data::<Data>().total_borrows
+    }
+
+    default fn _borrow_balance_stored(&self, account: AccountId) -> Balance {
+        let snapshot = self.data::<Data>().account_borrows.get(&account);
+        // TODO: calculation
+        if let None = snapshot {
+            return 0
+        };
+        snapshot.unwrap().principal
     }
 
     // event emission
