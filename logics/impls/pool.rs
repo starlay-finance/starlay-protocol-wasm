@@ -87,7 +87,7 @@ pub trait Internal {
     fn _underlying(&self) -> AccountId;
     fn _controller(&self) -> AccountId;
     fn _total_borrows(&self) -> Balance;
-    fn _borrow_balance_stored(&self, id: AccountId) -> Balance;
+    fn _borrow_balance_stored(&self, account: AccountId) -> Balance;
 
     // event emission
     // fn _emit_accrue_interest_event(&self);
@@ -265,8 +265,18 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         // TODO: assertion check - compare current block number with accrual block number
         // TODO: assertion check - check current cash
 
-        // TODO: calculate new borrows & current total borrows (with borrow interestIndex)
-        // TODO: update state for borrowing
+        let account_borrows_prev = self._borrow_balance_stored(borrower);
+        let account_borrows_new = account_borrows_prev + borrow_amount;
+        let total_borrows_new = self._total_borrows() + borrow_amount;
+
+        self.data::<Data>().account_borrows.insert(
+            &borrower,
+            &BorrowSnapshot {
+                principal: account_borrows_new,
+                interest_index: 1, // TODO: borrow_index
+            },
+        );
+        self.data::<Data>().total_borrows = total_borrows_new;
 
         PSP22Ref::transfer(
             &self._underlying(),
@@ -320,12 +330,17 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
 
     default fn _borrow_balance_stored(&self, account: AccountId) -> Balance {
-        let snapshot = self.data::<Data>().account_borrows.get(&account);
-        // TODO: calculation
-        if let None = snapshot {
-            return 0
+        let snapshot = match self.data::<Data>().account_borrows.get(&account) {
+            Some(value) => value,
+            None => return 0,
         };
-        snapshot.unwrap().principal
+
+        if snapshot.principal == 0 {
+            return 0
+        }
+        let borrow_index = 1; // temp
+        let prinicipal_times_index = snapshot.principal * borrow_index;
+        return prinicipal_times_index / snapshot.interest_index
     }
 
     // event emission
