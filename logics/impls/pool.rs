@@ -71,6 +71,39 @@ pub trait Internal {
 
     fn _underlying(&self) -> AccountId;
     fn _controller(&self) -> AccountId;
+
+    // event emission
+    // fn _emit_accrue_interest_event(&self);
+    fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
+    fn _emit_redeem_event(
+        &self,
+        redeemer: AccountId,
+        redeem_amount: Balance,
+        redeem_tokens: Balance,
+    );
+    fn _emit_borrow_event(
+        &self,
+        borrower: AccountId,
+        borrow_amount: Balance,
+        account_borrows: Balance,
+        total_borrows: Balance,
+    );
+    fn _emit_repay_borrow_event(
+        &self,
+        payer: AccountId,
+        borrower: AccountId,
+        repay_amount: Balance,
+        account_borrows: Balance,
+        total_borrows: Balance,
+    );
+    fn _emit_liquidate_borrow_event(
+        &self,
+        liquidator: AccountId,
+        borrower: AccountId,
+        repay_amount: Balance,
+        token_collateral: Balance,
+        seize_tokens: Balance,
+    );
 }
 
 impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
@@ -148,12 +181,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         // TODO: assertion check - compare current block number with accrual block number
 
         // TODO: calculate exchange rate & mint amount
-        // let actual_mint_amount = mint_amount;
+        let actual_mint_amount = mint_amount;
         PSP22Ref::transfer_from_builder(
             &self._underlying(),
             minter,
             contract_addr,
-            mint_amount,
+            actual_mint_amount,
             Vec::<u8>::new(),
         )
         .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
@@ -163,7 +196,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         .unwrap();
         self._mint_to(minter, mint_amount).unwrap();
 
-        // TODO: event emission
+        self._emit_mint_event(minter, actual_mint_amount, mint_amount);
 
         Ok(())
     }
@@ -195,7 +228,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         )
         .unwrap();
 
-        // TODO: event emission
+        self._emit_redeem_event(redeemer, redeem_amount, redeem_tokens);
 
         Ok(())
     }
@@ -229,12 +262,54 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         todo!()
     }
 
-    fn _underlying(&self) -> AccountId {
+    default fn _underlying(&self) -> AccountId {
         self.data::<Data>().underlying
     }
 
-    fn _controller(&self) -> AccountId {
+    default fn _controller(&self) -> AccountId {
         self.data::<Data>().controller
+    }
+
+    // event emission
+    default fn _emit_mint_event(
+        &self,
+        _minter: AccountId,
+        _mint_amount: Balance,
+        _mint_tokens: Balance,
+    ) {
+    }
+    default fn _emit_redeem_event(
+        &self,
+        _redeemer: AccountId,
+        _redeem_amount: Balance,
+        _redeem_tokens: Balance,
+    ) {
+    }
+    default fn _emit_borrow_event(
+        &self,
+        _borrower: AccountId,
+        _borrow_amount: Balance,
+        _account_borrows: Balance,
+        _total_borrows: Balance,
+    ) {
+    }
+    default fn _emit_repay_borrow_event(
+        &self,
+        _payer: AccountId,
+        _borrower: AccountId,
+        _repay_amount: Balance,
+        _account_borrows: Balance,
+        _total_borrows: Balance,
+    ) {
+    }
+    default fn _emit_liquidate_borrow_event(
+        &self,
+        _liquidator: AccountId,
+        _borrower: AccountId,
+        _repay_amount: Balance,
+        _token_collateral: Balance,
+        _seize_tokens: Balance,
+    ) {
     }
 }
 
