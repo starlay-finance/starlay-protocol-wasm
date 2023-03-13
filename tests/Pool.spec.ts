@@ -203,4 +203,47 @@ describe('Pool spec', () => {
       // expect(event2.args.totalBorrows.toNumber()).toEqual(4_500)
     })
   })
+
+  describe('.repay_borrow', () => {
+    let deployer: KeyringPair
+    let token: PSP22Token
+    let pool: Pool
+    let users: KeyringPair[]
+
+    beforeAll(async () => {
+      ;({ deployer, token, pool, users } = await setup())
+    })
+
+    it('preparations', async () => {
+      await token.tx.mint(deployer.address, 10_000)
+      await token.tx.approve(pool.address, 10_000)
+      await pool.tx.mint(10_000)
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(10_000)
+
+      const [user1, _] = users
+      await pool.withSigner(user1).tx.borrow(10_000)
+      expect(
+        (await token.query.balanceOf(user1.address)).value.ok.toNumber(),
+      ).toEqual(10_000)
+    })
+
+    it('execute', async () => {
+      const [user1, _] = users
+      await token.withSigner(user1).tx.approve(pool.address, 4_500)
+      // TODO
+      // const { events } = await pool.withSigner(user1).tx.repayBorrow(4_500)
+
+      // expect(
+      //   (await token.query.balanceOf(user1.address)).value.ok.toNumber(),
+      // ).toEqual(5_500)
+      // expect(
+      //   (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
+      // ).toEqual(4_500)
+
+      // const event = events[0]
+      // expect(event.name).toEqual('RepayBorrow')
+    })
+  })
 })
