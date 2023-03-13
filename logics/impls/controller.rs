@@ -368,7 +368,15 @@ impl<T: Storage<Data>> Internal for T {
         _borrower: AccountId,
         _borrow_amount: Balance,
     ) -> Result<()> {
-        todo!()
+        // TODO: assertion check - paused status
+        // TODO: assertion check - check to already entry market by borrower
+        // TODO: assertion check - check oracle price for underlying asset
+        // TODO: assertion check - borrow cap
+        // TODO: assertion check - HypotheticalAccountLiquidity
+
+        // TODO: keep the flywheel moving
+
+        Ok(())
     }
     default fn _borrow_verify(
         &self,

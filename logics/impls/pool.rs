@@ -232,8 +232,28 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
         Ok(())
     }
-    default fn _borrow(&mut self, _borrower: AccountId, _borrow_amount: Balance) -> Result<()> {
-        todo!()
+    default fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
+        let contract_addr = Self::env().account_id();
+        ControllerRef::borrow_allowed(&self._controller(), contract_addr, borrower, borrow_amount)
+            .unwrap();
+
+        // TODO: assertion check - compare current block number with accrual block number
+        // TODO: assertion check - check current cash
+
+        // TODO: calculate new borrows & current total borrows (with borrow interestIndex)
+        // TODO: update state for borrowing
+
+        PSP22Ref::transfer(
+            &self._underlying(),
+            borrower,
+            borrow_amount,
+            Vec::<u8>::new(),
+        )
+        .unwrap();
+
+        self._emit_borrow_event(borrower, 0, 0, 0);
+
+        Ok(())
     }
     default fn _repay_borrow(
         &mut self,
