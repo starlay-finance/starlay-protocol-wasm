@@ -394,7 +394,9 @@ impl<T: Storage<Data>> Internal for T {
         _borrower: AccountId,
         _repay_amount: Balance,
     ) -> Result<()> {
-        todo!()
+        // TODO: keep the flywheel moving
+
+        Ok(())
     }
     default fn _repay_borrow_verify(
         &self,

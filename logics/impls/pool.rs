@@ -297,11 +297,63 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
     default fn _repay_borrow(
         &mut self,
-        _payer: AccountId,
-        _borrower: AccountId,
-        _repay_amount: Balance,
+        payer: AccountId,
+        borrower: AccountId,
+        repay_amount: Balance,
     ) -> Result<()> {
-        todo!()
+        let contract_addr = Self::env().account_id();
+        ControllerRef::repay_borrow_allowed(
+            &self._controller(),
+            contract_addr,
+            payer,
+            borrower,
+            repay_amount,
+        )
+        .unwrap();
+
+        // TODO: assertion check - compare current block number with accrual block number
+
+        let account_borrow_prev = self._borrow_balance_stored(borrower);
+        let repay_amount_final = if repay_amount == u128::MAX {
+            account_borrow_prev
+        } else {
+            repay_amount
+        };
+
+        PSP22Ref::transfer_from_builder(
+            &self._underlying(),
+            payer,
+            contract_addr,
+            repay_amount_final,
+            Vec::<u8>::new(),
+        )
+        .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
+        .try_invoke()
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+        let account_borrows_new = account_borrow_prev - repay_amount_final;
+        let total_borrows_new = self._total_borrows() - repay_amount_final;
+
+        self.data::<Data>().account_borrows.insert(
+            &borrower,
+            &BorrowSnapshot {
+                principal: account_borrows_new,
+                interest_index: 1, // TODO: borrow_index
+            },
+        );
+        self.data::<Data>().total_borrows = total_borrows_new;
+
+        self._emit_repay_borrow_event(
+            payer,
+            borrower,
+            repay_amount_final,
+            account_borrows_new,
+            total_borrows_new,
+        );
+
+        Ok(())
     }
     default fn _liquidate_borrow(
         &mut self,
