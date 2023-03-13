@@ -53,6 +53,10 @@ pub trait Pool: PSP22 {
     fn underlying(&self) -> AccountId;
     #[ink(message)]
     fn controller(&self) -> AccountId;
+    #[ink(message)]
+    fn total_borrows(&self) -> Balance;
+    #[ink(message)]
+    fn borrow_balance_stored(&self, account: AccountId) -> Balance;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
