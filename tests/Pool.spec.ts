@@ -70,7 +70,7 @@ describe('Pool spec', () => {
 
     it('execute', async () => {
       await token.tx.approve(pool.address, 3_000)
-      await pool.tx.mint(3_000)
+      const { events } = await pool.tx.mint(3_000)
 
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
@@ -81,6 +81,12 @@ describe('Pool spec', () => {
       expect(
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(3000)
+
+      const event = events[0]
+      expect(event.name).toEqual('Mint')
+      expect(event.args.minter).toEqual(deployer.address)
+      expect(event.args.mintAmount.toNumber()).toEqual(3_000)
+      expect(event.args.mintTokens.toNumber()).toEqual(3_000)
     })
   })
 
@@ -104,7 +110,7 @@ describe('Pool spec', () => {
     })
 
     it('execute', async () => {
-      await pool.tx.redeem(3_000)
+      const { events } = await pool.tx.redeem(3_000)
 
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
@@ -115,6 +121,12 @@ describe('Pool spec', () => {
       expect(
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(7000)
+
+      const event = events[0]
+      expect(event.name).toEqual('Redeem')
+      expect(event.args.redeemer).toEqual(deployer.address)
+      expect(event.args.redeemAmount.toNumber()).toEqual(3_000)
+      expect(event.args.redeemTokens.toNumber()).toEqual(3_000)
     })
   })
 })
