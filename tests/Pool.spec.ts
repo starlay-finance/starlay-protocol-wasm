@@ -5,7 +5,6 @@ import { hexToUtf8, zeroAddress } from './testHelpers'
 import Pool_factory from '../types/constructors/pool'
 import Pool from '../types/contracts/pool'
 
-import Controller from '../types/contracts/controller'
 import PSP22Token from '../types/contracts/psp22_token'
 
 describe('Pool spec', () => {
@@ -57,16 +56,16 @@ describe('Pool spec', () => {
     let deployer: KeyringPair
     let token: PSP22Token
     let pool: Pool
-    let controller: Controller
 
     beforeAll(async () => {
-      ;({ deployer, token, pool, controller } = await setup())
+      ;({ deployer, token, pool } = await setup())
     })
 
     it('preparations', async () => {
       await token.tx.mint(deployer.address, 10_000)
-      const { value } = await token.query.balanceOf(deployer.address)
-      expect(value.ok.toNumber()).toEqual(10_000)
+      expect(
+        (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(10_000)
     })
 
     it('execute', async () => {
@@ -89,16 +88,13 @@ describe('Pool spec', () => {
     let deployer: KeyringPair
     let token: PSP22Token
     let pool: Pool
-    let controller: Controller
 
     beforeAll(async () => {
-      ;({ deployer, token, pool, controller } = await setup())
+      ;({ deployer, token, pool } = await setup())
     })
 
     it('preparations', async () => {
       await token.tx.mint(deployer.address, 10_000)
-      const { value } = await token.query.balanceOf(deployer.address)
-      expect(value.ok.toNumber()).toEqual(10_000)
 
       await token.tx.approve(pool.address, 10_000)
       await pool.tx.mint(10_000)
