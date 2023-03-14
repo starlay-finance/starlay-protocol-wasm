@@ -166,7 +166,8 @@ pub trait Controller {
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {
-    // TODO
+    MintIsPaused,
+    BorrowIsPaused,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

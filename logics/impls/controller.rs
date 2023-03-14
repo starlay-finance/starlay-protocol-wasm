@@ -350,11 +350,14 @@ impl<T: Storage<Data>> Controller for T {
 impl<T: Storage<Data>> Internal for T {
     default fn _mint_allowed(
         &self,
-        _pool: AccountId,
+        pool: AccountId,
         _minter: AccountId,
         _mint_amount: Balance,
     ) -> Result<()> {
-        // TODO: assertion check - paused status
+        if let Some(true) | None = self._mint_guardian_paused(pool) {
+            return Err(Error::MintIsPaused)
+        }
+
         // TODO: keep the flywheel moving
 
         Ok(())
@@ -389,11 +392,13 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _borrow_allowed(
         &self,
-        _pool: AccountId,
+        pool: AccountId,
         _borrower: AccountId,
         _borrow_amount: Balance,
     ) -> Result<()> {
-        // TODO: assertion check - paused status
+        if let Some(true) | None = self._borrow_guardian_paused(pool) {
+            return Err(Error::BorrowIsPaused)
+        }
         // TODO: assertion check - check to already entry market by borrower
         // TODO: assertion check - check oracle price for underlying asset
         // TODO: assertion check - borrow cap
