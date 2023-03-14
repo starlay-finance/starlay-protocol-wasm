@@ -38,6 +38,9 @@ describe('Pool spec', () => {
     )
     const users = [bob, charlie]
 
+    // initialize
+    await controller.tx.supportMarket(pool.address)
+
     return { deployer, token, pool, controller, users }
   }
 
