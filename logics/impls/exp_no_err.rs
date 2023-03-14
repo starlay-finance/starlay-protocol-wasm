@@ -32,7 +32,7 @@ fn mantissa_one() -> U256 {
 }
 
 pub struct Exp {
-    mantissa: WrappedU256,
+    pub mantissa: WrappedU256,
 }
 pub struct Double {
     mantissa: WrappedU256,
@@ -56,16 +56,22 @@ impl Exp {
         self._op(another, |o, v| o.mul(v).div(exp_scale()))
     }
 
+    pub fn mul_mantissa(&self, mantissa: U256) -> Exp {
+        self.mul(Exp {
+            mantissa: WrappedU256::from(mantissa),
+        })
+    }
+
     fn div(&self, another: Exp) -> Exp {
         self._op(another, |o, v| o.mul(exp_scale()).div(v))
     }
-    fn mul_scalar_truncate(&self, scalar: u128) -> U256 {
+    pub fn mul_scalar_truncate(&self, scalar: U256) -> U256 {
         let product = self.mul(Exp {
-            mantissa: WrappedU256::from(U256::from(scalar)),
+            mantissa: WrappedU256::from(scalar),
         });
         product._trunc()
     }
-    fn mul_scalar_truncate_add_uint(&self, scalar: u128, addend: WrappedU256) -> U256 {
+    pub fn mul_scalar_truncate_add_uint(&self, scalar: U256, addend: U256) -> U256 {
         self.mul_scalar_truncate(scalar).add(addend)
     }
 

@@ -1,5 +1,13 @@
+use core::ops::{
+    Add,
+    Div,
+    Mul,
+};
+
+use crate::traits::types::WrappedU256;
 pub use crate::traits::{
     controller::ControllerRef,
+    interest_rate_model::InterestRateModelRef,
     pool::*,
 };
 use ink::{
@@ -17,9 +25,13 @@ use openbrush::{
         AccountId,
         Balance,
         Storage,
+        Timestamp,
         ZERO_ADDRESS,
     },
 };
+use primitive_types::U256;
+
+use super::exp_no_err::Exp;
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 
@@ -38,8 +50,13 @@ pub struct BorrowSnapshot {
 pub struct Data {
     pub underlying: AccountId,
     pub controller: AccountId,
+    pub rate_model: AccountId,
     pub total_borrows: Balance,
+    pub total_reserves: Balance,
     pub account_borrows: Mapping<AccountId, BorrowSnapshot>,
+    pub accural_block_timestamp: u64,
+    pub borrow_index: WrappedU256,
+    pub reserve_factor: WrappedU256,
 }
 
 impl Default for Data {
@@ -47,8 +64,13 @@ impl Default for Data {
         Data {
             underlying: ZERO_ADDRESS.into(),
             controller: ZERO_ADDRESS.into(),
+            rate_model: ZERO_ADDRESS.into(),
             total_borrows: Default::default(),
+            total_reserves: Default::default(),
             account_borrows: Default::default(),
+            accural_block_timestamp: 0,
+            borrow_index: WrappedU256::from(U256::zero()),
+            reserve_factor: WrappedU256::from(U256::zero()),
         }
     }
 }
@@ -84,10 +106,16 @@ pub trait Internal {
         seize_tokens: AccountId,
     ) -> AccountId;
 
+    fn _borrow_rate_max_mantissa(&self) -> U256;
     fn _underlying(&self) -> AccountId;
     fn _controller(&self) -> AccountId;
     fn _total_borrows(&self) -> Balance;
+    fn _total_reserves(&self) -> Balance;
+    fn _rate_model(&self) -> AccountId;
     fn _borrow_balance_stored(&self, account: AccountId) -> Balance;
+    fn _accural_block_timestamp(&self) -> Timestamp;
+    fn _borrow_index(&self) -> Exp;
+    fn _reserve_factor(&self) -> Exp;
 
     // event emission
     // fn _emit_accrue_interest_event(&self);
@@ -120,6 +148,12 @@ pub trait Internal {
         repay_amount: Balance,
         token_collateral: Balance,
         seize_tokens: Balance,
+    );
+    fn _emit_accrute_interest_event(
+        &self,
+        interest_accumulated: WrappedU256,
+        new_index: WrappedU256,
+        new_total_borrows: WrappedU256,
     );
 }
 
@@ -197,8 +231,45 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
 
 impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     default fn _accrue_interest(&mut self) {
-        // todo!()
+        let current = Self::env().block_timestamp();
+        let accural = self._accural_block_timestamp();
+        if accural.eq(&current) {
+            return
+        }
+        let balance = PSP22Ref::balance_of(&self._underlying(), Self::env().account_id());
+        let borrows = self._total_borrows();
+        let reserves = self._total_reserves();
+        let idx = self._borrow_index();
+        let borrow_rate: WrappedU256 =
+            InterestRateModelRef::get_borrow_rate(&self._rate_model(), balance, borrows, reserves);
+        if U256::from(borrow_rate).gt(&self._borrow_rate_max_mantissa()) {
+            panic!("borrow rate is absurdly high")
+        }
+        let delta = current.abs_diff(accural);
+        let simple_interest_factor = Exp {
+            mantissa: borrow_rate,
+        }
+        .mul_mantissa(U256::from(delta));
+        let interest_accumulated = simple_interest_factor.mul_scalar_truncate(U256::from(borrows));
+        let total_borrows_new = interest_accumulated.as_u128().add(borrows);
+        let total_reserves_new = self._reserve_factor().mul_scalar_truncate_add_uint(
+            self._borrow_index().mantissa.into(),
+            self._borrow_index().mantissa.into(),
+        );
+        let borrow_index_new = simple_interest_factor
+            .mul_scalar_truncate_add_uint(idx.mantissa.into(), idx.mantissa.into());
+        let mut data = &mut self.data::<Data>();
+        data.accural_block_timestamp = current.to_be();
+        data.borrow_index = WrappedU256::from(borrow_index_new);
+        data.total_borrows = total_borrows_new;
+        data.total_reserves = total_reserves_new.as_u128(); // TODO
+        self._emit_accrute_interest_event(
+            WrappedU256::from(interest_accumulated),
+            WrappedU256::from(borrow_index_new),
+            WrappedU256::from(U256::from(total_borrows_new)),
+        )
     }
+
     default fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()> {
         let contract_addr = Self::env().account_id();
         ControllerRef::mint_allowed(&self._controller(), contract_addr, minter, mint_amount)
@@ -387,6 +458,23 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         self.data::<Data>().total_borrows
     }
 
+    default fn _rate_model(&self) -> AccountId {
+        self.data::<Data>().rate_model
+    }
+
+    default fn _accural_block_timestamp(&self) -> Timestamp {
+        Timestamp::from(self.data::<Data>().accural_block_timestamp)
+    }
+    default fn _total_reserves(&self) -> Balance {
+        self.data::<Data>().total_reserves
+    }
+
+    default fn _borrow_index(&self) -> Exp {
+        Exp {
+            mantissa: self.data::<Data>().borrow_index,
+        }
+    }
+
     default fn _borrow_balance_stored(&self, account: AccountId) -> Balance {
         let snapshot = match self.data::<Data>().account_borrows.get(&account) {
             Some(value) => value,
@@ -440,6 +528,28 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         _repay_amount: Balance,
         _token_collateral: Balance,
         _seize_tokens: Balance,
+    ) {
+    }
+
+    fn _borrow_rate_max_mantissa(&self) -> U256 {
+        // .0005% / block
+        U256::from(10)
+            .pow(U256::from(16))
+            .mul(U256::from(5))
+            .div(U256::from(1000))
+    }
+
+    fn _reserve_factor(&self) -> Exp {
+        Exp {
+            mantissa: self.data::<Data>().reserve_factor,
+        }
+    }
+
+    fn _emit_accrute_interest_event(
+        &self,
+        _interest_accumulated: WrappedU256,
+        _new_index: WrappedU256,
+        _new_total_borrows: WrappedU256,
     ) {
     }
 }
