@@ -148,9 +148,19 @@ pub trait Controller {
     #[ink(message)]
     fn support_market(&mut self, pool: AccountId) -> Result<()>;
 
+    #[ink(message)]
+    fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()>;
+
+    #[ink(message)]
+    fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()>;
+
     // view function
     #[ink(message)]
     fn markets(&self) -> Vec<AccountId>;
+    #[ink(message)]
+    fn mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
+    #[ink(message)]
+    fn borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]

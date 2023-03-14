@@ -33,6 +33,8 @@ pub mod contract {
             Self {
                 controller: Data {
                     markets: Default::default(),
+                    mint_guardian_paused: Default::default(),
+                    borrow_guardian_paused: Default::default(),
                 },
             }
         }
@@ -101,6 +103,34 @@ pub mod contract {
             let p2 = AccountId::from([0x02; 32]);
             assert!(contract.support_market(p2).is_ok());
             assert_eq!(contract.markets(), [p1, p2]);
+        }
+
+        #[ink::test]
+        fn mint_guardian_paused_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new();
+
+            let pool = AccountId::from([0x01; 32]);
+            assert_eq!(contract.mint_guardian_paused(pool), None);
+            assert!(contract.set_mint_guardian_paused(pool, true).is_ok());
+            assert_eq!(contract.mint_guardian_paused(pool), Some(true));
+            assert!(contract.set_mint_guardian_paused(pool, false).is_ok());
+            assert_eq!(contract.mint_guardian_paused(pool), Some(false));
+        }
+
+        #[ink::test]
+        fn borrow_guardian_paused_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new();
+
+            let pool = AccountId::from([0x01; 32]);
+            assert_eq!(contract.borrow_guardian_paused(pool), None);
+            assert!(contract.set_borrow_guardian_paused(pool, true).is_ok());
+            assert_eq!(contract.borrow_guardian_paused(pool), Some(true));
+            assert!(contract.set_borrow_guardian_paused(pool, false).is_ok());
+            assert_eq!(contract.borrow_guardian_paused(pool), Some(false));
         }
     }
 }
