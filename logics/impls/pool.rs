@@ -84,6 +84,14 @@ pub trait Internal {
         seize_tokens: AccountId,
     ) -> AccountId;
 
+    fn _transfer_underlying_from(
+        &self,
+        from: AccountId,
+        to: AccountId,
+        value: Balance,
+    ) -> Result<()>;
+    fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()>;
+
     fn _underlying(&self) -> AccountId;
     fn _controller(&self) -> AccountId;
     fn _get_cash_prior(&self) -> Balance;
@@ -305,7 +313,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
         Ok(())
     }
-    // NOTE: not working
+
     default fn _repay_borrow(
         &mut self,
         payer: AccountId,
@@ -383,6 +391,23 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         _seize_tokens: AccountId,
     ) -> AccountId {
         todo!()
+    }
+
+    fn _transfer_underlying_from(
+        &self,
+        from: AccountId,
+        to: AccountId,
+        value: Balance,
+    ) -> Result<()> {
+        PSP22Ref::transfer_from_builder(&self._underlying(), from, to, value, Vec::<u8>::new())
+            .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
+            .try_invoke()
+            .unwrap()
+            .unwrap()
+            .map_err(to_psp22_error)
+    }
+    fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()> {
+        PSP22Ref::transfer(&self._underlying(), to, value, Vec::<u8>::new()).map_err(to_psp22_error)
     }
 
     default fn _underlying(&self) -> AccountId {
