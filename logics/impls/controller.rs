@@ -505,6 +505,11 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _support_market(&mut self, pool: &AccountId) -> Result<()> {
         self.data().markets.push(*pool);
+
+        // set default states
+        self._set_mint_guardian_paused(pool, false)?;
+        self._set_borrow_guardian_paused(pool, false)?;
+
         Ok(())
     }
     default fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()> {
