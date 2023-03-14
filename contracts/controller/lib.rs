@@ -92,20 +92,78 @@ pub mod contract {
         fn mint_allowed_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
+            let mut contract = ControllerContract::new();
+
+            let pool = AccountId::from([0x01; 32]);
+            assert!(contract.support_market(pool).is_ok());
+            assert!(contract.mint_allowed(pool, accounts.bob, 0).is_ok());
+        }
+
+        #[ink::test]
+        fn mint_allowed_fail_when_not_supported() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
             let contract = ControllerContract::new();
 
             let pool = AccountId::from([0x01; 32]);
-            assert!(contract.mint_allowed(pool, accounts.bob, 0).is_ok());
+            assert_eq!(
+                contract.mint_allowed(pool, accounts.bob, 0).unwrap_err(),
+                Error::MintIsPaused
+            );
+        }
+
+        #[ink::test]
+        fn mint_allowed_fail_when_paused() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new();
+
+            let pool = AccountId::from([0x01; 32]);
+            assert!(contract.support_market(pool).is_ok());
+            assert!(contract.set_mint_guardian_paused(pool, true).is_ok());
+            assert_eq!(
+                contract.mint_allowed(pool, accounts.bob, 0).unwrap_err(),
+                Error::MintIsPaused
+            );
         }
 
         #[ink::test]
         fn borrow_allowed_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
+            let mut contract = ControllerContract::new();
+
+            let pool = AccountId::from([0x01; 32]);
+            assert!(contract.support_market(pool).is_ok());
+            assert!(contract.borrow_allowed(pool, accounts.bob, 0).is_ok());
+        }
+
+        #[ink::test]
+        fn borrow_allowed_fail_when_not_supported() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
             let contract = ControllerContract::new();
 
             let pool = AccountId::from([0x01; 32]);
-            assert!(contract.borrow_allowed(pool, accounts.bob, 0).is_ok());
+            assert_eq!(
+                contract.borrow_allowed(pool, accounts.bob, 0).unwrap_err(),
+                Error::BorrowIsPaused
+            );
+        }
+
+        #[ink::test]
+        fn borrow_allowed_fail_when_paused() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new();
+
+            let pool = AccountId::from([0x01; 32]);
+            assert!(contract.support_market(pool).is_ok());
+            assert!(contract.set_borrow_guardian_paused(pool, true).is_ok());
+            assert_eq!(
+                contract.borrow_allowed(pool, accounts.bob, 0).unwrap_err(),
+                Error::BorrowIsPaused
+            );
         }
 
         #[ink::test]
