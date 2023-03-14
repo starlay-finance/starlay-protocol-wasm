@@ -267,4 +267,6 @@ describe('Pool spec', () => {
       expect(event.args.totalBorrows.toNumber()).toEqual(5_500)
     })
   })
+
+  it.todo('.repay_borrow_behalf', () => {})
 })
