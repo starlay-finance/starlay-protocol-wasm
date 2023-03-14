@@ -220,18 +220,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
         // TODO: calculate exchange rate & mint amount
         let actual_mint_amount = mint_amount;
-        PSP22Ref::transfer_from_builder(
-            &self._underlying(),
-            minter,
-            contract_addr,
-            actual_mint_amount,
-            Vec::<u8>::new(),
-        )
-        .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
-        .try_invoke()
-        .unwrap()
-        .unwrap()
-        .unwrap();
+        self._transfer_underlying_from(minter, contract_addr, actual_mint_amount)
+            .unwrap();
         self._mint_to(minter, mint_amount).unwrap();
 
         self._emit_mint_event(minter, actual_mint_amount, mint_amount);
@@ -260,13 +250,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         }
 
         self._burn_from(redeemer, redeem_tokens).unwrap();
-        PSP22Ref::transfer(
-            &self._underlying(),
-            redeemer,
-            redeem_amount,
-            Vec::<u8>::new(),
-        )
-        .unwrap();
+        self._transfer_underlying(redeemer, redeem_amount).unwrap();
 
         self._emit_redeem_event(redeemer, redeem_amount, redeem_tokens);
 
@@ -296,13 +280,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         );
         self.data::<Data>().total_borrows = total_borrows_new;
 
-        PSP22Ref::transfer(
-            &self._underlying(),
-            borrower,
-            borrow_amount,
-            Vec::<u8>::new(),
-        )
-        .unwrap();
+        self._transfer_underlying(borrower, borrow_amount).unwrap();
 
         self._emit_borrow_event(
             borrower,
@@ -339,18 +317,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             repay_amount
         };
 
-        PSP22Ref::transfer_from_builder(
-            &self._underlying(),
-            payer,
-            contract_addr,
-            repay_amount_final,
-            Vec::<u8>::new(),
-        )
-        .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
-        .try_invoke()
-        .unwrap()
-        .unwrap()
-        .unwrap();
+        self._transfer_underlying_from(payer, contract_addr, repay_amount_final)
+            .unwrap();
 
         let account_borrows_new = account_borrow_prev - repay_amount_final;
         let total_borrows_new = self._total_borrows() - repay_amount_final;
