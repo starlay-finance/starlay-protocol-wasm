@@ -86,6 +86,7 @@ pub trait Internal {
 
     fn _underlying(&self) -> AccountId;
     fn _controller(&self) -> AccountId;
+    fn _get_cash_prior(&self) -> Balance;
     fn _total_borrows(&self) -> Balance;
     fn _borrow_balance_stored(&self, account: AccountId) -> Balance;
 
@@ -184,6 +185,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
 
     default fn controller(&self) -> AccountId {
         self._controller()
+    }
+
+    default fn get_cash_prior(&self) -> Balance {
+        self._get_cash_prior()
     }
 
     default fn total_borrows(&self) -> Balance {
@@ -381,6 +386,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
     default fn _controller(&self) -> AccountId {
         self.data::<Data>().controller
+    }
+
+    default fn _get_cash_prior(&self) -> Balance {
+        PSP22Ref::balance_of(&self._underlying(), Self::env().account_id())
     }
 
     default fn _total_borrows(&self) -> Balance {

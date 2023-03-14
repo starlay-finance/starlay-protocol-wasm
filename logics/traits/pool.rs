@@ -54,6 +54,8 @@ pub trait Pool: PSP22 {
     #[ink(message)]
     fn controller(&self) -> AccountId;
     #[ink(message)]
+    fn get_cash_prior(&self) -> Balance;
+    #[ink(message)]
     fn total_borrows(&self) -> Balance;
     #[ink(message)]
     fn borrow_balance_stored(&self, account: AccountId) -> Balance;
