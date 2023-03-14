@@ -89,6 +89,26 @@ pub mod contract {
         }
 
         #[ink::test]
+        fn mint_allowed_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let contract = ControllerContract::new();
+
+            let pool = AccountId::from([0x01; 32]);
+            assert!(contract.mint_allowed(pool, accounts.bob, 0).is_ok());
+        }
+
+        #[ink::test]
+        fn borrow_allowed_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let contract = ControllerContract::new();
+
+            let pool = AccountId::from([0x01; 32]);
+            assert!(contract.borrow_allowed(pool, accounts.bob, 0).is_ok());
+        }
+
+        #[ink::test]
         fn support_market_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
