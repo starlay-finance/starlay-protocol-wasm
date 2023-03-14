@@ -134,6 +134,14 @@ describe('Pool spec', () => {
     })
   })
 
+  describe('.redeem (fail case)', () => {
+    it('when no cash in pool', async () => {
+      const { pool } = await setup()
+      const { value } = await pool.query.redeem(3_000)
+      expect(value.ok.err).toStrictEqual({ redeemTransferOutNotPossible: null })
+    })
+  })
+
   describe('.borrow', () => {
     let deployer: KeyringPair
     let token: PSP22Token
@@ -202,6 +210,14 @@ describe('Pool spec', () => {
       expect(event2.args.borrowAmount.toNumber()).toEqual(2_500)
       expect(event2.args.accountBorrows.toNumber()).toEqual(2_500)
       expect(event2.args.totalBorrows.toNumber()).toEqual(5_500)
+    })
+  })
+
+  describe('.borrow (fail case)', () => {
+    it('when no cash in pool', async () => {
+      const { pool } = await setup()
+      const { value } = await pool.query.borrow(3_000)
+      expect(value.ok.err).toStrictEqual({ borrowCashNotAvailable: null })
     })
   })
 
