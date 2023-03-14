@@ -1,9 +1,12 @@
 pub use crate::traits::controller::*;
 use ink::prelude::vec::Vec;
-use openbrush::traits::{
-    AccountId,
-    Balance,
-    Storage,
+use openbrush::{
+    storage::Mapping,
+    traits::{
+        AccountId,
+        Balance,
+        Storage,
+    },
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
@@ -12,6 +15,8 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
     pub markets: Vec<AccountId>,
+    pub mint_guardian_paused: Mapping<AccountId, bool>,
+    pub borrow_guardian_paused: Mapping<AccountId, bool>,
 }
 
 pub trait Internal {
@@ -120,9 +125,13 @@ pub trait Internal {
     ) -> Result<Balance>;
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
     fn _support_market(&mut self, pool: &AccountId) -> Result<()>;
+    fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
+    fn _set_borrow_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
 
     // view function
     fn _markets(&self) -> Vec<AccountId>;
+    fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
+    fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
 
     // event emission
     fn _emit_market_listed_event(&self, pool: AccountId);
@@ -317,19 +326,38 @@ impl<T: Storage<Data>> Controller for T {
         Ok(())
     }
 
+    default fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
+        // TODO: assertion check - ownership
+        self._set_mint_guardian_paused(&pool, paused)
+    }
+
+    default fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
+        // TODO: assertion check - ownership
+        self._set_borrow_guardian_paused(&pool, paused)
+    }
+
     default fn markets(&self) -> Vec<AccountId> {
         self._markets()
+    }
+    default fn mint_guardian_paused(&self, pool: AccountId) -> Option<bool> {
+        self._mint_guardian_paused(pool)
+    }
+    default fn borrow_guardian_paused(&self, pool: AccountId) -> Option<bool> {
+        self._borrow_guardian_paused(pool)
     }
 }
 
 impl<T: Storage<Data>> Internal for T {
     default fn _mint_allowed(
         &self,
-        _pool: AccountId,
+        pool: AccountId,
         _minter: AccountId,
         _mint_amount: Balance,
     ) -> Result<()> {
-        // TODO: assertion check - paused status
+        if let Some(true) | None = self._mint_guardian_paused(pool) {
+            return Err(Error::MintIsPaused)
+        }
+
         // TODO: keep the flywheel moving
 
         Ok(())
@@ -364,11 +392,13 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _borrow_allowed(
         &self,
-        _pool: AccountId,
+        pool: AccountId,
         _borrower: AccountId,
         _borrow_amount: Balance,
     ) -> Result<()> {
-        // TODO: assertion check - paused status
+        if let Some(true) | None = self._borrow_guardian_paused(pool) {
+            return Err(Error::BorrowIsPaused)
+        }
         // TODO: assertion check - check to already entry market by borrower
         // TODO: assertion check - check oracle price for underlying asset
         // TODO: assertion check - borrow cap
@@ -480,11 +510,35 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _support_market(&mut self, pool: &AccountId) -> Result<()> {
         self.data().markets.push(*pool);
+
+        // set default states
+        self._set_mint_guardian_paused(pool, false)?;
+        self._set_borrow_guardian_paused(pool, false)?;
+
+        Ok(())
+    }
+    default fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()> {
+        self.data().mint_guardian_paused.insert(pool, &paused);
+        Ok(())
+    }
+
+    default fn _set_borrow_guardian_paused(
+        &mut self,
+        pool: &AccountId,
+        paused: bool,
+    ) -> Result<()> {
+        self.data().borrow_guardian_paused.insert(pool, &paused);
         Ok(())
     }
 
     default fn _markets(&self) -> Vec<AccountId> {
         self.data().markets.clone()
+    }
+    default fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool> {
+        self.data().mint_guardian_paused.get(&pool)
+    }
+    default fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool> {
+        self.data().borrow_guardian_paused.get(&pool)
     }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}
