@@ -130,6 +130,7 @@ pub trait Internal {
 
     // view function
     fn _markets(&self) -> Vec<AccountId>;
+    fn _is_listed_market(&self, pool: AccountId) -> bool;
     fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
 
@@ -440,13 +441,21 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _liquidate_borrow_allowed(
         &self,
-        _pool_borrowed: AccountId,
-        _pool_collateral: AccountId,
+        pool_borrowed: AccountId,
+        pool_collateral: AccountId,
         _liquidator: AccountId,
         _borrower: AccountId,
         _repay_amount: Balance,
     ) -> Result<()> {
-        todo!()
+        if !self._is_listed_market(pool_borrowed) || !self._is_listed_market(pool_collateral) {
+            return Err(Error::MarketNotListed)
+        }
+
+        // TODO: calculate account's liquidity
+        //   The borrower must have shortfall in order to be liquidatable
+        //   The liquidator may not repay more than what is allowed by the closeFactor
+
+        Ok(())
     }
     default fn _liquidate_borrow_verify(
         &self,
@@ -533,6 +542,15 @@ impl<T: Storage<Data>> Internal for T {
 
     default fn _markets(&self) -> Vec<AccountId> {
         self.data().markets.clone()
+    }
+    default fn _is_listed_market(&self, pool: AccountId) -> bool {
+        let markets = self._markets();
+        for market in markets {
+            if market == pool {
+                return true
+            }
+        }
+        return false
     }
     default fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool> {
         self.data().mint_guardian_paused.get(&pool)
