@@ -175,10 +175,9 @@ describe('Pool spec', () => {
       const event1 = events1[0]
       expect(event1.name).toEqual('Borrow')
       expect(event1.args.borrower).toEqual(user1.address)
-      // TODO: check // console.log(event1)
-      // expect(event1.args.borrowAmount.toNumber()).toEqual(3_000)
-      // expect(event1.args.accountBorrows.toNumber()).toEqual(3_000)
-      // expect(event1.args.totalBorrows.toNumber()).toEqual(3_000)
+      expect(event1.args.borrowAmount.toNumber()).toEqual(3_000)
+      expect(event1.args.accountBorrows.toNumber()).toEqual(3_000)
+      expect(event1.args.totalBorrows.toNumber()).toEqual(3_000)
 
       const { events: events2 } = await pool.withSigner(user2).tx.borrow(2_500)
 
@@ -200,10 +199,9 @@ describe('Pool spec', () => {
       const event2 = events2[0]
       expect(event2.name).toEqual('Borrow')
       expect(event2.args.borrower).toEqual(user2.address)
-      // TODO: check // console.log(event2)
-      // expect(event2.args.borrowAmount.toNumber()).toEqual(2_500)
-      // expect(event2.args.accountBorrows.toNumber()).toEqual(2_500)
-      // expect(event2.args.totalBorrows.toNumber()).toEqual(4_500)
+      expect(event2.args.borrowAmount.toNumber()).toEqual(2_500)
+      expect(event2.args.accountBorrows.toNumber()).toEqual(2_500)
+      expect(event2.args.totalBorrows.toNumber()).toEqual(5_500)
     })
   })
 
@@ -235,18 +233,22 @@ describe('Pool spec', () => {
     it('execute', async () => {
       const [user1, _] = users
       await token.withSigner(user1).tx.approve(pool.address, 4_500)
-      // TODO
-      // const { events } = await pool.withSigner(user1).tx.repayBorrow(4_500)
+      const { events } = await pool.withSigner(user1).tx.repayBorrow(4_500)
 
-      // expect(
-      //   (await token.query.balanceOf(user1.address)).value.ok.toNumber(),
-      // ).toEqual(5_500)
-      // expect(
-      //   (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
-      // ).toEqual(4_500)
+      expect(
+        (await token.query.balanceOf(user1.address)).value.ok.toNumber(),
+      ).toEqual(5_500)
+      expect(
+        (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
+      ).toEqual(4_500)
 
-      // const event = events[0]
-      // expect(event.name).toEqual('RepayBorrow')
+      const event = events[0]
+      expect(event.name).toEqual('RepayBorrow')
+      expect(event.args.payer).toEqual(user1.address)
+      expect(event.args.borrower).toEqual(user1.address)
+      expect(event.args.repayAmount.toNumber()).toEqual(4_500)
+      expect(event.args.accountBorrows.toNumber()).toEqual(5_500)
+      expect(event.args.totalBorrows.toNumber()).toEqual(5_500)
     })
   })
 })
