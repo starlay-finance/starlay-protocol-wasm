@@ -247,7 +247,9 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         ControllerRef::redeem_allowed(&self._controller(), contract_addr, redeemer, redeem_tokens)
             .unwrap();
 
-        // TODO: assertion check - check current cash
+        if self._get_cash_prior() < redeem_amount {
+            return Err(Error::RedeemTransferOutNotPossible)
+        }
 
         self._burn_from(redeemer, redeem_tokens).unwrap();
         PSP22Ref::transfer(
@@ -268,7 +270,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             .unwrap();
 
         // TODO: assertion check - compare current block number with accrual block number
-        // TODO: assertion check - check current cash
+
+        if self._get_cash_prior() < borrow_amount {
+            return Err(Error::BorrowCashNotAvailable)
+        }
 
         let account_borrows_prev = self._borrow_balance_stored(borrower);
         let account_borrows_new = account_borrows_prev + borrow_amount;

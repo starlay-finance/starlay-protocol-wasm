@@ -66,6 +66,8 @@ pub trait Pool: PSP22 {
 pub enum Error {
     NotImplemented,
     InvalidParameter,
+    BorrowCashNotAvailable,
+    RedeemTransferOutNotPossible,
     PSP22(PSP22Error),
     Lang(LangError),
 }
