@@ -68,7 +68,7 @@ pub trait Internal {
         payer: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
-    ) -> Result<()>;
+    ) -> Result<Balance>;
     fn _liquidate_borrow(
         &mut self,
         liquidator: AccountId,
@@ -127,7 +127,7 @@ pub trait Internal {
         liquidator: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
-        token_collateral: Balance,
+        token_collateral: AccountId,
         seize_tokens: Balance,
     );
 }
@@ -155,7 +155,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
 
     default fn repay_borrow(&mut self, repay_amount: Balance) -> Result<()> {
         self._accrue_interest();
-        self._repay_borrow(Self::env().caller(), Self::env().caller(), repay_amount)
+        self._repay_borrow(Self::env().caller(), Self::env().caller(), repay_amount)?;
+        Ok(())
     }
 
     default fn repay_borrow_behalf(
@@ -164,7 +165,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         repay_amount: Balance,
     ) -> Result<()> {
         self._accrue_interest();
-        self._repay_borrow(Self::env().caller(), borrower, repay_amount)
+        self._repay_borrow(Self::env().caller(), borrower, repay_amount)?;
+        Ok(())
     }
 
     default fn liquidate_borrow(
@@ -297,7 +299,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         payer: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
-    ) -> Result<()> {
+    ) -> Result<Balance> {
         let contract_addr = Self::env().account_id();
         ControllerRef::repay_borrow_allowed(
             &self._controller(),
@@ -340,16 +342,45 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             total_borrows_new,
         );
 
-        Ok(())
+        Ok(repay_amount_final)
     }
     default fn _liquidate_borrow(
         &mut self,
-        _liquidator: AccountId,
-        _borrower: AccountId,
-        _repay_amount: Balance,
-        _collateral: AccountId,
+        liquidator: AccountId,
+        borrower: AccountId,
+        repay_amount: Balance,
+        collateral: AccountId,
     ) -> Result<()> {
-        todo!()
+        let contract_addr = Self::env().account_id();
+        ControllerRef::liquidate_borrow_allowed(
+            &self._controller(),
+            contract_addr,
+            collateral,
+            liquidator,
+            borrower,
+            repay_amount,
+        )
+        .unwrap();
+
+        // TODO: assertion check - compare current block number with accrual block number
+        // TODO: assertion check - compare current block number with accrual block number (for collateral token)
+
+        if liquidator == borrower {
+            return Err(Error::LiquidateLiquidatorIsBorrower)
+        }
+        if repay_amount == 0 {
+            return Err(Error::LiquidateCloseAmountIsZero)
+        }
+
+        let actual_repay_amount = self
+            ._repay_borrow(liquidator, borrower, repay_amount)
+            .unwrap();
+
+        // TODO: seize (transfer collateral tokens to the liquidator)
+
+        self._emit_liquidate_borrow_event(liquidator, borrower, actual_repay_amount, collateral, 0);
+
+        Ok(())
     }
     default fn _seize(
         &mut self,
@@ -445,7 +476,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         _liquidator: AccountId,
         _borrower: AccountId,
         _repay_amount: Balance,
-        _token_collateral: Balance,
+        _token_collateral: AccountId,
         _seize_tokens: Balance,
     ) {
     }
