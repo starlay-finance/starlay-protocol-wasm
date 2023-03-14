@@ -77,6 +77,7 @@ impl Default for Data {
 
 pub trait Internal {
     fn _accrue_interest(&mut self);
+    fn _accure_interest_at(&mut self, at: Timestamp);
     fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()>;
     fn _redeem(
         &mut self,
@@ -231,9 +232,11 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
 
 impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     default fn _accrue_interest(&mut self) {
-        let current = Self::env().block_timestamp();
+        self._accure_interest_at(Self::env().block_timestamp())
+    }
+    default fn _accure_interest_at(&mut self, at: Timestamp) {
         let accural = self._accural_block_timestamp();
-        if accural.eq(&current) {
+        if accural.eq(&at) {
             return
         }
         let balance = PSP22Ref::balance_of(&self._underlying(), Self::env().account_id());
@@ -245,7 +248,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         if U256::from(borrow_rate).gt(&self._borrow_rate_max_mantissa()) {
             panic!("borrow rate is absurdly high")
         }
-        let delta = current.abs_diff(accural);
+        let delta = at.abs_diff(accural);
         let simple_interest_factor = Exp {
             mantissa: borrow_rate,
         }
@@ -259,7 +262,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let borrow_index_new = simple_interest_factor
             .mul_scalar_truncate_add_uint(idx.mantissa.into(), idx.mantissa.into());
         let mut data = &mut self.data::<Data>();
-        data.accural_block_timestamp = current.to_be();
+        data.accural_block_timestamp = at.to_be();
         data.borrow_index = WrappedU256::from(borrow_index_new);
         data.total_borrows = total_borrows_new;
         data.total_reserves = total_reserves_new.as_u128(); // TODO
@@ -269,7 +272,6 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             WrappedU256::from(U256::from(total_borrows_new)),
         )
     }
-
     default fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()> {
         let contract_addr = Self::env().account_id();
         ControllerRef::mint_allowed(&self._controller(), contract_addr, minter, mint_amount)
