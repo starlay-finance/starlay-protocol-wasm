@@ -162,8 +162,8 @@ pub trait Internal {
         seizer_token: AccountId,
         liquidator: AccountId,
         borrower: AccountId,
-        seize_tokens: AccountId,
-    ) -> AccountId;
+        seize_tokens: Balance,
+    ) -> Result<()>;
 
     fn _transfer_underlying_from(
         &self,
@@ -185,7 +185,6 @@ pub trait Internal {
     fn _reserve_factor(&self) -> Exp;
 
     // event emission
-    // fn _emit_accrue_interest_event(&self);
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
     fn _emit_redeem_event(
         &self,
@@ -216,7 +215,13 @@ pub trait Internal {
         token_collateral: AccountId,
         seize_tokens: Balance,
     );
-    fn _emit_accrute_interest_event(
+    fn _emit_reserves_added_event(
+        &self,
+        benefactor: AccountId,
+        add_amount: Balance,
+        new_total_reserves: Balance,
+    );
+    fn _emit_accrue_interest_event(
         &self,
         interest_accumulated: Balance,
         new_index: WrappedU256,
@@ -275,8 +280,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         &mut self,
         liquidator: AccountId,
         borrower: AccountId,
-        seize_tokens: AccountId,
-    ) -> AccountId {
+        seize_tokens: Balance,
+    ) -> Result<()> {
         self._accrue_interest();
         self._seize(Self::env().caller(), liquidator, borrower, seize_tokens)
     }
@@ -331,7 +336,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         data.borrow_index = out.borrow_index.mantissa;
         data.total_borrows = out.total_borrows;
         data.total_reserves = out.total_reserves;
-        self._emit_accrute_interest_event(
+        self._emit_accrue_interest_event(
             out.interest_accumulated,
             WrappedU256::from(out.borrow_index.mantissa),
             out.total_borrows,
@@ -499,7 +504,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             ._repay_borrow(liquidator, borrower, repay_amount)
             .unwrap();
 
-        // TODO: seize (transfer collateral tokens to the liquidator)
+        // seize
+        if collateral == contract_addr {
+            self._seize(contract_addr, liquidator, borrower, 0).unwrap(); // TODO: seize_token's amount (seize_tokens) calculated
+        } else {
+            PoolRef::seize(&collateral, liquidator, borrower, 0).unwrap(); // TODO: seize_token's amount (seize_tokens) calculated
+        }
 
         self._emit_liquidate_borrow_event(liquidator, borrower, actual_repay_amount, collateral, 0);
 
@@ -507,12 +517,42 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
     default fn _seize(
         &mut self,
-        _seizer_token: AccountId,
-        _liquidator: AccountId,
-        _borrower: AccountId,
-        _seize_tokens: AccountId,
-    ) -> AccountId {
-        todo!()
+        seizer_token: AccountId,
+        liquidator: AccountId,
+        borrower: AccountId,
+        seize_tokens: Balance,
+    ) -> Result<()> {
+        let contract_addr = Self::env().account_id();
+        ControllerRef::seize_allowed(
+            &self._controller(),
+            contract_addr,
+            seizer_token,
+            liquidator,
+            borrower,
+            seize_tokens,
+        )
+        .unwrap();
+
+        if liquidator == borrower {
+            return Err(Error::LiquidateSeizeLiquidatorIsBorrower)
+        }
+
+        // calculate the new borrower and liquidator token balances
+        let protocol_seize_token = 0; // TODO
+        let liquidator_seize_token = seize_tokens - protocol_seize_token;
+        let exchange_rate = 1; // TODO
+        let protocol_seize_amount = protocol_seize_token * exchange_rate;
+        let total_reserves_new = self._total_reserves() + protocol_seize_amount;
+
+        // EFFECTS & INTERACTIONS
+        self.data::<Data>().total_reserves = total_reserves_new;
+        // total_supply = total_supply - protocol_seize_token; // TODO: check
+        self._burn_from(borrower, seize_tokens).unwrap();
+        self._mint_to(liquidator, liquidator_seize_token).unwrap();
+
+        self._emit_reserves_added_event(contract_addr, protocol_seize_amount, total_reserves_new);
+
+        Ok(())
     }
 
     fn _transfer_underlying_from(
@@ -555,6 +595,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     default fn _accural_block_timestamp(&self) -> Timestamp {
         Timestamp::from(self.data::<Data>().accural_block_timestamp)
     }
+
     default fn _total_reserves(&self) -> Balance {
         self.data::<Data>().total_reserves
     }
@@ -577,6 +618,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let borrow_index = 1; // temp
         let prinicipal_times_index = snapshot.principal * borrow_index;
         return prinicipal_times_index / snapshot.interest_index
+    }
+
+    default fn _reserve_factor(&self) -> Exp {
+        Exp {
+            mantissa: self.data::<Data>().reserve_factor,
+        }
     }
 
     // event emission
@@ -621,13 +668,15 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     ) {
     }
 
-    fn _reserve_factor(&self) -> Exp {
-        Exp {
-            mantissa: self.data::<Data>().reserve_factor,
-        }
+    default fn _emit_reserves_added_event(
+        &self,
+        _benefactor: AccountId,
+        _add_amount: Balance,
+        _new_total_reserves: Balance,
+    ) {
     }
 
-    fn _emit_accrute_interest_event(
+    default fn _emit_accrue_interest_event(
         &self,
         _interest_accumulated: Balance,
         _new_index: WrappedU256,
