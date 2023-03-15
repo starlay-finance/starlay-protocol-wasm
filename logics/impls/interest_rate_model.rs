@@ -32,6 +32,11 @@ fn base() -> U256 {
     U256::from_dec_str("1000000000000000000").unwrap()
 }
 
+fn supply_rate(utilization_rate: U256, borrow_rate: U256, one_minus_reserve_factor: U256) -> U256 {
+    let rate_to_pol = borrow_rate.mul(one_minus_reserve_factor).div(base());
+    utilization_rate.mul(rate_to_pol).div(base())
+}
+
 fn milliseconds_per_year() -> U256 {
     U256::from(60 * 60 * 24 * 365).mul(U256::from(1000))
 }
@@ -110,15 +115,22 @@ impl Data {
     ) -> WrappedU256 {
         let one_minus_reserve_factor =
             U256::from(base()).sub(u256_from_balance(_reserve_factor_mantissa));
-        let borrow_rate = self._get_borrow_rate(_cash, _borrows, _reserves);
-        let rate_to_pool = U256::from(borrow_rate)
-            .mul(one_minus_reserve_factor)
-            .div(base());
-        WrappedU256::from(
-            utilization_rate(_cash, _borrows, _reserves)
-                .mul(rate_to_pool)
-                .div(base()),
-        )
+        let borrow_rate = self.borrow_rate(_cash, _borrows, _reserves);
+        WrappedU256::from(supply_rate(
+            utilization_rate(_cash, _borrows, _reserves),
+            U256::from(borrow_rate),
+            one_minus_reserve_factor,
+        ))
+    }
+
+    fn _supply_rate(
+        &self,
+        utilization_rate: U256,
+        borrow_rate: U256,
+        one_minus_reserve_factor: U256,
+    ) -> U256 {
+        let rate_to_pol = borrow_rate.mul(one_minus_reserve_factor).div(base());
+        utilization_rate.mul(rate_to_pol).div(base())
     }
 }
 
@@ -307,6 +319,36 @@ mod tests {
     }
     #[test]
     fn test_get_supply_rate() {
-        // TODO
+        let reserve_factor = U256::one().mul(base()).div(U256::from(100)); // 1%
+        let total_borrow: u32 = 100;
+        // utilization rate: 10%
+        let total_cash: u32 = 900;
+        let reserves: u32 = 0;
+        struct Case {
+            utilization_rate: U256,
+            borrow_rate: U256,
+            one_minus_reserve_factor: U256,
+        }
+        let cases = [Case {
+            utilization_rate: percent(10),
+            borrow_rate: percent(20),
+            one_minus_reserve_factor: base().div(100),
+        }];
+        for case in cases {
+            let got = supply_rate(
+                case.utilization_rate,
+                case.borrow_rate,
+                case.one_minus_reserve_factor,
+            );
+            let want = case
+                .utilization_rate
+                .mul(
+                    case.borrow_rate
+                        .mul(case.one_minus_reserve_factor)
+                        .div(base()),
+                )
+                .div(base());
+            assert_eq!(got, want)
+        }
     }
 }
