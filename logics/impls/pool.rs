@@ -385,7 +385,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             ._repay_borrow(liquidator, borrower, repay_amount)
             .unwrap();
 
-        // TODO: seize (transfer collateral tokens to the liquidator)
+        // seize
+        if collateral == contract_addr {
+            self._seize(contract_addr, liquidator, borrower, 0).unwrap(); // TODO: seize_token's amount (seize_tokens) calculated
+        } else {
+            PoolRef::seize(&collateral, liquidator, borrower, 0).unwrap(); // TODO: seize_token's amount (seize_tokens) calculated
+        }
 
         self._emit_liquidate_borrow_event(liquidator, borrower, actual_repay_amount, collateral, 0);
 
