@@ -435,4 +435,6 @@ describe('Pool spec', () => {
       })
     })
   })
+
+  it.todo('.seize')
 })

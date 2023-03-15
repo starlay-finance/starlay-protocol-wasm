@@ -133,6 +133,12 @@ pub trait Internal {
         token_collateral: AccountId,
         seize_tokens: Balance,
     );
+    fn _emit_reserves_added_event(
+        &self,
+        benefactor: AccountId,
+        add_amount: Balance,
+        new_total_reserves: Balance,
+    );
 }
 
 impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
@@ -420,7 +426,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         self._burn_from(borrower, seize_tokens).unwrap();
         self._mint_to(liquidator, liquidator_seize_token).unwrap();
 
-        // TODO: event
+        self._emit_reserves_added_event(contract_addr, protocol_seize_amount, total_reserves_new);
 
         Ok(())
     }
@@ -515,6 +521,13 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         _repay_amount: Balance,
         _token_collateral: AccountId,
         _seize_tokens: Balance,
+    ) {
+    }
+    default fn _emit_reserves_added_event(
+        &self,
+        _benefactor: AccountId,
+        _add_amount: Balance,
+        _new_total_reserves: Balance,
     ) {
     }
 }

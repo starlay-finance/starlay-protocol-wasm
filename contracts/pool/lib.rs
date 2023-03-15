@@ -72,6 +72,12 @@ pub mod contract {
         token_collateral: AccountId,
         seize_tokens: Balance,
     }
+    #[ink(event)]
+    pub struct ReservesAdded {
+        benefactor: AccountId,
+        add_amount: Balance,
+        new_total_reserves: Balance,
+    }
 
     impl Pool for PoolContract {
         #[ink(message)]
@@ -152,6 +158,18 @@ pub mod contract {
                 repay_amount,
                 token_collateral,
                 seize_tokens,
+            })
+        }
+        fn _emit_reserves_added_event(
+            &self,
+            benefactor: AccountId,
+            add_amount: Balance,
+            new_total_reserves: Balance,
+        ) {
+            self.env().emit_event(ReservesAdded {
+                benefactor,
+                add_amount,
+                new_total_reserves,
             })
         }
     }
