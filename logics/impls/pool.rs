@@ -392,8 +392,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         ControllerRef::borrow_allowed(&self._controller(), contract_addr, borrower, borrow_amount)
             .unwrap();
 
-        // TODO: assertion check - compare current block number with accrual block number
-
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        };
         if self._get_cash_prior() < borrow_amount {
             return Err(Error::BorrowCashNotAvailable)
         }
