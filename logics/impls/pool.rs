@@ -42,7 +42,7 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 )]
 pub struct BorrowSnapshot {
     principal: Balance,
-    interest_index: u128,
+    interest_index: WrappedU256,
 }
 
 struct CalculateInterestInput {
@@ -414,7 +414,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             &borrower,
             &BorrowSnapshot {
                 principal: account_borrows_new,
-                interest_index: 1, // TODO: borrow_index
+                interest_index: self._borrow_index().mantissa, // TODO: borrow_index
             },
         );
         self.data::<Data>().total_borrows = total_borrows_new;
@@ -469,7 +469,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             &borrower,
             &BorrowSnapshot {
                 principal: account_borrows_new,
-                interest_index: 1, // TODO: borrow_index
+                interest_index: self._borrow_index().mantissa, // TODO: borrow_index
             },
         );
         self.data::<Data>().total_borrows = total_borrows_new;
@@ -632,9 +632,14 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         if snapshot.principal == 0 {
             return 0
         }
-        let borrow_index = 1; // temp
+        let borrow_index = self._borrow_index().truncate().as_u128();
         let prinicipal_times_index = snapshot.principal * borrow_index;
-        return prinicipal_times_index / snapshot.interest_index
+        return prinicipal_times_index
+            / Exp {
+                mantissa: snapshot.interest_index,
+            }
+            .truncate()
+            .as_u128()
     }
 
     default fn _reserve_factor(&self) -> Exp {

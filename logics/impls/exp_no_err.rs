@@ -97,6 +97,9 @@ impl Exp {
             mantissa: WrappedU256::from(op(U256::from(self.mantissa), U256::from(a.mantissa))),
         }
     }
+    pub fn truncate(&self) -> U256 {
+        self._trunc()
+    }
     fn _trunc(&self) -> U256 {
         U256::from(self.mantissa).div(exp_scale())
     }
