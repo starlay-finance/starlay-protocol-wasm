@@ -280,7 +280,7 @@ mod tests {
             },
         ];
         for case in cases {
-            // borrow rate = multiplier * kink + jump multiplier * (utilization - kink) + base rate
+            // borrow rate = multiplier * kink + jump multiplier * (utilization(%) - kink(%)) + base rate
             let want = percent(kink)
                 .mul(mul_base(case.multiplier))
                 .div(base())

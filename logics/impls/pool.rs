@@ -261,7 +261,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         );
         let borrow_index_new = simple_interest_factor
             .mul_scalar_truncate_add_uint(idx.mantissa.into(), idx.mantissa.into());
-        let mut data = &mut self.data::<Data>();
+        let mut data = self.data::<Data>();
         data.accural_block_timestamp = at.to_be();
         data.borrow_index = WrappedU256::from(borrow_index_new);
         data.total_borrows = total_borrows_new;
