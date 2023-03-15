@@ -270,7 +270,98 @@ describe('Pool spec', () => {
 
   it.todo('.repay_borrow_behalf')
 
-  it.todo('.liquidate_borrow')
+  describe('.liquidate_borrow', () => {
+    // TODO: check seize
+    let deployer: KeyringPair
+    let token: PSP22Token
+    let pool: Pool
+    let users: KeyringPair[]
+    let secondToken: PSP22Token
+    let secondPool: Pool
+
+    beforeAll(async () => {
+      let api
+      let controller
+      ;({ api, deployer, controller, token, pool, users } = await setup())
+      secondToken = await deployPSP22Token({
+        api: api,
+        signer: deployer,
+        args: [
+          0,
+          'Dai Stablecoin' as unknown as string[],
+          'DAI' as unknown as string[],
+          8,
+        ],
+      })
+
+      const poolFactory = new Pool_factory(api, deployer)
+      secondPool = new Pool(
+        (
+          await poolFactory.newFromAsset(
+            secondToken.address,
+            secondToken.address,
+          )
+        ).address,
+        deployer,
+        api,
+      )
+
+      // initialize
+      await controller.tx.supportMarket(secondPool.address)
+    })
+
+    it('preparations', async () => {
+      await token.tx.mint(deployer.address, 10_000)
+      await token.tx.approve(pool.address, 10_000)
+      await pool.tx.mint(10_000)
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(10_000)
+
+      const [borrower, repayer] = users
+      await pool.withSigner(borrower).tx.borrow(10_000)
+      await token.tx.mint(repayer.address, 10_000)
+      expect(
+        (await token.query.balanceOf(repayer.address)).value.ok.toNumber(),
+      ).toEqual(10_000)
+      expect(
+        (await token.query.balanceOf(borrower.address)).value.ok.toNumber(),
+      ).toEqual(10_000)
+      expect(
+        (
+          await pool.query.borrowBalanceStored(borrower.address)
+        ).value.ok.toNumber(),
+      ).toEqual(10_000)
+    })
+
+    it('execute', async () => {
+      const [borrower, repayer] = users
+      await token.withSigner(repayer).tx.approve(pool.address, 10_000)
+      const { events } = await pool
+        .withSigner(repayer)
+        .tx.liquidateBorrow(borrower.address, 10_000, secondPool.address)
+      expect(
+        (await token.query.balanceOf(repayer.address)).value.ok.toNumber(),
+      ).toEqual(0)
+      expect(
+        (await token.query.balanceOf(borrower.address)).value.ok.toNumber(),
+      ).toEqual(10_000)
+      expect(
+        (
+          await pool.query.borrowBalanceStored(borrower.address)
+        ).value.ok.toNumber(),
+      ).toEqual(0)
+
+      expect(events[0].name).toEqual('RepayBorrow')
+      const event = events[1]
+      expect(event.name).toEqual('LiquidateBorrow')
+      expect(event.args.liquidator).toEqual(repayer.address)
+      expect(event.args.borrower).toEqual(borrower.address)
+      expect(event.args.repayAmount.toNumber()).toEqual(10_000)
+      expect(event.args.tokenCollateral).toEqual(secondPool.address)
+      expect(event.args.seizeTokens.toNumber()).toEqual(0)
+    })
+  })
 
   describe('.liquidate_borrow (fail case)', () => {
     const setup_extended = async () => {
@@ -299,6 +390,7 @@ describe('Pool spec', () => {
         args.api,
       )
 
+      // initialize
       await args.controller.tx.supportMarket(secondPool.address)
 
       return {
