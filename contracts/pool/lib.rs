@@ -73,7 +73,19 @@ pub mod contract {
         seize_tokens: Balance,
     }
 
-    impl Pool for PoolContract {}
+    impl Pool for PoolContract {
+        fn redeem_underlying(&mut self, redeem_tokens: Balance) -> Result<()> {
+            Err(Error::NotImplemented)
+        }
+
+        fn repay_borrow_behalf(
+            &mut self,
+            borrower: AccountId,
+            repay_amount: Balance,
+        ) -> Result<()> {
+            Err(Error::NotImplemented)
+        }
+    }
     impl Internal for PoolContract {
         fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance) {
             self.env().emit_event(Mint {
