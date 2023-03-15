@@ -91,7 +91,7 @@ pub trait Internal {
         payer: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
-    ) -> Result<()>;
+    ) -> Result<Balance>;
     fn _liquidate_borrow(
         &mut self,
         liquidator: AccountId,
@@ -108,8 +108,17 @@ pub trait Internal {
     ) -> AccountId;
 
     fn _borrow_rate_max_mantissa(&self) -> U256;
+    fn _transfer_underlying_from(
+        &self,
+        from: AccountId,
+        to: AccountId,
+        value: Balance,
+    ) -> Result<()>;
+    fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()>;
+
     fn _underlying(&self) -> AccountId;
     fn _controller(&self) -> AccountId;
+    fn _get_cash_prior(&self) -> Balance;
     fn _total_borrows(&self) -> Balance;
     fn _total_reserves(&self) -> Balance;
     fn _rate_model(&self) -> AccountId;
@@ -147,7 +156,7 @@ pub trait Internal {
         liquidator: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
-        token_collateral: Balance,
+        token_collateral: AccountId,
         seize_tokens: Balance,
     );
     fn _emit_accrute_interest_event(
@@ -181,7 +190,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
 
     default fn repay_borrow(&mut self, repay_amount: Balance) -> Result<()> {
         self._accrue_interest();
-        self._repay_borrow(Self::env().caller(), Self::env().caller(), repay_amount)
+        self._repay_borrow(Self::env().caller(), Self::env().caller(), repay_amount)?;
+        Ok(())
     }
 
     default fn repay_borrow_behalf(
@@ -190,7 +200,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         repay_amount: Balance,
     ) -> Result<()> {
         self._accrue_interest();
-        self._repay_borrow(Self::env().caller(), borrower, repay_amount)
+        self._repay_borrow(Self::env().caller(), borrower, repay_amount)?;
+        Ok(())
     }
 
     default fn liquidate_borrow(
@@ -219,6 +230,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
 
     default fn controller(&self) -> AccountId {
         self._controller()
+    }
+
+    default fn get_cash_prior(&self) -> Balance {
+        self._get_cash_prior()
     }
 
     default fn total_borrows(&self) -> Balance {
@@ -280,18 +295,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
         // TODO: calculate exchange rate & mint amount
         let actual_mint_amount = mint_amount;
-        PSP22Ref::transfer_from_builder(
-            &self._underlying(),
-            minter,
-            contract_addr,
-            actual_mint_amount,
-            Vec::<u8>::new(),
-        )
-        .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
-        .try_invoke()
-        .unwrap()
-        .unwrap()
-        .unwrap();
+        self._transfer_underlying_from(minter, contract_addr, actual_mint_amount)
+            .unwrap();
         self._mint_to(minter, mint_amount).unwrap();
 
         self._emit_mint_event(minter, actual_mint_amount, mint_amount);
@@ -315,16 +320,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         ControllerRef::redeem_allowed(&self._controller(), contract_addr, redeemer, redeem_tokens)
             .unwrap();
 
-        // TODO: assertion check - check current cash
+        if self._get_cash_prior() < redeem_amount {
+            return Err(Error::RedeemTransferOutNotPossible)
+        }
 
         self._burn_from(redeemer, redeem_tokens).unwrap();
-        PSP22Ref::transfer(
-            &self._underlying(),
-            redeemer,
-            redeem_amount,
-            Vec::<u8>::new(),
-        )
-        .unwrap();
+        self._transfer_underlying(redeemer, redeem_amount).unwrap();
 
         self._emit_redeem_event(redeemer, redeem_amount, redeem_tokens);
 
@@ -336,7 +337,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             .unwrap();
 
         // TODO: assertion check - compare current block number with accrual block number
-        // TODO: assertion check - check current cash
+
+        if self._get_cash_prior() < borrow_amount {
+            return Err(Error::BorrowCashNotAvailable)
+        }
 
         let account_borrows_prev = self._borrow_balance_stored(borrower);
         let account_borrows_new = account_borrows_prev + borrow_amount;
@@ -351,13 +355,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         );
         self.data::<Data>().total_borrows = total_borrows_new;
 
-        PSP22Ref::transfer(
-            &self._underlying(),
-            borrower,
-            borrow_amount,
-            Vec::<u8>::new(),
-        )
-        .unwrap();
+        self._transfer_underlying(borrower, borrow_amount).unwrap();
 
         self._emit_borrow_event(
             borrower,
@@ -368,13 +366,13 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
         Ok(())
     }
-    // NOTE: not working
+
     default fn _repay_borrow(
         &mut self,
         payer: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
-    ) -> Result<()> {
+    ) -> Result<Balance> {
         let contract_addr = Self::env().account_id();
         ControllerRef::repay_borrow_allowed(
             &self._controller(),
@@ -394,18 +392,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             repay_amount
         };
 
-        PSP22Ref::transfer_from_builder(
-            &self._underlying(),
-            payer,
-            contract_addr,
-            repay_amount_final,
-            Vec::<u8>::new(),
-        )
-        .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
-        .try_invoke()
-        .unwrap()
-        .unwrap()
-        .unwrap();
+        self._transfer_underlying_from(payer, contract_addr, repay_amount_final)
+            .unwrap();
 
         let account_borrows_new = account_borrow_prev - repay_amount_final;
         let total_borrows_new = self._total_borrows() - repay_amount_final;
@@ -427,16 +415,45 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             total_borrows_new,
         );
 
-        Ok(())
+        Ok(repay_amount_final)
     }
     default fn _liquidate_borrow(
         &mut self,
-        _liquidator: AccountId,
-        _borrower: AccountId,
-        _repay_amount: Balance,
-        _collateral: AccountId,
+        liquidator: AccountId,
+        borrower: AccountId,
+        repay_amount: Balance,
+        collateral: AccountId,
     ) -> Result<()> {
-        todo!()
+        let contract_addr = Self::env().account_id();
+        ControllerRef::liquidate_borrow_allowed(
+            &self._controller(),
+            contract_addr,
+            collateral,
+            liquidator,
+            borrower,
+            repay_amount,
+        )
+        .unwrap();
+
+        // TODO: assertion check - compare current block number with accrual block number
+        // TODO: assertion check - compare current block number with accrual block number (for collateral token)
+
+        if liquidator == borrower {
+            return Err(Error::LiquidateLiquidatorIsBorrower)
+        }
+        if repay_amount == 0 {
+            return Err(Error::LiquidateCloseAmountIsZero)
+        }
+
+        let actual_repay_amount = self
+            ._repay_borrow(liquidator, borrower, repay_amount)
+            .unwrap();
+
+        // TODO: seize (transfer collateral tokens to the liquidator)
+
+        self._emit_liquidate_borrow_event(liquidator, borrower, actual_repay_amount, collateral, 0);
+
+        Ok(())
     }
     default fn _seize(
         &mut self,
@@ -448,12 +465,33 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         todo!()
     }
 
+    fn _transfer_underlying_from(
+        &self,
+        from: AccountId,
+        to: AccountId,
+        value: Balance,
+    ) -> Result<()> {
+        PSP22Ref::transfer_from_builder(&self._underlying(), from, to, value, Vec::<u8>::new())
+            .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
+            .try_invoke()
+            .unwrap()
+            .unwrap()
+            .map_err(to_psp22_error)
+    }
+    fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()> {
+        PSP22Ref::transfer(&self._underlying(), to, value, Vec::<u8>::new()).map_err(to_psp22_error)
+    }
+
     default fn _underlying(&self) -> AccountId {
         self.data::<Data>().underlying
     }
 
     default fn _controller(&self) -> AccountId {
         self.data::<Data>().controller
+    }
+
+    default fn _get_cash_prior(&self) -> Balance {
+        PSP22Ref::balance_of(&self._underlying(), Self::env().account_id())
     }
 
     default fn _total_borrows(&self) -> Balance {
@@ -528,7 +566,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         _liquidator: AccountId,
         _borrower: AccountId,
         _repay_amount: Balance,
-        _token_collateral: Balance,
+        _token_collateral: AccountId,
         _seize_tokens: Balance,
     ) {
     }
