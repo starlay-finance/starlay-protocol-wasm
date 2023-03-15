@@ -15,14 +15,10 @@ use primitive_types::U256;
 
 use crate::traits::types::WrappedU256;
 fn exp_scale() -> U256 {
-    U256::from_dec_str("10")
-        .unwrap()
-        .pow(U256::from_str("18").unwrap())
+    U256::from(10_u128.pow(18))
 }
 fn double_scale() -> U256 {
-    U256::from_dec_str("10")
-        .unwrap()
-        .pow(U256::from_str("36").unwrap())
+    U256::from(10_u128.pow(36))
 }
 fn half_exp_scale() -> U256 {
     exp_scale().div(2)
@@ -32,7 +28,7 @@ fn mantissa_one() -> U256 {
 }
 
 pub struct Exp {
-    mantissa: WrappedU256,
+    pub mantissa: WrappedU256,
 }
 pub struct Double {
     mantissa: WrappedU256,
@@ -56,16 +52,20 @@ impl Exp {
         self._op(another, |o, v| o.mul(v).div(exp_scale()))
     }
 
+    pub fn mul_mantissa(&self, mantissa: U256) -> Exp {
+        Exp {
+            mantissa: WrappedU256::from(U256::from(self.mantissa).mul(mantissa)),
+        }
+    }
+
     fn div(&self, another: Exp) -> Exp {
         self._op(another, |o, v| o.mul(exp_scale()).div(v))
     }
-    fn mul_scalar_truncate(&self, scalar: u128) -> U256 {
-        let product = self.mul(Exp {
-            mantissa: WrappedU256::from(U256::from(scalar)),
-        });
+    pub fn mul_scalar_truncate(&self, scalar: U256) -> U256 {
+        let product = self.mul_mantissa(scalar);
         product._trunc()
     }
-    fn mul_scalar_truncate_add_uint(&self, scalar: u128, addend: WrappedU256) -> U256 {
+    pub fn mul_scalar_truncate_add_uint(&self, scalar: U256, addend: U256) -> U256 {
         self.mul_scalar_truncate(scalar).add(addend)
     }
 
