@@ -69,6 +69,7 @@ fn borrow_rate_max_mantissa() -> U256 {
         .mul(U256::from(5))
         .div(U256::from(1000))
 }
+
 fn calculate_interest(input: &CalculateInterestInput) -> CalculateInterestOutput {
     if input.borrow_rate.gt(&borrow_rate_max_mantissa()) {
         panic!("borrow rate is absurdly high")
@@ -83,12 +84,7 @@ fn calculate_interest(input: &CalculateInterestInput) -> CalculateInterestOutput
 
     let interest_accumulated =
         simple_interest_factor.mul_scalar_truncate(U256::from(input.total_borrows));
-    println!("{}", U256::from(delta).to_string());
-    println!(
-        "{}",
-        U256::from(simple_interest_factor.mantissa).to_string()
-    );
-    println!("{}", U256::from(interest_accumulated).to_string());
+
     let total_borrows_new = interest_accumulated.as_u128().add(input.total_borrows);
     let total_reserves_new = Exp {
         mantissa: WrappedU256::from(input.reserve_factor),
@@ -169,7 +165,6 @@ pub trait Internal {
         seize_tokens: AccountId,
     ) -> AccountId;
 
-    fn _borrow_rate_max_mantissa(&self) -> U256;
     fn _transfer_underlying_from(
         &self,
         from: AccountId,
@@ -626,14 +621,6 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     ) {
     }
 
-    fn _borrow_rate_max_mantissa(&self) -> U256 {
-        // .0005% / block
-        U256::from(10)
-            .pow(U256::from(16))
-            .mul(U256::from(5))
-            .div(U256::from(1000))
-    }
-
     fn _reserve_factor(&self) -> Exp {
         Exp {
             mantissa: self.data::<Data>().reserve_factor,
@@ -666,7 +653,6 @@ mod tests {
     fn mantissa() -> U256 {
         U256::from(10).pow(U256::from(18))
     }
-    const MILLISECS_PER_HOUR: u64 = 60 * 60 * 1_000;
     #[test]
     #[should_panic(expected = "borrow rate is absurdly high")]
     fn test_calculate_interest_panic_if_over_borrow_rate_max() {
@@ -687,29 +673,69 @@ mod tests {
     #[test]
     fn test_calculate_interest() {
         let old_timestamp = Timestamp::default();
-        let input = CalculateInterestInput {
-            old_block_timestamp: old_timestamp,
-            new_block_timestamp: old_timestamp + mantissa().as_u64(),
-            borrow_index: Exp {
-                mantissa: WrappedU256::from(U256::zero()),
+        let inputs: &[CalculateInterestInput] = &[
+            CalculateInterestInput {
+                old_block_timestamp: old_timestamp,
+                new_block_timestamp: old_timestamp + mantissa().as_u64(),
+                borrow_index: Exp {
+                    mantissa: WrappedU256::from(U256::zero()),
+                },
+                borrow_rate: mantissa().div(100000), // 0.001 %
+                reserve_factor: mantissa().div(100), // 1 %
+                total_borrows: 10_000 * (10_u128.pow(18)),
+                total_reserves: 10_000 * (10_u128.pow(18)),
             },
-            borrow_rate: mantissa().div(100000), // 0.001 %
-            reserve_factor: mantissa().div(100), // 1 %
-            total_borrows: 10_000 * (10_u128.pow(18)),
-            total_reserves: 10_000 * (10_u128.pow(18)),
-        };
-        let got = calculate_interest(&input);
-        // interest accumulated should be (borrow rate * delta * total borrows)
-        assert_eq!(
-            got.interest_accumulated,
-            input
+            CalculateInterestInput {
+                old_block_timestamp: old_timestamp,
+                new_block_timestamp: old_timestamp + 1000 * 60 * 60, // 1 hour
+                borrow_index: Exp {
+                    mantissa: WrappedU256::from(U256::from(123123123)),
+                },
+                borrow_rate: mantissa().div(1000000),
+                reserve_factor: mantissa().div(10),
+                total_borrows: 100_000 * (10_u128.pow(18)),
+                total_reserves: 1_000_000 * (10_u128.pow(18)),
+            },
+            CalculateInterestInput {
+                old_block_timestamp: old_timestamp,
+                new_block_timestamp: old_timestamp + 999 * 60 * 60 * 2345 * 123,
+                borrow_index: Exp {
+                    mantissa: WrappedU256::from(U256::from(123123123)),
+                },
+                borrow_rate: mantissa().div(123123),
+                reserve_factor: mantissa().div(10).mul(2),
+                total_borrows: 123_456 * (10_u128.pow(18)),
+                total_reserves: 789_012 * (10_u128.pow(18)),
+            },
+        ];
+        for input in inputs {
+            let got = calculate_interest(&input);
+            let delta = input
+                .new_block_timestamp
+                .abs_diff(input.old_block_timestamp);
+            // interest accumulated should be (borrow rate * delta * total borrows)
+            let interest_want = input
                 .borrow_rate
                 .mul(U256::from(
-                    input.new_block_timestamp - input.old_block_timestamp
+                    input.new_block_timestamp - input.old_block_timestamp,
                 ))
                 .mul(U256::from(input.total_borrows))
                 .div(mantissa())
-                .as_u128()
-        );
+                .as_u128();
+            let reserves_want = U256::from(input.reserve_factor)
+                .mul(U256::from(interest_want))
+                .div(U256::from(10_u128.pow(18)))
+                .add(U256::from(input.total_reserves));
+            assert_eq!(got.interest_accumulated, interest_want);
+            assert_eq!(got.total_borrows, interest_want + (input.total_borrows));
+            assert_eq!(got.total_reserves, reserves_want.as_u128());
+            let borrow_idx_want = input
+                .borrow_rate
+                .mul(U256::from(delta))
+                .mul(U256::from(input.borrow_index.mantissa))
+                .div(U256::from(10_u128.pow(18)))
+                .add(U256::from(input.borrow_index.mantissa));
+            assert_eq!(U256::from(got.borrow_index.mantissa), borrow_idx_want);
+        }
     }
 }

@@ -15,14 +15,10 @@ use primitive_types::U256;
 
 use crate::traits::types::WrappedU256;
 fn exp_scale() -> U256 {
-    U256::from_dec_str("10")
-        .unwrap()
-        .pow(U256::from_str("18").unwrap())
+    U256::from(10_u128.pow(18))
 }
 fn double_scale() -> U256 {
-    U256::from_dec_str("10")
-        .unwrap()
-        .pow(U256::from_str("36").unwrap())
+    U256::from(10_u128.pow(36))
 }
 fn half_exp_scale() -> U256 {
     exp_scale().div(2)
