@@ -41,7 +41,7 @@ describe('Pool spec', () => {
     // initialize
     await controller.tx.supportMarket(pool.address)
 
-    return { deployer, token, pool, controller, users }
+    return { api, deployer, token, pool, controller, users }
   }
 
   it('instantiate', async () => {
@@ -268,5 +268,65 @@ describe('Pool spec', () => {
     })
   })
 
-  it.todo('.repay_borrow_behalf', () => {})
+  it.todo('.repay_borrow_behalf')
+
+  it.todo('.liquidate_borrow')
+
+  describe('.liquidate_borrow (fail case)', () => {
+    const setup_extended = async () => {
+      const args = await setup()
+
+      const secondToken = await deployPSP22Token({
+        api: args.api,
+        signer: args.deployer,
+        args: [
+          0,
+          'Dai Stablecoin' as unknown as string[],
+          'DAI' as unknown as string[],
+          8,
+        ],
+      })
+
+      const poolFactory = new Pool_factory(args.api, args.deployer)
+      const secondPool = new Pool(
+        (
+          await poolFactory.newFromAsset(
+            secondToken.address,
+            secondToken.address,
+          )
+        ).address,
+        args.deployer,
+        args.api,
+      )
+
+      await args.controller.tx.supportMarket(secondPool.address)
+
+      return {
+        ...args,
+        secondToken,
+        secondPool,
+      }
+    }
+
+    it('when liquidator is equal to borrower', async () => {
+      const { pool, users, secondPool } = await setup_extended()
+      const [user1] = users
+      const { value } = await pool
+        .withSigner(user1)
+        .query.liquidateBorrow(user1.address, 0, secondPool.address)
+      expect(value.ok.err).toStrictEqual({
+        liquidateLiquidatorIsBorrower: null,
+      })
+    })
+    it('when repay_amount is zero', async () => {
+      const { pool, users, secondPool } = await setup_extended()
+      const [user1, user2] = users
+      const { value } = await pool
+        .withSigner(user1)
+        .query.liquidateBorrow(user2.address, 0, secondPool.address)
+      expect(value.ok.err).toStrictEqual({
+        liquidateCloseAmountIsZero: null,
+      })
+    })
+  })
 })
