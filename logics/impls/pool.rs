@@ -39,6 +39,7 @@ pub struct Data {
     pub underlying: AccountId,
     pub controller: AccountId,
     pub total_borrows: Balance,
+    pub total_reserves: Balance,
     pub account_borrows: Mapping<AccountId, BorrowSnapshot>,
 }
 
@@ -48,6 +49,7 @@ impl Default for Data {
             underlying: ZERO_ADDRESS.into(),
             controller: ZERO_ADDRESS.into(),
             total_borrows: Default::default(),
+            total_reserves: 0,
             account_borrows: Default::default(),
         }
     }
@@ -81,8 +83,8 @@ pub trait Internal {
         seizer_token: AccountId,
         liquidator: AccountId,
         borrower: AccountId,
-        seize_tokens: AccountId,
-    ) -> AccountId;
+        seize_tokens: Balance,
+    ) -> Result<()>;
 
     fn _transfer_underlying_from(
         &self,
@@ -96,6 +98,7 @@ pub trait Internal {
     fn _controller(&self) -> AccountId;
     fn _get_cash_prior(&self) -> Balance;
     fn _total_borrows(&self) -> Balance;
+    fn _total_reserves(&self) -> Balance;
     fn _borrow_balance_stored(&self, account: AccountId) -> Balance;
 
     // event emission
@@ -183,8 +186,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         &mut self,
         liquidator: AccountId,
         borrower: AccountId,
-        seize_tokens: AccountId,
-    ) -> AccountId {
+        seize_tokens: Balance,
+    ) -> Result<()> {
         self._accrue_interest();
         self._seize(Self::env().caller(), liquidator, borrower, seize_tokens)
     }
@@ -384,12 +387,42 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
     default fn _seize(
         &mut self,
-        _seizer_token: AccountId,
-        _liquidator: AccountId,
-        _borrower: AccountId,
-        _seize_tokens: AccountId,
-    ) -> AccountId {
-        todo!()
+        seizer_token: AccountId,
+        liquidator: AccountId,
+        borrower: AccountId,
+        seize_tokens: Balance,
+    ) -> Result<()> {
+        let contract_addr = Self::env().account_id();
+        ControllerRef::seize_allowed(
+            &self._controller(),
+            contract_addr,
+            seizer_token,
+            liquidator,
+            borrower,
+            seize_tokens,
+        )
+        .unwrap();
+
+        if liquidator == borrower {
+            return Err(Error::LiquidateSeizeLiquidatorIsBorrower)
+        }
+
+        // calculate the new borrower and liquidator token balances
+        let protocol_seize_token = 0; // TODO
+        let liquidator_seize_token = seize_tokens - protocol_seize_token;
+        let exchange_rate = 1; // TODO
+        let protocol_seize_amount = protocol_seize_token * exchange_rate;
+        let total_reserves_new = self._total_reserves() + protocol_seize_amount;
+
+        // EFFECTS & INTERACTIONS
+        self.data::<Data>().total_reserves = total_reserves_new;
+        // total_supply = total_supply - protocol_seize_token; // TODO: check
+        self._burn_from(borrower, seize_tokens).unwrap();
+        self._mint_to(liquidator, liquidator_seize_token).unwrap();
+
+        // TODO: event
+
+        Ok(())
     }
 
     fn _transfer_underlying_from(
@@ -423,6 +456,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
     default fn _total_borrows(&self) -> Balance {
         self.data::<Data>().total_borrows
+    }
+
+    default fn _total_reserves(&self) -> Balance {
+        self.data::<Data>().total_reserves
     }
 
     default fn _borrow_balance_stored(&self, account: AccountId) -> Balance {
