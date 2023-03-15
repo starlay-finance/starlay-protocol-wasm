@@ -112,7 +112,7 @@ pub struct Data {
     pub total_borrows: Balance,
     pub total_reserves: Balance,
     pub account_borrows: Mapping<AccountId, BorrowSnapshot>,
-    pub accural_block_timestamp: u64,
+    pub accural_block_timestamp: Timestamp,
     pub borrow_index: WrappedU256,
     pub reserve_factor: WrappedU256,
 }
