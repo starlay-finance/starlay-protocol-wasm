@@ -168,6 +168,7 @@ pub trait Controller {
 pub enum Error {
     MintIsPaused,
     BorrowIsPaused,
+    MarketNotListed,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

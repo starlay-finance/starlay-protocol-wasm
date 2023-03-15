@@ -68,6 +68,8 @@ pub enum Error {
     InvalidParameter,
     BorrowCashNotAvailable,
     RedeemTransferOutNotPossible,
+    LiquidateLiquidatorIsBorrower,
+    LiquidateCloseAmountIsZero,
     PSP22(PSP22Error),
     Lang(LangError),
 }

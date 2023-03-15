@@ -64,6 +64,14 @@ pub mod contract {
         account_borrows: Balance,
         total_borrows: Balance,
     }
+    #[ink(event)]
+    pub struct LiquidateBorrow {
+        liquidator: AccountId,
+        borrower: AccountId,
+        repay_amount: Balance,
+        token_collateral: AccountId,
+        seize_tokens: Balance,
+    }
 
     impl Pool for PoolContract {}
     impl Internal for PoolContract {
@@ -114,6 +122,22 @@ pub mod contract {
                 repay_amount,
                 account_borrows,
                 total_borrows,
+            })
+        }
+        fn _emit_liquidate_borrow_event(
+            &self,
+            liquidator: AccountId,
+            borrower: AccountId,
+            repay_amount: Balance,
+            token_collateral: AccountId,
+            seize_tokens: Balance,
+        ) {
+            self.env().emit_event(LiquidateBorrow {
+                liquidator,
+                borrower,
+                repay_amount,
+                token_collateral,
+                seize_tokens,
             })
         }
     }
