@@ -409,12 +409,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let account_borrows_prev = self._borrow_balance_stored(borrower);
         let account_borrows_new = account_borrows_prev + borrow_amount;
         let total_borrows_new = self._total_borrows() + borrow_amount;
-
+        let idx = self._borrow_index().mantissa;
         self.data::<Data>().account_borrows.insert(
             &borrower,
             &BorrowSnapshot {
                 principal: account_borrows_new,
-                interest_index: self._borrow_index().mantissa, // TODO: borrow_index
+                interest_index: idx,
             },
         );
         self.data::<Data>().total_borrows = total_borrows_new;
@@ -465,11 +465,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let account_borrows_new = account_borrow_prev - repay_amount_final;
         let total_borrows_new = self._total_borrows() - repay_amount_final;
 
+        let idx = self._borrow_index().mantissa;
         self.data::<Data>().account_borrows.insert(
             &borrower,
             &BorrowSnapshot {
                 principal: account_borrows_new,
-                interest_index: self._borrow_index().mantissa, // TODO: borrow_index
+                interest_index: idx,
             },
         );
         self.data::<Data>().total_borrows = total_borrows_new;
