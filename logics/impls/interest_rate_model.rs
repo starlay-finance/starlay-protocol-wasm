@@ -319,21 +319,28 @@ mod tests {
     }
     #[test]
     fn test_get_supply_rate() {
-        let reserve_factor = U256::one().mul(base()).div(U256::from(100)); // 1%
-        let total_borrow: u32 = 100;
-        // utilization rate: 10%
-        let total_cash: u32 = 900;
-        let reserves: u32 = 0;
         struct Case {
             utilization_rate: U256,
             borrow_rate: U256,
             one_minus_reserve_factor: U256,
         }
-        let cases = [Case {
-            utilization_rate: percent(10),
-            borrow_rate: percent(20),
-            one_minus_reserve_factor: base().div(100),
-        }];
+        let cases = [
+            Case {
+                utilization_rate: percent(10),
+                borrow_rate: percent(20),
+                one_minus_reserve_factor: base().div(100),
+            },
+            Case {
+                utilization_rate: percent(11),
+                borrow_rate: percent(22),
+                one_minus_reserve_factor: U256::from(2).mul(base()).div(100),
+            },
+            Case {
+                utilization_rate: percent(15),
+                borrow_rate: percent(23),
+                one_minus_reserve_factor: U256::from(3).mul(base()).div(100),
+            },
+        ];
         for case in cases {
             let got = supply_rate(
                 case.utilization_rate,
