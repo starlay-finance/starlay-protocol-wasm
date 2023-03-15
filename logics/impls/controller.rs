@@ -1,4 +1,7 @@
-pub use crate::traits::controller::*;
+pub use crate::traits::{
+    controller::*,
+    pool::PoolRef,
+};
 use ink::prelude::vec::Vec;
 use openbrush::{
     storage::Mapping,
@@ -470,13 +473,26 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _seize_allowed(
         &self,
-        _pool_collateral: AccountId,
-        _pool_borrowed: AccountId,
+        pool_collateral: AccountId,
+        pool_borrowed: AccountId,
         _liquidator: AccountId,
         _borrower: AccountId,
         _seize_tokens: Balance,
     ) -> Result<()> {
-        todo!()
+        // TODO: assertion check - check paused status
+
+        if !self._is_listed_market(pool_collateral) || !self._is_listed_market(pool_borrowed) {
+            return Err(Error::MarketNotListed)
+        }
+        let p_collateral_ctrler = PoolRef::controller(&pool_collateral);
+        let p_borrowed_ctrler = PoolRef::controller(&pool_borrowed);
+        if p_collateral_ctrler != p_borrowed_ctrler {
+            return Err(Error::ControllerMismatch)
+        }
+
+        // TODO: keep the flywheel moving
+
+        Ok(())
     }
     default fn _seize_verify(
         &self,

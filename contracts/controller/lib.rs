@@ -219,6 +219,30 @@ pub mod contract {
         }
 
         #[ink::test]
+        fn seize_allowed_fail() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new();
+
+            // not in market
+            let pool1 = AccountId::from([0x01; 32]);
+            let pool2 = AccountId::from([0x02; 32]);
+            assert_eq!(
+                contract
+                    .seize_allowed(pool1, pool2, ZERO_ADDRESS.into(), ZERO_ADDRESS.into(), 0)
+                    .unwrap_err(),
+                Error::MarketNotListed
+            );
+            assert!(contract.support_market(pool1).is_ok());
+            assert_eq!(
+                contract
+                    .seize_allowed(pool1, pool2, ZERO_ADDRESS.into(), ZERO_ADDRESS.into(), 0)
+                    .unwrap_err(),
+                Error::MarketNotListed
+            );
+        }
+
+        #[ink::test]
         fn support_market_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
