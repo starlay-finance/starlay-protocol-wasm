@@ -633,13 +633,11 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         if snapshot.principal == 0 {
             return 0
         }
-        let borrow_index = self._borrow_index().truncate().as_u128();
-        let prinicipal_times_index = snapshot.principal * borrow_index;
-        return prinicipal_times_index
-            / Exp {
-                mantissa: snapshot.interest_index,
-            }
-            .truncate()
+        let borrow_index = self._borrow_index();
+        let prinicipal_times_index =
+            U256::from(snapshot.principal).mul(U256::from(borrow_index.mantissa));
+        prinicipal_times_index
+            .div(U256::from(snapshot.interest_index))
             .as_u128()
     }
 
