@@ -185,7 +185,6 @@ pub trait Internal {
     fn _reserve_factor(&self) -> Exp;
 
     // event emission
-    // fn _emit_accrue_interest_event(&self);
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
     fn _emit_redeem_event(
         &self,
@@ -228,6 +227,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
     default fn mint(&mut self, mint_amount: Balance) -> Result<()> {
         self._accrue_interest();
         self._mint(Self::env().caller(), mint_amount)
+    }
+
+    default fn get_accrual_block_timestamp(&self) -> Timestamp {
+        self._accural_block_timestamp()
     }
 
     default fn redeem(&mut self, redeem_tokens: Balance) -> Result<()> {
@@ -341,8 +344,11 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let contract_addr = Self::env().account_id();
         ControllerRef::mint_allowed(&self._controller(), contract_addr, minter, mint_amount)
             .unwrap();
-        // TODO: assertion check - compare current block number with accrual block number
 
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        };
         // TODO: calculate exchange rate & mint amount
         let actual_mint_amount = mint_amount;
         self._transfer_underlying_from(minter, contract_addr, actual_mint_amount)
@@ -433,7 +439,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         )
         .unwrap();
 
-        // TODO: assertion check - compare current block number with accrual block number
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        };
 
         let account_borrow_prev = self._borrow_balance_stored(borrower);
         let repay_amount_final = if repay_amount == u128::MAX {
@@ -485,8 +494,13 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         )
         .unwrap();
 
-        // TODO: assertion check - compare current block number with accrual block number
-        // TODO: assertion check - compare current block number with accrual block number (for collateral token)
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        }
+        if PoolRef::get_accrual_block_timestamp(&collateral) != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        }
 
         if liquidator == borrower {
             return Err(Error::LiquidateLiquidatorIsBorrower)

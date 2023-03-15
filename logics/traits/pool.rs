@@ -7,6 +7,7 @@ use openbrush::{
     traits::{
         AccountId,
         Balance,
+        Timestamp,
     },
 };
 
@@ -59,6 +60,8 @@ pub trait Pool: PSP22 {
     fn total_borrows(&self) -> Balance;
     #[ink(message)]
     fn borrow_balance_stored(&self, account: AccountId) -> Balance;
+    #[ink(message)]
+    fn get_accrual_block_timestamp(&self) -> Timestamp;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -70,6 +73,7 @@ pub enum Error {
     RedeemTransferOutNotPossible,
     LiquidateLiquidatorIsBorrower,
     LiquidateCloseAmountIsZero,
+    AccrualBlockNumberIsNotFresh,
     PSP22(PSP22Error),
     Lang(LangError),
 }
