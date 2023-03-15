@@ -57,18 +57,16 @@ impl Exp {
     }
 
     pub fn mul_mantissa(&self, mantissa: U256) -> Exp {
-        self.mul(Exp {
-            mantissa: WrappedU256::from(mantissa),
-        })
+        Exp {
+            mantissa: WrappedU256::from(U256::from(self.mantissa).mul(mantissa)),
+        }
     }
 
     fn div(&self, another: Exp) -> Exp {
         self._op(another, |o, v| o.mul(exp_scale()).div(v))
     }
     pub fn mul_scalar_truncate(&self, scalar: U256) -> U256 {
-        let product = self.mul(Exp {
-            mantissa: WrappedU256::from(scalar),
-        });
+        let product = self.mul_mantissa(scalar);
         product._trunc()
     }
     pub fn mul_scalar_truncate_add_uint(&self, scalar: U256, addend: U256) -> U256 {
