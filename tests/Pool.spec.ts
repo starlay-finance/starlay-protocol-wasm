@@ -142,6 +142,14 @@ describe('Pool spec', () => {
     })
   })
 
+  it('.redeem_underlying', async () => {
+    const { pool, users } = await setup()
+    const { value } = await pool
+      .withSigner(users[0])
+      .query.redeemUnderlying(3_000)
+    expect(value.ok.err).toStrictEqual({ notImplemented: null })
+  })
+
   describe('.borrow', () => {
     let deployer: KeyringPair
     let token: PSP22Token
@@ -268,7 +276,13 @@ describe('Pool spec', () => {
     })
   })
 
-  it.todo('.repay_borrow_behalf')
+  it('.repay_borrow_behalf', async () => {
+    const { pool, users } = await setup()
+    const { value } = await pool
+      .withSigner(users[0])
+      .query.repayBorrowBehalf(users[1].address, 0)
+    expect(value.ok.err).toStrictEqual({ notImplemented: null })
+  })
 
   describe('.liquidate_borrow', () => {
     // TODO: check seize

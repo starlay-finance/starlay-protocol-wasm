@@ -74,14 +74,16 @@ pub mod contract {
     }
 
     impl Pool for PoolContract {
-        fn redeem_underlying(&mut self, redeem_tokens: Balance) -> Result<()> {
+        #[ink(message)]
+        fn redeem_underlying(&mut self, _redeem_tokens: Balance) -> Result<()> {
             Err(Error::NotImplemented)
         }
 
+        #[ink(message)]
         fn repay_borrow_behalf(
             &mut self,
-            borrower: AccountId,
-            repay_amount: Balance,
+            _borrower: AccountId,
+            _repay_amount: Balance,
         ) -> Result<()> {
             Err(Error::NotImplemented)
         }
@@ -285,6 +287,48 @@ pub mod contract {
                 String::from("symbol"),
                 8,
             );
+        }
+
+        #[ink::test]
+        fn redeem_underlying_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let dummy_id = AccountId::from([0x01; 32]);
+            let mut contract = PoolContract::new(
+                dummy_id,
+                dummy_id,
+                String::from("Token Name"),
+                String::from("symbol"),
+                8,
+            );
+
+            assert_eq!(
+                contract.redeem_underlying(0).unwrap_err(),
+                Error::NotImplemented
+            )
+        }
+
+        #[ink::test]
+        fn repay_borrow_behalf_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let dummy_id = AccountId::from([0x01; 32]);
+            let mut contract = PoolContract::new(
+                dummy_id,
+                dummy_id,
+                String::from("Token Name"),
+                String::from("symbol"),
+                8,
+            );
+
+            assert_eq!(
+                contract
+                    .repay_borrow_behalf(accounts.charlie, 0)
+                    .unwrap_err(),
+                Error::NotImplemented
+            )
         }
     }
 }
