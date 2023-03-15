@@ -185,7 +185,6 @@ pub trait Internal {
     fn _reserve_factor(&self) -> Exp;
 
     // event emission
-    // fn _emit_accrue_interest_event(&self);
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
     fn _emit_redeem_event(
         &self,
@@ -222,7 +221,7 @@ pub trait Internal {
         add_amount: Balance,
         new_total_reserves: Balance,
     );
-    fn _emit_accrute_interest_event(
+    fn _emit_accrue_interest_event(
         &self,
         interest_accumulated: Balance,
         new_index: WrappedU256,
@@ -337,7 +336,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         data.borrow_index = out.borrow_index.mantissa;
         data.total_borrows = out.total_borrows;
         data.total_reserves = out.total_reserves;
-        self._emit_accrute_interest_event(
+        self._emit_accrue_interest_event(
             out.interest_accumulated,
             WrappedU256::from(out.borrow_index.mantissa),
             out.total_borrows,
@@ -621,6 +620,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         return prinicipal_times_index / snapshot.interest_index
     }
 
+    default fn _reserve_factor(&self) -> Exp {
+        Exp {
+            mantissa: self.data::<Data>().reserve_factor,
+        }
+    }
+
     // event emission
     default fn _emit_mint_event(
         &self,
@@ -671,18 +676,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     ) {
     }
 
-    fn _emit_accrute_interest_event(
+    default fn _emit_accrue_interest_event(
         &self,
         _interest_accumulated: Balance,
         _new_index: WrappedU256,
         _new_total_borrows: Balance,
     ) {
-    }
-
-    fn _reserve_factor(&self) -> Exp {
-        Exp {
-            mantissa: self.data::<Data>().reserve_factor,
-        }
     }
 }
 
