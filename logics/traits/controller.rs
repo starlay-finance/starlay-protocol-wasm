@@ -169,6 +169,7 @@ pub enum Error {
     MintIsPaused,
     BorrowIsPaused,
     MarketNotListed,
+    ControllerMismatch,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

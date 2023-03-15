@@ -47,8 +47,8 @@ pub trait Pool: PSP22 {
         &mut self,
         liquidator: AccountId,
         borrower: AccountId,
-        seize_tokens: AccountId,
-    ) -> AccountId;
+        seize_tokens: Balance,
+    ) -> Result<()>;
 
     #[ink(message)]
     fn underlying(&self) -> AccountId;
@@ -74,6 +74,7 @@ pub enum Error {
     LiquidateLiquidatorIsBorrower,
     LiquidateCloseAmountIsZero,
     AccrualBlockNumberIsNotFresh,
+    LiquidateSeizeLiquidatorIsBorrower,
     PSP22(PSP22Error),
     Lang(LangError),
 }
