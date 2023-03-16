@@ -80,6 +80,7 @@ pub enum Error {
     LiquidateSeizeLiquidatorIsBorrower,
     ReduceReservesCashNotAvailable,
     ReduceReservesCashValidation,
+    BORROW_RATE_IS_ABSURDLY_HIGH,
     PSP22(PSP22Error),
     Lang(LangError),
 }
