@@ -553,10 +553,15 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         } else {
             PoolRef::seize(&collateral, liquidator, borrower, seize_tokens).unwrap();
         }
+        self._emit_liquidate_borrow_event(
+            liquidator,
+            borrower,
+            actual_repay_amount,
+            collateral,
+            seize_tokens,
+        );
         // skip post-process because nothing is done
         // ControllerRef::liquidate_borrow_verify(&self._controller(), contract_addr, collateral, liquidator, borrower, actual_repay_amount, seize_tokens).unwrap();
-
-        self._emit_liquidate_borrow_event(liquidator, borrower, actual_repay_amount, collateral, 0);
 
         Ok(())
     }
