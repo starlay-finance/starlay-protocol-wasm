@@ -437,6 +437,5 @@ describe('Pool spec', () => {
     })
   })
 
-  it.todo('.seize')
   it.todo('.reduceReserves')
 })
