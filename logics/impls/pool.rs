@@ -381,7 +381,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let contract_addr = Self::env().account_id();
         ControllerRef::redeem_allowed(&self._controller(), contract_addr, redeemer, redeem_tokens)
             .unwrap();
-
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        };
         if self._get_cash_prior() < redeem_amount {
             return Err(Error::RedeemTransferOutNotPossible)
         }
