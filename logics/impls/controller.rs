@@ -1,3 +1,4 @@
+use crate::traits::types::WrappedU256;
 pub use crate::traits::{
     controller::*,
     pool::PoolRef,
@@ -9,8 +10,10 @@ use openbrush::{
         AccountId,
         Balance,
         Storage,
+        ZERO_ADDRESS,
     },
 };
+use primitive_types::U256;
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 
@@ -20,6 +23,22 @@ pub struct Data {
     pub markets: Vec<AccountId>,
     pub mint_guardian_paused: Mapping<AccountId, bool>,
     pub borrow_guardian_paused: Mapping<AccountId, bool>,
+    pub oracle: AccountId,
+    pub close_factor_mantissa: WrappedU256,
+    pub liquidation_incentive_mantissa: WrappedU256,
+}
+
+impl Default for Data {
+    fn default() -> Self {
+        Self {
+            markets: Default::default(),
+            mint_guardian_paused: Default::default(),
+            borrow_guardian_paused: Default::default(),
+            oracle: ZERO_ADDRESS.into(),
+            close_factor_mantissa: WrappedU256::from(U256::zero()),
+            liquidation_incentive_mantissa: WrappedU256::from(U256::zero()),
+        }
+    }
 }
 
 pub trait Internal {
