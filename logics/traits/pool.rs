@@ -49,6 +49,8 @@ pub trait Pool: PSP22 {
         borrower: AccountId,
         seize_tokens: Balance,
     ) -> Result<()>;
+    #[ink(message)]
+    fn reduce_reserves(&mut self, amount: Balance) -> Result<()>;
 
     #[ink(message)]
     fn underlying(&self) -> AccountId;
@@ -75,6 +77,8 @@ pub enum Error {
     LiquidateCloseAmountIsZero,
     AccrualBlockNumberIsNotFresh,
     LiquidateSeizeLiquidatorIsBorrower,
+    ReduceReservesCashNotAvailable,
+    ReduceReservesCashValidation,
     PSP22(PSP22Error),
     Lang(LangError),
 }

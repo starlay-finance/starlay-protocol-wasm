@@ -2,6 +2,7 @@ use core::ops::{
     Add,
     Div,
     Mul,
+    Sub,
 };
 
 use crate::traits::types::WrappedU256;
@@ -12,6 +13,7 @@ pub use crate::traits::{
 };
 use ink::{
     prelude::vec::Vec,
+    primitives::AccountId,
     LangError,
 };
 use openbrush::{
@@ -22,7 +24,6 @@ use openbrush::{
     },
     storage::Mapping,
     traits::{
-        AccountId,
         Balance,
         Storage,
         Timestamp,
@@ -164,6 +165,7 @@ pub trait Internal {
         borrower: AccountId,
         seize_tokens: Balance,
     ) -> Result<()>;
+    fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()>;
 
     fn _transfer_underlying_from(
         &self,
@@ -227,6 +229,7 @@ pub trait Internal {
         new_index: WrappedU256,
         new_total_borrows: Balance,
     );
+    fn _emit_reserves_reduced_event(&self, _reduce_amount: Balance, _total_reserves_new: Balance);
 }
 
 impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
@@ -304,6 +307,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
 
     default fn total_borrows(&self) -> Balance {
         self._total_borrows()
+    }
+
+    default fn reduce_reserves(&mut self, amount: Balance) -> Result<()> {
+        self._reduce_reserves(Self::env().caller(), amount)
     }
 
     default fn borrow_balance_stored(&self, account: AccountId) -> Balance {
@@ -703,6 +710,35 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         _new_index: WrappedU256,
         _new_total_borrows: Balance,
     ) {
+    }
+
+    default fn _emit_reserves_reduced_event(
+        &self,
+        _reduce_amount: Balance,
+        _total_reserves_new: Balance,
+    ) {
+    }
+
+    fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()> {
+        self._accrue_interest();
+        // TODO: assert admin
+        let current_timestamp = Self::env().block_timestamp();
+
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        }
+        if self._get_cash_prior().lt(&amount) {
+            return Err(Error::ReduceReservesCashNotAvailable)
+        }
+        if self._total_reserves().lt(&amount) {
+            return Err(Error::ReduceReservesCashValidation)
+        }
+        let total_reserves_new = self._total_reserves().sub(amount);
+        let mut data = self.data::<Data>();
+        data.total_reserves = total_reserves_new;
+        self._transfer_underlying(admin, amount).unwrap();
+        self._emit_reserves_reduced_event(amount, total_reserves_new);
+        Ok(())
     }
 }
 
