@@ -377,6 +377,9 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             (_, amount) if amount > 0 => (amount / exchange_rate, amount),
             _ => return Err(Error::InvalidParameter),
         };
+        if (redeem_tokens == 0 && redeem_amount > 0) || (redeem_tokens > 0 && redeem_amount == 0) {
+            return Err(Error::OnlyEitherRedeemTokensOrRedeemAmountIsZero)
+        }
 
         let contract_addr = Self::env().account_id();
         ControllerRef::redeem_allowed(&self._controller(), contract_addr, redeemer, redeem_tokens)
