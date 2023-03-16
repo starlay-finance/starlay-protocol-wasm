@@ -42,7 +42,7 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 )]
 pub struct BorrowSnapshot {
     principal: Balance,
-    interest_index: u128,
+    interest_index: WrappedU256,
 }
 
 struct CalculateInterestInput {
@@ -235,6 +235,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         self._mint(Self::env().caller(), mint_amount)
     }
 
+    default fn get_accrual_block_timestamp(&self) -> Timestamp {
+        self._accural_block_timestamp()
+    }
+
     default fn redeem(&mut self, redeem_tokens: Balance) -> Result<()> {
         self._accrue_interest();
         self._redeem(Self::env().caller(), redeem_tokens, 0)
@@ -346,8 +350,11 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let contract_addr = Self::env().account_id();
         ControllerRef::mint_allowed(&self._controller(), contract_addr, minter, mint_amount)
             .unwrap();
-        // TODO: assertion check - compare current block number with accrual block number
 
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        };
         // TODO: calculate exchange rate & mint amount
         let actual_mint_amount = mint_amount;
         self._transfer_underlying_from(minter, contract_addr, actual_mint_amount)
@@ -391,8 +398,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         ControllerRef::borrow_allowed(&self._controller(), contract_addr, borrower, borrow_amount)
             .unwrap();
 
-        // TODO: assertion check - compare current block number with accrual block number
-
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        };
         if self._get_cash_prior() < borrow_amount {
             return Err(Error::BorrowCashNotAvailable)
         }
@@ -400,12 +409,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let account_borrows_prev = self._borrow_balance_stored(borrower);
         let account_borrows_new = account_borrows_prev + borrow_amount;
         let total_borrows_new = self._total_borrows() + borrow_amount;
-
+        let idx = self._borrow_index().mantissa;
         self.data::<Data>().account_borrows.insert(
             &borrower,
             &BorrowSnapshot {
                 principal: account_borrows_new,
-                interest_index: 1, // TODO: borrow_index
+                interest_index: idx,
             },
         );
         self.data::<Data>().total_borrows = total_borrows_new;
@@ -438,7 +447,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         )
         .unwrap();
 
-        // TODO: assertion check - compare current block number with accrual block number
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        };
 
         let account_borrow_prev = self._borrow_balance_stored(borrower);
         let repay_amount_final = if repay_amount == u128::MAX {
@@ -453,11 +465,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let account_borrows_new = account_borrow_prev - repay_amount_final;
         let total_borrows_new = self._total_borrows() - repay_amount_final;
 
+        let idx = self._borrow_index().mantissa;
         self.data::<Data>().account_borrows.insert(
             &borrower,
             &BorrowSnapshot {
                 principal: account_borrows_new,
-                interest_index: 1, // TODO: borrow_index
+                interest_index: idx,
             },
         );
         self.data::<Data>().total_borrows = total_borrows_new;
@@ -490,8 +503,13 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         )
         .unwrap();
 
-        // TODO: assertion check - compare current block number with accrual block number
-        // TODO: assertion check - compare current block number with accrual block number (for collateral token)
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        }
+        if PoolRef::get_accrual_block_timestamp(&collateral) != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        }
 
         if liquidator == borrower {
             return Err(Error::LiquidateLiquidatorIsBorrower)
@@ -615,9 +633,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         if snapshot.principal == 0 {
             return 0
         }
-        let borrow_index = 1; // temp
-        let prinicipal_times_index = snapshot.principal * borrow_index;
-        return prinicipal_times_index / snapshot.interest_index
+        let borrow_index = self._borrow_index();
+        let prinicipal_times_index =
+            U256::from(snapshot.principal).mul(U256::from(borrow_index.mantissa));
+        prinicipal_times_index
+            .div(U256::from(snapshot.interest_index))
+            .as_u128()
     }
 
     default fn _reserve_factor(&self) -> Exp {
