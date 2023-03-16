@@ -73,7 +73,7 @@ fn borrow_rate_max_mantissa() -> U256 {
 
 fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInterestOutput> {
     if input.borrow_rate.gt(&borrow_rate_max_mantissa()) {
-        return Err(Error::BORROW_RATE_IS_ABSURDLY_HIGH)
+        return Err(Error::BorrowRateIsAbsurdlyHigh)
     }
     let delta = input
         .new_block_timestamp
@@ -800,7 +800,7 @@ mod tests {
             total_reserves: Balance::default(),
         };
         let out = calculate_interest(&input);
-        assert_eq!(out.err().unwrap(), Error::BORROW_RATE_IS_ABSURDLY_HIGH)
+        assert_eq!(out.err().unwrap(), Error::BorrowRateIsAbsurdlyHigh)
     }
 
     #[test]
