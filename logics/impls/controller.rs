@@ -1,3 +1,4 @@
+use super::exp_no_err::Exp;
 use crate::traits::types::WrappedU256;
 pub use crate::traits::{
     controller::*,
@@ -154,6 +155,8 @@ pub trait Internal {
     fn _is_listed_market(&self, pool: AccountId) -> bool;
     fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
+    fn _close_factor_mantissa(&self) -> Exp;
+    fn _liquidation_incentive_mantissa(&self) -> Exp;
 
     // event emission
     fn _emit_market_listed_event(&self, pool: AccountId);
@@ -589,6 +592,16 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool> {
         self.data().borrow_guardian_paused.get(&pool)
+    }
+    default fn _close_factor_mantissa(&self) -> Exp {
+        Exp {
+            mantissa: self.data::<Data>().close_factor_mantissa,
+        }
+    }
+    default fn _liquidation_incentive_mantissa(&self) -> Exp {
+        Exp {
+            mantissa: self.data::<Data>().liquidation_incentive_mantissa,
+        }
     }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}
