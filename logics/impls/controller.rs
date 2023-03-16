@@ -149,6 +149,11 @@ pub trait Internal {
     fn _support_market(&mut self, pool: &AccountId) -> Result<()>;
     fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
     fn _set_borrow_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
+    fn _set_close_factor(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()>;
+    fn _set_liquidation_incentive(
+        &mut self,
+        new_liquidation_incentive_mantissa: WrappedU256,
+    ) -> Result<()>;
 
     // view function
     fn _markets(&self) -> Vec<AccountId>;
@@ -340,6 +345,7 @@ impl<T: Storage<Data>> Controller for T {
     }
 
     default fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
+        // TODO: assertion check - ownership
         self._set_price_oracle(new_oracle)
     }
 
@@ -358,6 +364,19 @@ impl<T: Storage<Data>> Controller for T {
     default fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
         // TODO: assertion check - ownership
         self._set_borrow_guardian_paused(&pool, paused)
+    }
+
+    default fn set_close_factor(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()> {
+        // TODO: assertion check - ownership
+        self._set_close_factor(new_close_factor_mantissa)
+    }
+
+    default fn set_liquidation_incentive(
+        &mut self,
+        new_liquidation_incentive_mantissa: WrappedU256,
+    ) -> Result<()> {
+        // TODO: assertion check - ownership
+        self._set_liquidation_incentive(new_liquidation_incentive_mantissa)
     }
 
     default fn markets(&self) -> Vec<AccountId> {
@@ -549,8 +568,9 @@ impl<T: Storage<Data>> Internal for T {
     ) -> Result<Balance> {
         todo!()
     }
-    default fn _set_price_oracle(&mut self, _new_oracle: AccountId) -> Result<()> {
-        todo!()
+    default fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
+        self.data().oracle = new_oracle;
+        Ok(())
     }
     default fn _support_market(&mut self, pool: &AccountId) -> Result<()> {
         self.data().markets.push(*pool);
@@ -565,13 +585,23 @@ impl<T: Storage<Data>> Internal for T {
         self.data().mint_guardian_paused.insert(pool, &paused);
         Ok(())
     }
-
     default fn _set_borrow_guardian_paused(
         &mut self,
         pool: &AccountId,
         paused: bool,
     ) -> Result<()> {
         self.data().borrow_guardian_paused.insert(pool, &paused);
+        Ok(())
+    }
+    default fn _set_close_factor(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()> {
+        self.data().close_factor_mantissa = new_close_factor_mantissa;
+        Ok(())
+    }
+    default fn _set_liquidation_incentive(
+        &mut self,
+        new_liquidation_incentive_mantissa: WrappedU256,
+    ) -> Result<()> {
+        self.data().liquidation_incentive_mantissa = new_liquidation_incentive_mantissa;
         Ok(())
     }
 
