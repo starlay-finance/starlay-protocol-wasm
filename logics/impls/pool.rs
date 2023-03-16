@@ -13,7 +13,6 @@ pub use crate::traits::{
 };
 use ink::{
     prelude::vec::Vec,
-    primitives::AccountId,
     LangError,
 };
 use openbrush::{
@@ -24,6 +23,7 @@ use openbrush::{
     },
     storage::Mapping,
     traits::{
+        AccountId,
         Balance,
         Storage,
         Timestamp,
