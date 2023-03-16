@@ -373,7 +373,7 @@ impl<T: Storage<Data>> Internal for T {
         _mint_amount: Balance,
         _mint_tokens: Balance,
     ) -> Result<()> {
-        todo!()
+        Ok(()) // do nothing
     }
     default fn _redeem_allowed(
         &self,
@@ -392,7 +392,7 @@ impl<T: Storage<Data>> Internal for T {
         _redeem_amount: Balance,
         _redeem_tokens: Balance,
     ) -> Result<()> {
-        todo!()
+        Ok(()) // do nothing
     }
     default fn _borrow_allowed(
         &self,
@@ -419,7 +419,7 @@ impl<T: Storage<Data>> Internal for T {
         _borrow_amount: Balance,
         _borrow_tokens: Balance,
     ) -> Result<()> {
-        todo!()
+        Ok(()) // do nothing
     }
     default fn _repay_borrow_allowed(
         &self,
@@ -440,7 +440,7 @@ impl<T: Storage<Data>> Internal for T {
         _repay_amount: Balance,
         _borrower_index: u128,
     ) -> Result<()> {
-        todo!()
+        Ok(()) // do nothing
     }
     default fn _liquidate_borrow_allowed(
         &self,
@@ -469,7 +469,7 @@ impl<T: Storage<Data>> Internal for T {
         _repay_amount: Balance,
         _seize_tokens: Balance,
     ) -> Result<()> {
-        todo!()
+        Ok(()) // do nothing
     }
     default fn _seize_allowed(
         &self,
@@ -502,7 +502,7 @@ impl<T: Storage<Data>> Internal for T {
         _borrower: AccountId,
         _seize_tokens: Balance,
     ) -> Result<()> {
-        todo!()
+        Ok(()) // do nothing
     }
     default fn _transfer_allowed(
         &self,
@@ -520,7 +520,7 @@ impl<T: Storage<Data>> Internal for T {
         _dst: AccountId,
         _transfer_tokens: Balance,
     ) -> Result<()> {
-        todo!()
+        Ok(()) // do nothing
     }
     default fn _liquidate_calculate_seize_tokens(
         &self,
