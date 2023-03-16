@@ -56,7 +56,6 @@ pub trait Internal {
         pool: AccountId,
         borrower: AccountId,
         borrow_amount: Balance,
-        borrow_tokens: Balance,
     ) -> Result<()>;
     fn _repay_borrow_allowed(
         &self,
@@ -194,9 +193,8 @@ impl<T: Storage<Data>> Controller for T {
         pool: AccountId,
         borrower: AccountId,
         borrow_amount: Balance,
-        borrow_tokens: Balance,
     ) -> Result<()> {
-        self._borrow_verify(pool, borrower, borrow_amount, borrow_tokens)
+        self._borrow_verify(pool, borrower, borrow_amount)
     }
 
     default fn repay_borrow_allowed(
@@ -417,7 +415,6 @@ impl<T: Storage<Data>> Internal for T {
         _pool: AccountId,
         _borrower: AccountId,
         _borrow_amount: Balance,
-        _borrow_tokens: Balance,
     ) -> Result<()> {
         Ok(()) // do nothing
     }

@@ -52,7 +52,6 @@ pub trait Controller {
         pool: AccountId,
         borrower: AccountId,
         borrow_amount: Balance,
-        borrow_tokens: Balance,
     ) -> Result<()>;
 
     #[ink(message)]
