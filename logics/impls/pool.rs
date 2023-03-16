@@ -363,6 +363,9 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
         self._emit_mint_event(minter, actual_mint_amount, mint_amount);
 
+        // skip post-process because nothing is done
+        // ControllerRef::mint_verify(&self._controller(), contract_addr, minter, actual_mint_amount, mint_amount).unwrap();
+
         Ok(())
     }
     default fn _redeem(
@@ -377,6 +380,9 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             (_, amount) if amount > 0 => (amount / exchange_rate, amount),
             _ => return Err(Error::InvalidParameter),
         };
+        if (redeem_tokens == 0 && redeem_amount > 0) || (redeem_tokens > 0 && redeem_amount == 0) {
+            return Err(Error::OnlyEitherRedeemTokensOrRedeemAmountIsZero)
+        }
 
         let contract_addr = Self::env().account_id();
         ControllerRef::redeem_allowed(&self._controller(), contract_addr, redeemer, redeem_tokens)
@@ -393,6 +399,9 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         self._transfer_underlying(redeemer, redeem_amount).unwrap();
 
         self._emit_redeem_event(redeemer, redeem_amount, redeem_tokens);
+
+        // skip post-process because nothing is done
+        // ControllerRef::redeem_verify(&self._controller(), contract_addr, redeemer, redeem_tokens, redeem_amount).unwrap();
 
         Ok(())
     }
@@ -430,6 +439,9 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             account_borrows_new,
             total_borrows_new,
         );
+
+        // skip post-process because nothing is done
+        // ControllerRef::borrow_verify(&self._controller(), contract_addr, borrower, borrow_amount).unwrap();
 
         Ok(())
     }
@@ -486,6 +498,9 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             total_borrows_new,
         );
 
+        // skip post-process because nothing is done
+        // ControllerRef::repay_borrow_verify(&self._controller(), contract_addr, payer, borrower, repay_amount_final, 0).unwrap(); // temp: index is zero (type difference)
+
         Ok(repay_amount_final)
     }
     default fn _liquidate_borrow(
@@ -526,13 +541,24 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             .unwrap();
 
         // seize
+        let seize_tokens = 0; // TODO: seize_token's amount (seize_tokens) calculated
         if collateral == contract_addr {
-            self._seize(contract_addr, liquidator, borrower, 0).unwrap(); // TODO: seize_token's amount (seize_tokens) calculated
+            self._seize(contract_addr, liquidator, borrower, seize_tokens)
+                .unwrap();
         } else {
-            PoolRef::seize(&collateral, liquidator, borrower, 0).unwrap(); // TODO: seize_token's amount (seize_tokens) calculated
+            PoolRef::seize(&collateral, liquidator, borrower, seize_tokens).unwrap();
         }
 
-        self._emit_liquidate_borrow_event(liquidator, borrower, actual_repay_amount, collateral, 0);
+        self._emit_liquidate_borrow_event(
+            liquidator,
+            borrower,
+            actual_repay_amount,
+            collateral,
+            seize_tokens,
+        );
+
+        // skip post-process because nothing is done
+        // ControllerRef::liquidate_borrow_verify(&self._controller(), contract_addr, collateral, liquidator, borrower, actual_repay_amount, seize_tokens).unwrap();
 
         Ok(())
     }
@@ -572,6 +598,9 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         self._mint_to(liquidator, liquidator_seize_token).unwrap();
 
         self._emit_reserves_added_event(contract_addr, protocol_seize_amount, total_reserves_new);
+
+        // skip post-process because nothing is done
+        // ControllerRef::seize_verify(&self._controller(), contract_addr, seizer_token, liquidator, borrower, seize_tokens).unwrap();
 
         Ok(())
     }
