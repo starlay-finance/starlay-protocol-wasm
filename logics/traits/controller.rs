@@ -180,6 +180,7 @@ pub enum Error {
     BorrowIsPaused,
     MarketNotListed,
     ControllerMismatch,
+    TooMuchRepay,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;
