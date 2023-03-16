@@ -104,6 +104,26 @@ fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInteres
         total_reserves: total_reserves_new.as_u128(), // TODO
     })
 }
+
+// returns liquidator_seize_tokens and protocolSeizeAmount
+fn protocol_seize_amount(
+    exchange_rate: Exp,
+    seize_tokens: Balance,
+    protocol_seize_share_mantissa: U256,
+) -> (Balance, Balance) {
+    let protocol_seize_tokens = Exp {
+        mantissa: WrappedU256::from(U256::from(seize_tokens).mul(protocol_seize_share_mantissa)),
+    }
+    .truncate();
+    let liquidator_seize_tokens = U256::from(seize_tokens).sub(protocol_seize_tokens);
+    (
+        liquidator_seize_tokens.as_u128(),
+        exchange_rate
+            .mul_scalar_truncate(protocol_seize_tokens)
+            .as_u128(),
+    )
+}
+
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
@@ -870,5 +890,22 @@ mod tests {
                 .add(U256::from(input.borrow_index.mantissa));
             assert_eq!(U256::from(got.borrow_index.mantissa), borrow_idx_want);
         }
+    }
+
+    #[test]
+    fn test_protocol_seize_amount() {
+        // 1%
+        let exchange_rate = Exp {
+            mantissa: (WrappedU256::from(
+                U256::from(10)
+                    .pow(U256::from(18))
+                    .mul(U256::one())
+                    .div(U256::from(100)),
+            )),
+        };
+        let seize_tokens = 10_u128.pow(18).mul(100000000000);
+        let protocol_seize_share_mantissa = U256::from(10).pow(U256::from(18));
+        let out = protocol_seize_amount(exchange_rate, seize_tokens, protocol_seize_share_mantissa);
+        assert_eq!(out.0, 1)
     }
 }
