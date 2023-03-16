@@ -14,7 +14,7 @@ pub mod contract {
     use openbrush::traits::Storage;
 
     #[ink(storage)]
-    #[derive(Storage)]
+    #[derive(Default, Storage)]
     pub struct ControllerContract {
         #[storage_field]
         controller: Data,
@@ -30,13 +30,7 @@ pub mod contract {
     impl ControllerContract {
         #[ink(constructor)]
         pub fn new() -> Self {
-            Self {
-                controller: Data {
-                    markets: Default::default(),
-                    mint_guardian_paused: Default::default(),
-                    borrow_guardian_paused: Default::default(),
-                },
-            }
+            Self::default()
         }
     }
 

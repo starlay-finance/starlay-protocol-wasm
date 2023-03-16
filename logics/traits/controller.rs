@@ -4,6 +4,8 @@ use openbrush::traits::{
     Balance,
 };
 
+use super::types::WrappedU256;
+
 #[openbrush::wrapper]
 pub type ControllerRef = dyn Controller;
 
@@ -152,6 +154,15 @@ pub trait Controller {
 
     #[ink(message)]
     fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()>;
+
+    #[ink(message)]
+    fn set_close_factor(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()>;
+
+    #[ink(message)]
+    fn set_liquidation_incentive(
+        &mut self,
+        new_liquidation_incentive_mantissa: WrappedU256,
+    ) -> Result<()>;
 
     // view function
     #[ink(message)]
