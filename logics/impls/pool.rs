@@ -1,15 +1,14 @@
-use core::ops::{
-    Add,
-    Div,
-    Mul,
-    Sub,
-};
-
 use crate::traits::types::WrappedU256;
 pub use crate::traits::{
     controller::ControllerRef,
     interest_rate_model::InterestRateModelRef,
     pool::*,
+};
+use core::ops::{
+    Add,
+    Div,
+    Mul,
+    Sub,
 };
 use ink::{
     prelude::vec::Vec,
@@ -20,6 +19,7 @@ use openbrush::{
         self,
         Internal as PSP22Internal,
         PSP22Ref,
+        PSP22,
     },
     storage::Mapping,
     traits::{
@@ -32,7 +32,10 @@ use openbrush::{
 };
 use primitive_types::U256;
 
-use super::exp_no_err::Exp;
+use super::exp_no_err::{
+    exp_scale,
+    Exp,
+};
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 
@@ -65,10 +68,11 @@ struct CalculateInterestOutput {
 
 fn borrow_rate_max_mantissa() -> U256 {
     // .0005% / time
-    U256::from(10)
-        .pow(U256::from(16))
-        .mul(U256::from(5))
-        .div(U256::from(1000))
+    exp_scale().mul(U256::from(5)).div(U256::from(1000 * 100))
+}
+
+fn protocol_seize_share_mantissa() -> U256 {
+    exp_scale().mul(U256::from(28)).div(U256::from(10 * 100)) // 2.8%
 }
 
 fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInterestOutput> {
@@ -104,6 +108,41 @@ fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInteres
         total_reserves: total_reserves_new.as_u128(), // TODO
     })
 }
+
+// returns liquidator_seize_tokens and protocolSeizeAmount
+fn protocol_seize_amount(
+    exchange_rate: Exp,
+    seize_tokens: Balance,
+    protocol_seize_share_mantissa: U256,
+) -> (Balance, Balance) {
+    let protocol_seize_tokens = Exp {
+        mantissa: WrappedU256::from(U256::from(seize_tokens).mul(protocol_seize_share_mantissa)),
+    }
+    .truncate();
+    let liquidator_seize_tokens = U256::from(seize_tokens).sub(protocol_seize_tokens);
+    (
+        liquidator_seize_tokens.as_u128(),
+        exchange_rate
+            .mul_scalar_truncate(protocol_seize_tokens)
+            .as_u128(),
+    )
+}
+
+fn exchange_rate(
+    total_supply: Balance,
+    total_cash: Balance,
+    total_borrows: Balance,
+    total_reserves: Balance,
+) -> U256 {
+    if total_supply == 0 {
+        return U256::zero()
+    };
+    let cash_plus_borrows_minus_reserves = total_cash.add(total_borrows).sub(total_reserves);
+    U256::from(cash_plus_borrows_minus_reserves)
+        .mul(exp_scale())
+        .div(U256::from(total_supply))
+}
+
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
@@ -185,6 +224,7 @@ pub trait Internal {
     fn _accural_block_timestamp(&self) -> Timestamp;
     fn _borrow_index(&self) -> Exp;
     fn _reserve_factor(&self) -> Exp;
+    fn _exchange_rate_stored(&self) -> U256;
 
     // event emission
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
@@ -301,6 +341,15 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         self._controller()
     }
 
+    default fn exchage_rate_stored(&self) -> WrappedU256 {
+        WrappedU256::from(self._exchange_rate_stored())
+    }
+
+    default fn exchange_rate_current(&mut self) -> Result<WrappedU256> {
+        self._accrue_interest()?;
+        Ok(self.exchage_rate_stored())
+    }
+
     default fn get_cash_prior(&self) -> Balance {
         self._get_cash_prior()
     }
@@ -382,10 +431,32 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         redeem_tokens_in: Balance,
         redeem_amount_in: Balance,
     ) -> Result<()> {
-        let exchange_rate = 1; // TODO: calculate exchange rate & redeem amount
+        let exchange_rate = Exp {
+            mantissa: WrappedU256::from(self._exchange_rate_stored()),
+        }; // TODO: calculate exchange rate & redeem amount
         let (redeem_tokens, redeem_amount) = match (redeem_tokens_in, redeem_amount_in) {
-            (tokens, _) if tokens > 0 => (tokens, tokens * exchange_rate),
-            (_, amount) if amount > 0 => (amount / exchange_rate, amount),
+            (tokens, _) if tokens > 0 => {
+                (
+                    tokens,
+                    exchange_rate
+                        .mul_scalar_truncate(U256::from(tokens))
+                        .as_u128(),
+                )
+            }
+            (_, amount) if amount > 0 => {
+                (
+                    Exp {
+                        mantissa: WrappedU256::from(
+                            U256::from(amount)
+                                .mul(exp_scale())
+                                .div(U256::from(exchange_rate.mantissa)),
+                        ),
+                    }
+                    .truncate()
+                    .as_u128(),
+                    amount,
+                )
+            }
             _ => return Err(Error::InvalidParameter),
         };
         if (redeem_tokens == 0 && redeem_amount > 0) || (redeem_tokens > 0 && redeem_amount == 0) {
@@ -586,19 +657,19 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         if liquidator == borrower {
             return Err(Error::LiquidateSeizeLiquidatorIsBorrower)
         }
-
         // calculate the new borrower and liquidator token balances
-        let protocol_seize_token = 0; // TODO
-        let liquidator_seize_token = seize_tokens - protocol_seize_token;
-        let exchange_rate = 1; // TODO
-        let protocol_seize_amount = protocol_seize_token * exchange_rate;
+        let exchange_rate = Exp {
+            mantissa: WrappedU256::from(self._exchange_rate_stored()),
+        };
+        let (liquidator_seize_tokens, protocol_seize_amount) =
+            protocol_seize_amount(exchange_rate, seize_tokens, protocol_seize_share_mantissa());
         let total_reserves_new = self._total_reserves() + protocol_seize_amount;
 
         // EFFECTS & INTERACTIONS
         self.data::<Data>().total_reserves = total_reserves_new;
         // total_supply = total_supply - protocol_seize_token; // TODO: check
         self._burn_from(borrower, seize_tokens).unwrap();
-        self._mint_to(liquidator, liquidator_seize_token).unwrap();
+        self._mint_to(liquidator, liquidator_seize_tokens).unwrap();
 
         self._emit_reserves_added_event(contract_addr, protocol_seize_amount, total_reserves_new);
         // skip post-process because nothing is done
@@ -767,6 +838,15 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         self._emit_reserves_reduced_event(amount, total_reserves_new);
         Ok(())
     }
+
+    fn _exchange_rate_stored(&self) -> U256 {
+        exchange_rate(
+            self.total_supply(),
+            self._get_cash_prior(),
+            self._total_borrows(),
+            self._total_reserves(),
+        )
+    }
 }
 
 pub fn to_psp22_error(e: psp22::PSP22Error) -> Error {
@@ -869,6 +949,88 @@ mod tests {
                 .div(U256::from(10_u128.pow(18)))
                 .add(U256::from(input.borrow_index.mantissa));
             assert_eq!(U256::from(got.borrow_index.mantissa), borrow_idx_want);
+        }
+    }
+
+    #[test]
+    // protocol_seize_tokens = seizeTokens * protocolSeizeShare
+    // liquidator_seize_tokens = seizeTokens - (seizeTokens * protocolSeizeShare)
+    // protocol_seize_amount = exchangeRate * protocolSeizeTokens
+    fn test_protocol_seize_amount() {
+        // 1%
+        let exchange_rate = Exp {
+            mantissa: (WrappedU256::from(
+                U256::from(10)
+                    .pow(U256::from(18))
+                    .mul(U256::one())
+                    .div(U256::from(100)),
+            )),
+        };
+        let seize_tokens = 10_u128.pow(18).mul(100000000000);
+        let protocol_seize_tokens = seize_tokens.mul(10).div(100);
+        let protocol_seize_share_mantissa = U256::from(10_u128.pow(18).div(10)); // 10%
+        let liquidator_seize_tokens_want = seize_tokens.mul(9).div(10);
+        let protocol_seize_amount_want = protocol_seize_tokens.mul(1).div(100); // 1%
+        let (liquidator_seize_tokens_got, protocol_seize_amount_got) =
+            protocol_seize_amount(exchange_rate, seize_tokens, protocol_seize_share_mantissa);
+        assert_eq!(liquidator_seize_tokens_got, liquidator_seize_tokens_want);
+        assert_eq!(protocol_seize_amount_got, protocol_seize_amount_want);
+    }
+    #[test]
+    fn test_exchange_rate_in_case_total_supply_is_zero() {
+        assert_eq!(exchange_rate(0, 1, 1, 1), U256::zero());
+    }
+
+    #[test]
+    fn test_exchange_rate() {
+        let with_dec = |val: u128| 10_u128.pow(18).mul(val);
+        struct Case {
+            total_cash: u128,
+            total_borrows: u128,
+            total_reserves: u128,
+            total_supply: u128,
+        }
+        let cases: &[Case] = &[
+            Case {
+                total_cash: with_dec(999987),
+                total_borrows: with_dec(199987),
+                total_reserves: with_dec(299987),
+                total_supply: with_dec(1999987),
+            },
+            Case {
+                total_cash: with_dec(999983),
+                total_borrows: with_dec(199983),
+                total_reserves: with_dec(299983),
+                total_supply: with_dec(1999983),
+            },
+            Case {
+                total_cash: with_dec(1999983),
+                total_borrows: with_dec(1199983),
+                total_reserves: with_dec(1299983),
+                total_supply: with_dec(11999983),
+            },
+            Case {
+                total_cash: with_dec(1234567),
+                total_borrows: with_dec(234567),
+                total_reserves: with_dec(34567),
+                total_supply: with_dec(11999983),
+            },
+        ];
+        for case in cases {
+            let rate_want = U256::from(10_u128.pow(18))
+                .mul(U256::from(
+                    case.total_cash + case.total_borrows - case.total_reserves,
+                ))
+                .div(U256::from(case.total_supply));
+            assert_eq!(
+                exchange_rate(
+                    case.total_supply,
+                    case.total_cash,
+                    case.total_borrows,
+                    case.total_reserves
+                ),
+                rate_want
+            )
         }
     }
 }
