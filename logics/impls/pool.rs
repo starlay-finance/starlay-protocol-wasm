@@ -71,6 +71,10 @@ fn borrow_rate_max_mantissa() -> U256 {
         .div(U256::from(1000))
 }
 
+fn protocol_seize_share_mantissa() -> U256 {
+    U256::from(10_u128.pow(15).mul(28)) // 2.8%
+}
+
 fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInterestOutput> {
     if input.borrow_rate.gt(&borrow_rate_max_mantissa()) {
         return Err(Error::BorrowRateIsAbsurdlyHigh)
@@ -104,6 +108,26 @@ fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInteres
         total_reserves: total_reserves_new.as_u128(), // TODO
     })
 }
+
+// returns liquidator_seize_tokens and protocolSeizeAmount
+fn protocol_seize_amount(
+    exchange_rate: Exp,
+    seize_tokens: Balance,
+    protocol_seize_share_mantissa: U256,
+) -> (Balance, Balance) {
+    let protocol_seize_tokens = Exp {
+        mantissa: WrappedU256::from(U256::from(seize_tokens).mul(protocol_seize_share_mantissa)),
+    }
+    .truncate();
+    let liquidator_seize_tokens = U256::from(seize_tokens).sub(protocol_seize_tokens);
+    (
+        liquidator_seize_tokens.as_u128(),
+        exchange_rate
+            .mul_scalar_truncate(protocol_seize_tokens)
+            .as_u128(),
+    )
+}
+
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
@@ -586,19 +610,20 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         if liquidator == borrower {
             return Err(Error::LiquidateSeizeLiquidatorIsBorrower)
         }
-
         // calculate the new borrower and liquidator token balances
-        let protocol_seize_token = 0; // TODO
-        let liquidator_seize_token = seize_tokens - protocol_seize_token;
-        let exchange_rate = 1; // TODO
-        let protocol_seize_amount = protocol_seize_token * exchange_rate;
+        // TODO: Exchange rate
+        let exchange_rate = Exp {
+            mantissa: WrappedU256::from(U256::from(10_u128.pow(18).div(100))),
+        };
+        let (liquidator_seize_tokens, protocol_seize_amount) =
+            protocol_seize_amount(exchange_rate, seize_tokens, protocol_seize_share_mantissa());
         let total_reserves_new = self._total_reserves() + protocol_seize_amount;
 
         // EFFECTS & INTERACTIONS
         self.data::<Data>().total_reserves = total_reserves_new;
         // total_supply = total_supply - protocol_seize_token; // TODO: check
         self._burn_from(borrower, seize_tokens).unwrap();
-        self._mint_to(liquidator, liquidator_seize_token).unwrap();
+        self._mint_to(liquidator, liquidator_seize_tokens).unwrap();
 
         self._emit_reserves_added_event(contract_addr, protocol_seize_amount, total_reserves_new);
         // skip post-process because nothing is done
@@ -870,5 +895,30 @@ mod tests {
                 .add(U256::from(input.borrow_index.mantissa));
             assert_eq!(U256::from(got.borrow_index.mantissa), borrow_idx_want);
         }
+    }
+
+    #[test]
+    // protocol_seize_tokens = seizeTokens * protocolSeizeShare
+    // liquidator_seize_tokens = seizeTokens - (seizeTokens * protocolSeizeShare)
+    // protocol_seize_amount = exchangeRate * protocolSeizeTokens
+    fn test_protocol_seize_amount() {
+        // 1%
+        let exchange_rate = Exp {
+            mantissa: (WrappedU256::from(
+                U256::from(10)
+                    .pow(U256::from(18))
+                    .mul(U256::one())
+                    .div(U256::from(100)),
+            )),
+        };
+        let seize_tokens = 10_u128.pow(18).mul(100000000000);
+        let protocol_seize_tokens = seize_tokens.mul(10).div(100);
+        let protocol_seize_share_mantissa = U256::from(10_u128.pow(18).div(10)); // 10%
+        let liquidator_seize_tokens_want = seize_tokens.mul(9).div(10);
+        let protocol_seize_amount_want = protocol_seize_tokens.mul(1).div(100); // 1%
+        let (liquidator_seize_tokens_got, protocol_seize_amount_got) =
+            protocol_seize_amount(exchange_rate, seize_tokens, protocol_seize_share_mantissa);
+        assert_eq!(liquidator_seize_tokens_got, liquidator_seize_tokens_want);
+        assert_eq!(protocol_seize_amount_got, protocol_seize_amount_want);
     }
 }
