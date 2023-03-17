@@ -14,7 +14,7 @@ use openbrush::traits::String;
 use primitive_types::U256;
 
 use crate::traits::types::WrappedU256;
-fn exp_scale() -> U256 {
+pub fn exp_scale() -> U256 {
     U256::from(10_u128.pow(18))
 }
 fn double_scale() -> U256 {
