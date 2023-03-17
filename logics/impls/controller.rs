@@ -501,14 +501,23 @@ impl<T: Storage<Data>> Internal for T {
         &self,
         pool: AccountId,
         _borrower: AccountId,
-        _borrow_amount: Balance,
+        borrow_amount: Balance,
     ) -> Result<()> {
         if let Some(true) | None = self._borrow_guardian_paused(pool) {
             return Err(Error::BorrowIsPaused)
         }
         // TODO: assertion check - check to already entry market by borrower
         // TODO: assertion check - check oracle price for underlying asset
-        // TODO: assertion check - borrow cap
+
+        let borrow_cap = self._borrow_cap(pool).unwrap();
+        // borrow cap of 0 corresponds to unlimited borrowing
+        if borrow_cap != 0 {
+            let total_borrow = PoolRef::total_borrows(&pool);
+            if total_borrow > borrow_cap - borrow_amount {
+                return Err(Error::BorrowCapReached)
+            }
+        }
+
         // TODO: assertion check - HypotheticalAccountLiquidity
 
         // TODO: keep the flywheel moving

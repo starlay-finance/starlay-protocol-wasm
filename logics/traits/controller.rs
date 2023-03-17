@@ -194,6 +194,7 @@ pub enum Error {
     ControllerMismatch,
     PriceError,
     TooMuchRepay,
+    BorrowCapReached,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;
