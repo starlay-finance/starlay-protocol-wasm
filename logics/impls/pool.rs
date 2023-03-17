@@ -68,14 +68,11 @@ struct CalculateInterestOutput {
 
 fn borrow_rate_max_mantissa() -> U256 {
     // .0005% / time
-    U256::from(10)
-        .pow(U256::from(16))
-        .mul(U256::from(5))
-        .div(U256::from(1000))
+    exp_scale().mul(U256::from(5)).div(U256::from(1000 * 100))
 }
 
 fn protocol_seize_share_mantissa() -> U256 {
-    U256::from(10_u128.pow(15).mul(28)) // 2.8%
+    exp_scale().mul(U256::from(28)).div(U256::from(10 * 100)) // 2.8%
 }
 
 fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInterestOutput> {
