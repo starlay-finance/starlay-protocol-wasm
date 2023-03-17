@@ -66,14 +66,6 @@ struct CalculateInterestOutput {
     interest_accumulated: Balance,
 }
 
-struct LiquidateCalculateSeizeTokensInput {
-    price_borrowed_mantissa: U256,
-    price_collateral_mantissa: U256,
-    exchange_rate_mantissa: U256,
-    liquidation_incentive_mantissa: U256,
-    actual_repay_amount: Balance,
-}
-
 fn borrow_rate_max_mantissa() -> U256 {
     // .0005% / time
     U256::from(10)
@@ -84,27 +76,6 @@ fn borrow_rate_max_mantissa() -> U256 {
 
 fn protocol_seize_share_mantissa() -> U256 {
     U256::from(10_u128.pow(15).mul(28)) // 2.8%
-}
-
-fn liquidate_calculate_seize_tokens(input: LiquidateCalculateSeizeTokensInput) -> Result<Balance> {
-    if input.price_borrowed_mantissa.is_zero() || input.price_collateral_mantissa.is_zero() {
-        return Err(Error::PriceError)
-    }
-    let numerator = Exp {
-        mantissa: WrappedU256::from(input.liquidation_incentive_mantissa),
-    }
-    .mul(Exp {
-        mantissa: WrappedU256::from(input.price_borrowed_mantissa),
-    });
-    let denominator = Exp {
-        mantissa: WrappedU256::from(input.price_collateral_mantissa),
-    }
-    .mul(Exp {
-        mantissa: WrappedU256::from(input.exchange_rate_mantissa),
-    });
-    let ratio = numerator.div(denominator);
-    let seize_tokens = ratio.mul_scalar_truncate(U256::from(input.actual_repay_amount));
-    Ok(seize_tokens.as_u128())
 }
 
 fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInterestOutput> {

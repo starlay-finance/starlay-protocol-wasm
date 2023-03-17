@@ -17,7 +17,13 @@ use openbrush::{
 use primitive_types::U256;
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
-
+struct LiquidateCalculateSeizeTokensInput {
+    price_borrowed_mantissa: U256,
+    price_collateral_mantissa: U256,
+    exchange_rate_mantissa: U256,
+    liquidation_incentive_mantissa: U256,
+    actual_repay_amount: Balance,
+}
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
@@ -27,6 +33,27 @@ pub struct Data {
     pub oracle: AccountId,
     pub close_factor_mantissa: WrappedU256,
     pub liquidation_incentive_mantissa: WrappedU256,
+}
+
+fn liquidate_calculate_seize_tokens(input: LiquidateCalculateSeizeTokensInput) -> Result<Balance> {
+    if input.price_borrowed_mantissa.is_zero() || input.price_collateral_mantissa.is_zero() {
+        return Err(Error::PriceError)
+    }
+    let numerator = Exp {
+        mantissa: WrappedU256::from(input.liquidation_incentive_mantissa),
+    }
+    .mul(Exp {
+        mantissa: WrappedU256::from(input.price_borrowed_mantissa),
+    });
+    let denominator = Exp {
+        mantissa: WrappedU256::from(input.price_collateral_mantissa),
+    }
+    .mul(Exp {
+        mantissa: WrappedU256::from(input.exchange_rate_mantissa),
+    });
+    let ratio = numerator.div(denominator);
+    let seize_tokens = ratio.mul_scalar_truncate(U256::from(input.actual_repay_amount));
+    Ok(seize_tokens.as_u128())
 }
 
 impl Default for Data {
@@ -635,4 +662,19 @@ impl<T: Storage<Data>> Internal for T {
     }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Exp;
+
+    use super::*;
+    use primitive_types::U256;
+    #[test]
+    fn test_liquidate_calculate_seize_tokens() {
+
+        //  seize_amount = actual_repay_amount * liquidation_incentive * price_borrowed / price_collateral
+        //  seize_tokens = seize_amount / exchange_rate
+        //   = actual_repay_amount * (liquidation_incentive * price_borrowed) / (price_collateral * exchange_rate)
+    }
 }
