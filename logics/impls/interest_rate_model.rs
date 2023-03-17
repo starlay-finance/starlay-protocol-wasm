@@ -108,15 +108,15 @@ impl Data {
 
     fn supply_rate(
         &self,
-        _cash: Balance,
-        _borrows: Balance,
-        _reserves: Balance,
-        _reserve_factor_mantissa: WrappedU256,
+        cash: Balance,
+        borrows: Balance,
+        reserves: Balance,
+        reserve_factor_mantissa: WrappedU256,
     ) -> WrappedU256 {
-        let one_minus_reserve_factor = U256::from(base()).sub(_reserve_factor_mantissa);
-        let borrow_rate = self.borrow_rate(_cash, _borrows, _reserves);
+        let one_minus_reserve_factor = U256::from(base()).sub(reserve_factor_mantissa);
+        let borrow_rate = self.borrow_rate(cash, borrows, reserves);
         WrappedU256::from(supply_rate(
-            utilization_rate(_cash, _borrows, _reserves),
+            utilization_rate(cash, borrows, reserves),
             U256::from(borrow_rate),
             one_minus_reserve_factor,
         ))
@@ -157,21 +157,21 @@ impl<T: Storage<Data>> InterestRateModel for T {
 impl<T: Storage<Data>> Internal for T {
     default fn _get_borrow_rate(
         &self,
-        _cash: Balance,
-        _borrows: Balance,
-        _reserves: Balance,
+        cash: Balance,
+        borrows: Balance,
+        reserves: Balance,
     ) -> WrappedU256 {
-        self.data().borrow_rate(_cash, _borrows, _reserves)
+        self.data().borrow_rate(cash, borrows, reserves)
     }
     default fn _get_supply_rate(
         &self,
-        _cash: Balance,
-        _borrows: Balance,
-        _reserves: Balance,
-        _reserve_factor_mantissa: WrappedU256,
+        cash: Balance,
+        borrows: Balance,
+        reserves: Balance,
+        reserve_factor_mantissa: WrappedU256,
     ) -> WrappedU256 {
         self.data()
-            .supply_rate(_cash, _borrows, _reserves, _reserve_factor_mantissa)
+            .supply_rate(cash, borrows, reserves, reserve_factor_mantissa)
     }
 }
 
