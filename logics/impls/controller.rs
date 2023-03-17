@@ -176,8 +176,8 @@ pub trait Internal {
     fn _support_market(&mut self, pool: &AccountId) -> Result<()>;
     fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
     fn _set_borrow_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
-    fn _set_close_factor(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()>;
-    fn _set_liquidation_incentive(
+    fn _set_close_factor_mantissa(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()>;
+    fn _set_liquidation_incentive_mantissa(
         &mut self,
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()>;
@@ -187,8 +187,9 @@ pub trait Internal {
     fn _is_listed_market(&self, pool: AccountId) -> bool;
     fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
-    fn _close_factor_mantissa(&self) -> Exp;
-    fn _liquidation_incentive_mantissa(&self) -> Exp;
+    fn _oracle(&self) -> AccountId;
+    fn _close_factor_mantissa(&self) -> WrappedU256;
+    fn _liquidation_incentive_mantissa(&self) -> WrappedU256;
 
     // event emission
     fn _emit_market_listed_event(&self, pool: AccountId);
@@ -393,17 +394,20 @@ impl<T: Storage<Data>> Controller for T {
         self._set_borrow_guardian_paused(&pool, paused)
     }
 
-    default fn set_close_factor(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()> {
+    default fn set_close_factor_mantissa(
+        &mut self,
+        new_close_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
         // TODO: assertion check - ownership
-        self._set_close_factor(new_close_factor_mantissa)
+        self._set_close_factor_mantissa(new_close_factor_mantissa)
     }
 
-    default fn set_liquidation_incentive(
+    default fn set_liquidation_incentive_mantissa(
         &mut self,
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()> {
         // TODO: assertion check - ownership
-        self._set_liquidation_incentive(new_liquidation_incentive_mantissa)
+        self._set_liquidation_incentive_mantissa(new_liquidation_incentive_mantissa)
     }
 
     default fn markets(&self) -> Vec<AccountId> {
@@ -414,6 +418,15 @@ impl<T: Storage<Data>> Controller for T {
     }
     default fn borrow_guardian_paused(&self, pool: AccountId) -> Option<bool> {
         self._borrow_guardian_paused(pool)
+    }
+    default fn oracle(&self) -> AccountId {
+        self._oracle()
+    }
+    default fn close_factor_mantissa(&self) -> WrappedU256 {
+        self._close_factor_mantissa()
+    }
+    default fn liquidation_incentive_mantissa(&self) -> WrappedU256 {
+        self._liquidation_incentive_mantissa()
     }
 }
 
@@ -512,8 +525,8 @@ impl<T: Storage<Data>> Internal for T {
         pool_borrowed: AccountId,
         pool_collateral: AccountId,
         _liquidator: AccountId,
-        _borrower: AccountId,
-        _repay_amount: Balance,
+        borrower: AccountId,
+        repay_amount: Balance,
     ) -> Result<()> {
         if !self._is_listed_market(pool_borrowed) || !self._is_listed_market(pool_collateral) {
             return Err(Error::MarketNotListed)
@@ -521,7 +534,16 @@ impl<T: Storage<Data>> Internal for T {
 
         // TODO: calculate account's liquidity
         //   The borrower must have shortfall in order to be liquidatable
+
         //   The liquidator may not repay more than what is allowed by the closeFactor
+        let bollow_balance = PoolRef::borrow_balance_stored(&pool_borrowed, borrower);
+        let max_close = Exp {
+            mantissa: self._close_factor_mantissa(),
+        }
+        .mul_scalar_truncate(U256::from(bollow_balance));
+        if U256::from(repay_amount).gt(&max_close) {
+            return Err(Error::TooMuchRepay)
+        }
 
         Ok(())
     }
@@ -620,11 +642,14 @@ impl<T: Storage<Data>> Internal for T {
         self.data().borrow_guardian_paused.insert(pool, &paused);
         Ok(())
     }
-    default fn _set_close_factor(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()> {
+    default fn _set_close_factor_mantissa(
+        &mut self,
+        new_close_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
         self.data().close_factor_mantissa = new_close_factor_mantissa;
         Ok(())
     }
-    default fn _set_liquidation_incentive(
+    default fn _set_liquidation_incentive_mantissa(
         &mut self,
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()> {
@@ -650,15 +675,14 @@ impl<T: Storage<Data>> Internal for T {
     default fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool> {
         self.data().borrow_guardian_paused.get(&pool)
     }
-    default fn _close_factor_mantissa(&self) -> Exp {
-        Exp {
-            mantissa: self.data::<Data>().close_factor_mantissa,
-        }
+    default fn _oracle(&self) -> AccountId {
+        self.data().oracle
     }
-    default fn _liquidation_incentive_mantissa(&self) -> Exp {
-        Exp {
-            mantissa: self.data::<Data>().liquidation_incentive_mantissa,
-        }
+    default fn _close_factor_mantissa(&self) -> WrappedU256 {
+        self.data::<Data>().close_factor_mantissa
+    }
+    default fn _liquidation_incentive_mantissa(&self) -> WrappedU256 {
+        self.data::<Data>().liquidation_incentive_mantissa
     }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}

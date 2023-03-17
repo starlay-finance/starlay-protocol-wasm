@@ -156,10 +156,10 @@ pub trait Controller {
     fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()>;
 
     #[ink(message)]
-    fn set_close_factor(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()>;
+    fn set_close_factor_mantissa(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()>;
 
     #[ink(message)]
-    fn set_liquidation_incentive(
+    fn set_liquidation_incentive_mantissa(
         &mut self,
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()>;
@@ -171,6 +171,12 @@ pub trait Controller {
     fn mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     #[ink(message)]
     fn borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
+    #[ink(message)]
+    fn oracle(&self) -> AccountId;
+    #[ink(message)]
+    fn close_factor_mantissa(&self) -> WrappedU256;
+    #[ink(message)]
+    fn liquidation_incentive_mantissa(&self) -> WrappedU256;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -181,6 +187,7 @@ pub enum Error {
     MarketNotListed,
     ControllerMismatch,
     PriceError,
+    TooMuchRepay,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

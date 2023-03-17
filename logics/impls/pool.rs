@@ -56,7 +56,7 @@ struct CalculateInterestInput {
     borrow_rate: U256,
     old_block_timestamp: Timestamp,
     new_block_timestamp: Timestamp,
-    reserve_factor: U256,
+    reserve_factor_mantissa: U256,
 }
 
 struct CalculateInterestOutput {
@@ -68,14 +68,11 @@ struct CalculateInterestOutput {
 
 fn borrow_rate_max_mantissa() -> U256 {
     // .0005% / time
-    U256::from(10)
-        .pow(U256::from(16))
-        .mul(U256::from(5))
-        .div(U256::from(1000))
+    exp_scale().mul(U256::from(5)).div(U256::from(1000 * 100))
 }
 
 fn protocol_seize_share_mantissa() -> U256 {
-    U256::from(10_u128.pow(15).mul(28)) // 2.8%
+    exp_scale().mul(U256::from(28)).div(U256::from(10 * 100)) // 2.8%
 }
 
 fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInterestOutput> {
@@ -95,7 +92,7 @@ fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInteres
 
     let total_borrows_new = interest_accumulated.as_u128().add(input.total_borrows);
     let total_reserves_new = Exp {
-        mantissa: WrappedU256::from(input.reserve_factor),
+        mantissa: WrappedU256::from(input.reserve_factor_mantissa),
     }
     .mul_scalar_truncate_add_uint(interest_accumulated, U256::from(input.total_reserves));
     let borrow_index_new = simple_interest_factor.mul_scalar_truncate_add_uint(
@@ -157,7 +154,7 @@ pub struct Data {
     pub account_borrows: Mapping<AccountId, BorrowSnapshot>,
     pub accural_block_timestamp: Timestamp,
     pub borrow_index: WrappedU256,
-    pub reserve_factor: WrappedU256,
+    pub reserve_factor_mantissa: WrappedU256,
 }
 
 impl Default for Data {
@@ -171,7 +168,7 @@ impl Default for Data {
             account_borrows: Default::default(),
             accural_block_timestamp: 0,
             borrow_index: WrappedU256::from(U256::zero()),
-            reserve_factor: WrappedU256::from(U256::zero()),
+            reserve_factor_mantissa: WrappedU256::from(U256::zero()),
         }
     }
 }
@@ -226,7 +223,7 @@ pub trait Internal {
     fn _borrow_balance_stored(&self, account: AccountId) -> Balance;
     fn _accural_block_timestamp(&self) -> Timestamp;
     fn _borrow_index(&self) -> Exp;
-    fn _reserve_factor(&self) -> Exp;
+    fn _reserve_factor_mantissa(&self) -> WrappedU256;
     fn _exchange_rate_stored(&self) -> U256;
 
     // event emission
@@ -392,7 +389,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             borrow_rate: borrow_rate.into(),
             old_block_timestamp: self._accural_block_timestamp(),
             new_block_timestamp: at,
-            reserve_factor: self._reserve_factor().mantissa.into(),
+            reserve_factor_mantissa: self._reserve_factor_mantissa().into(),
         })?;
 
         let mut data = self.data::<Data>();
@@ -749,10 +746,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             .as_u128()
     }
 
-    default fn _reserve_factor(&self) -> Exp {
-        Exp {
-            mantissa: self.data::<Data>().reserve_factor,
-        }
+    default fn _reserve_factor_mantissa(&self) -> WrappedU256 {
+        self.data::<Data>().reserve_factor_mantissa
     }
 
     // event emission
@@ -878,7 +873,7 @@ mod tests {
             borrow_rate: U256::one().mul(U256::from(10)).pow(U256::from(18)),
             new_block_timestamp: Timestamp::default(),
             old_block_timestamp: Timestamp::default(),
-            reserve_factor: U256::zero(),
+            reserve_factor_mantissa: U256::zero(),
             total_borrows: Balance::default(),
             total_reserves: Balance::default(),
         };
@@ -897,7 +892,7 @@ mod tests {
                     mantissa: WrappedU256::from(U256::zero()),
                 },
                 borrow_rate: mantissa().div(100000), // 0.001 %
-                reserve_factor: mantissa().div(100), // 1 %
+                reserve_factor_mantissa: mantissa().div(100), // 1 %
                 total_borrows: 10_000 * (10_u128.pow(18)),
                 total_reserves: 10_000 * (10_u128.pow(18)),
             },
@@ -908,7 +903,7 @@ mod tests {
                     mantissa: WrappedU256::from(U256::from(123123123)),
                 },
                 borrow_rate: mantissa().div(1000000),
-                reserve_factor: mantissa().div(10),
+                reserve_factor_mantissa: mantissa().div(10),
                 total_borrows: 100_000 * (10_u128.pow(18)),
                 total_reserves: 1_000_000 * (10_u128.pow(18)),
             },
@@ -919,7 +914,7 @@ mod tests {
                     mantissa: WrappedU256::from(U256::from(123123123)),
                 },
                 borrow_rate: mantissa().div(123123),
-                reserve_factor: mantissa().div(10).mul(2),
+                reserve_factor_mantissa: mantissa().div(10).mul(2),
                 total_borrows: 123_456 * (10_u128.pow(18)),
                 total_reserves: 789_012 * (10_u128.pow(18)),
             },
@@ -938,7 +933,7 @@ mod tests {
                 .mul(U256::from(input.total_borrows))
                 .div(mantissa())
                 .as_u128();
-            let reserves_want = U256::from(input.reserve_factor)
+            let reserves_want = U256::from(input.reserve_factor_mantissa)
                 .mul(U256::from(interest_want))
                 .div(U256::from(10_u128.pow(18)))
                 .add(U256::from(input.total_reserves));
