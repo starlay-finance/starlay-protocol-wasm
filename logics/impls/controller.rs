@@ -485,8 +485,8 @@ impl<T: Storage<Data>> Internal for T {
         pool_borrowed: AccountId,
         pool_collateral: AccountId,
         _liquidator: AccountId,
-        _borrower: AccountId,
-        _repay_amount: Balance,
+        borrower: AccountId,
+        repay_amount: Balance,
     ) -> Result<()> {
         if !self._is_listed_market(pool_borrowed) || !self._is_listed_market(pool_collateral) {
             return Err(Error::MarketNotListed)
@@ -494,7 +494,15 @@ impl<T: Storage<Data>> Internal for T {
 
         // TODO: calculate account's liquidity
         //   The borrower must have shortfall in order to be liquidatable
+
         //   The liquidator may not repay more than what is allowed by the closeFactor
+        let bollow_balance = PoolRef::borrow_balance_stored(&pool_borrowed, borrower);
+        let max_close = self
+            ._close_factor_mantissa()
+            .mul_scalar_truncate(U256::from(bollow_balance));
+        if U256::from(repay_amount).gt(&max_close) {
+            return Err(Error::TooMuchRepay)
+        }
 
         Ok(())
     }
