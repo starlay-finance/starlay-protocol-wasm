@@ -72,7 +72,7 @@ fn borrow_rate_max_mantissa() -> U256 {
 }
 
 fn protocol_seize_share_mantissa() -> U256 {
-    U256::from(10_u128.pow(15).mul(28))
+    U256::from(10_u128.pow(15).mul(28)) // 2.8%
 }
 
 fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInterestOutput> {
