@@ -52,6 +52,7 @@ pub mod contract {
             },
             DefaultEnvironment,
         };
+        use logics::traits::types::WrappedU256;
         use openbrush::traits::ZERO_ADDRESS;
 
         type Event = <ControllerContract as ink::reflect::ContractEventBase>::Type;
@@ -81,6 +82,12 @@ pub mod contract {
 
             let contract = ControllerContract::new();
             assert_eq!(contract.markets(), []);
+            assert_eq!(contract.oracle(), ZERO_ADDRESS.into());
+            assert_eq!(contract.close_factor_mantissa(), WrappedU256::from(0));
+            assert_eq!(
+                contract.liquidation_incentive_mantissa(),
+                WrappedU256::from(0)
+            );
         }
 
         #[ink::test]
