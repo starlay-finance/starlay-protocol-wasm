@@ -255,6 +255,7 @@ pub mod contract {
             assert_eq!(contract.markets(), [p1]);
             assert_eq!(contract.mint_guardian_paused(p1), Some(false));
             assert_eq!(contract.borrow_guardian_paused(p1), Some(false));
+            assert_eq!(contract.borrow_cap(p1), Some(0));
             let event = decode_market_listed_event(get_emitted_events()[0].clone());
             assert_eq!(event.pool, p1);
 
