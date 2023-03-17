@@ -10,9 +10,6 @@ jobs:
   unit-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Git branch name
-        id: git-branch-name
-        uses: EthanSK/git-branch-name-action@v1
       - name: Checkout the source code
         uses: actions/checkout@v3
       - id: cache-rustup
@@ -36,9 +33,9 @@ jobs:
         with:
           path: |
             **/target
-          key: artifacts-${{ runner.os }}-${{ env.GIT_BRANCH_NAME }}
+          key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
           restore-keys: |
-            artifacts-${{ runner.os }}-
+            artifacts-${{ runner.os }}-${{ runner.arch }}-
       - name: Check if cargo-contract exists
         id: check-cargo-contract
         continue-on-error: true
@@ -65,6 +62,6 @@ jobs:
         with:
           path: |
             **/target
-          key: artifacts-${{ runner.os }}-${{ env.GIT_BRANCH_NAME }}
+          key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
       - name: test
         run: cargo test
