@@ -394,7 +394,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         let cash = self._get_cash_prior();
         let borrows = self._total_borrows();
         let reserves = self._total_reserves();
-        let reserve_factor = self.data::<Data>().reserve_factor_mantissa;
+        let reserve_factor = self._reserve_factor_mantissa();
         self._supply_rate_per_msec(cash, borrows, reserves, reserve_factor)
     }
 
