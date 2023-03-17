@@ -1,5 +1,7 @@
 import { encodeAddress } from '@polkadot/keyring'
+import BN from 'bn.js'
 import { deployController } from './testContractsHelper'
+import { zeroAddress } from './testHelpers'
 
 describe('Controller spec', () => {
   const setup = async () => {
@@ -18,9 +20,36 @@ describe('Controller spec', () => {
     const { controller } = await setup()
     const markets = (await controller.query.markets()).value.ok
     expect(markets.length).toBe(0)
+    expect((await controller.query.oracle()).value.ok).toEqual(zeroAddress)
+    const closeFactorMantissa = (await controller.query.closeFactorMantissa())
+      .value.ok
+    expect(closeFactorMantissa).toEqual(0)
+    const liquidationIncentiveMantissa = (
+      await controller.query.liquidationIncentiveMantissa()
+    ).value.ok
+    expect(liquidationIncentiveMantissa).toEqual(0)
   })
 
-  it('add pool', async () => {
+  it('.set_close_factor_mantissa', async () => {
+    const { controller } = await setup()
+    const expScale = new BN(10).pow(new BN(18))
+    const bn = expScale.mul(new BN(5)).div(new BN(100)) // 5%
+    await controller.tx.setCloseFactorMantissa([bn])
+    const after = (await controller.query.closeFactorMantissa()).value.ok
+    expect(bn.toString()).toEqual(BigInt(after.toString()).toString())
+  })
+
+  it('.liquidation_incentive_mantissa', async () => {
+    const { controller } = await setup()
+    const expScale = new BN(10).pow(new BN(18))
+    const bn = expScale.mul(new BN(5)).div(new BN(100)) // 5%
+    await controller.tx.setLiquidationIncentiveMantissa([bn])
+    const after = (await controller.query.liquidationIncentiveMantissa()).value
+      .ok
+    expect(bn.toString()).toEqual(BigInt(after.toString()).toString())
+  })
+
+  it('.support_market', async () => {
     const { controller } = await setup()
 
     const tokenAddress = encodeAddress(
