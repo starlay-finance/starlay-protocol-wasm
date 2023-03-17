@@ -24,6 +24,7 @@ impl<T: Storage<Data>> PriceOracle for T {
 
 impl<T: Storage<Data>> Internal for T {
     default fn _get_price(&self, _asset: AccountId) -> u128 {
-        todo!()
+        // TDOO
+        12345678
     }
 }

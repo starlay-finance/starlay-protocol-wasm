@@ -48,7 +48,7 @@ impl Exp {
         self._op(another, |o, v| o.sub(v))
     }
 
-    fn mul(&self, another: Exp) -> Exp {
+    pub fn mul(&self, another: Exp) -> Exp {
         self._op(another, |o, v| o.mul(v).div(exp_scale()))
     }
 
@@ -58,7 +58,7 @@ impl Exp {
         }
     }
 
-    fn div(&self, another: Exp) -> Exp {
+    pub fn div(&self, another: Exp) -> Exp {
         self._op(another, |o, v| o.mul(exp_scale()).div(v))
     }
     pub fn mul_scalar_truncate(&self, scalar: U256) -> U256 {

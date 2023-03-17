@@ -87,6 +87,7 @@ pub enum Error {
     ReduceReservesCashNotAvailable,
     ReduceReservesCashValidation,
     BorrowRateIsAbsurdlyHigh,
+    PriceError,
     PSP22(PSP22Error),
     Lang(LangError),
 }
