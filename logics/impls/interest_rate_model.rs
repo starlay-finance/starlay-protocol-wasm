@@ -63,7 +63,7 @@ pub trait Internal {
         cash: Balance,
         borrows: Balance,
         reserves: Balance,
-        reserve_factor_mantissa: Balance,
+        reserve_factor_mantissa: WrappedU256,
     ) -> WrappedU256;
 }
 
@@ -111,10 +111,9 @@ impl Data {
         _cash: Balance,
         _borrows: Balance,
         _reserves: Balance,
-        _reserve_factor_mantissa: Balance,
+        _reserve_factor_mantissa: WrappedU256,
     ) -> WrappedU256 {
-        let one_minus_reserve_factor =
-            U256::from(base()).sub(u256_from_balance(_reserve_factor_mantissa));
+        let one_minus_reserve_factor = U256::from(base()).sub(_reserve_factor_mantissa);
         let borrow_rate = self.borrow_rate(_cash, _borrows, _reserves);
         WrappedU256::from(supply_rate(
             utilization_rate(_cash, _borrows, _reserves),
@@ -149,7 +148,7 @@ impl<T: Storage<Data>> InterestRateModel for T {
         cash: Balance,
         borrows: Balance,
         reserves: Balance,
-        reserve_factor_mantissa: Balance,
+        reserve_factor_mantissa: WrappedU256,
     ) -> WrappedU256 {
         self._get_supply_rate(cash, borrows, reserves, reserve_factor_mantissa)
     }
@@ -169,7 +168,7 @@ impl<T: Storage<Data>> Internal for T {
         _cash: Balance,
         _borrows: Balance,
         _reserves: Balance,
-        _reserve_factor_mantissa: Balance,
+        _reserve_factor_mantissa: WrappedU256,
     ) -> WrappedU256 {
         self.data()
             .supply_rate(_cash, _borrows, _reserves, _reserve_factor_mantissa)
