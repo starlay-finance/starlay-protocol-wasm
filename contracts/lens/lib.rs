@@ -4,7 +4,18 @@
 #[openbrush::contract]
 pub mod contract {
     use ink::prelude::vec::Vec;
-    use openbrush::traits::Storage;
+    use logics::traits::{
+        controller::ControllerRef,
+        pool::PoolRef,
+        types::WrappedU256,
+    };
+    use openbrush::{
+        contracts::traits::psp22::{
+            extensions::metadata::PSP22MetadataRef,
+            PSP22Ref,
+        },
+        traits::Storage,
+    };
     use scale::{
         Decode,
         Encode,
@@ -14,19 +25,19 @@ pub mod contract {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct PoolMetadata {
         pool: AccountId,
-        pool_decimals: u128,
+        pool_decimals: u8,
         underlying_asset_address: AccountId,
-        underlying_decimals: u128,
+        underlying_decimals: u8,
         is_listed: bool,
         total_cash: Balance,
         total_supply: Balance,
         total_borrows: Balance,
         total_reserves: Balance,
-        exchange_rate_current: u128,
-        supply_rate_per_sec: u128,
-        borrow_rate_per_sec: u128,
+        exchange_rate_current: WrappedU256,
+        supply_rate_per_sec: WrappedU256,
+        borrow_rate_per_sec: WrappedU256,
         collateral_factor_mantissa: u128,
-        reserve_factor_mantissa: u128,
+        reserve_factor_mantissa: WrappedU256,
         borrow_cap: u128,
     }
 
@@ -106,23 +117,26 @@ pub mod contract {
         }
 
         fn _pool_metadata(&self, pool: AccountId) -> PoolMetadata {
-            // TODO
+            let controller = PoolRef::controller(&pool);
+            let underlying_asset_address = PoolRef::underlying(&pool);
             PoolMetadata {
                 pool,
-                pool_decimals: 0,
-                underlying_asset_address: [0u8; 32].into(),
-                underlying_decimals: 0,
-                is_listed: false,
-                total_cash: 0,
-                total_supply: 0,
-                total_borrows: 0,
-                total_reserves: 0,
-                exchange_rate_current: 0,
-                supply_rate_per_sec: 0,
-                borrow_rate_per_sec: 0,
+                pool_decimals: PSP22MetadataRef::token_decimals(&pool),
+                underlying_asset_address,
+                underlying_decimals: PSP22MetadataRef::token_decimals(&underlying_asset_address),
+                is_listed: ControllerRef::is_listed(&controller, pool),
+                total_cash: PoolRef::get_cash_prior(&pool),
+                total_supply: PSP22Ref::total_supply(&pool),
+                total_borrows: PoolRef::total_borrows(&pool),
+                total_reserves: PoolRef::total_reserves(&pool),
+                exchange_rate_current: PoolRef::exchange_rate_current(&pool).unwrap_or_default(),
+                supply_rate_per_sec: PoolRef::supply_rate_per_msec(&pool),
+                borrow_rate_per_sec: PoolRef::borrow_rate_per_msec(&pool),
                 collateral_factor_mantissa: 0,
-                reserve_factor_mantissa: 0,
+                // TODO ControllerRef::collateral_factor(&controller, pool),
+                reserve_factor_mantissa: PoolRef::reserve_factor_mantissa(&pool),
                 borrow_cap: 0,
+                // TODO ControllerRef::borrow_cap(&controller, pool),
             }
         }
 

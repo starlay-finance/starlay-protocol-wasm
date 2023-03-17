@@ -157,7 +157,7 @@ pub trait Internal {
 
     // view function
     fn _markets(&self) -> Vec<AccountId>;
-    fn _is_listed_market(&self, pool: AccountId) -> bool;
+    fn _is_listed(&self, pool: AccountId) -> bool;
     fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     fn _oracle(&self) -> AccountId;
@@ -401,6 +401,9 @@ impl<T: Storage<Data>> Controller for T {
     default fn liquidation_incentive_mantissa(&self) -> WrappedU256 {
         self._liquidation_incentive_mantissa()
     }
+    default fn is_listed(&self, pool: AccountId) -> bool {
+        self._is_listed(pool)
+    }
 }
 
 impl<T: Storage<Data>> Internal for T {
@@ -501,7 +504,7 @@ impl<T: Storage<Data>> Internal for T {
         borrower: AccountId,
         repay_amount: Balance,
     ) -> Result<()> {
-        if !self._is_listed_market(pool_borrowed) || !self._is_listed_market(pool_collateral) {
+        if !self._is_listed(pool_borrowed) || !self._is_listed(pool_collateral) {
             return Err(Error::MarketNotListed)
         }
 
@@ -541,7 +544,7 @@ impl<T: Storage<Data>> Internal for T {
     ) -> Result<()> {
         // TODO: assertion check - check paused status
 
-        if !self._is_listed_market(pool_collateral) || !self._is_listed_market(pool_borrowed) {
+        if !self._is_listed(pool_collateral) || !self._is_listed(pool_borrowed) {
             return Err(Error::MarketNotListed)
         }
         let p_collateral_ctrler = PoolRef::controller(&pool_collateral);
@@ -633,7 +636,7 @@ impl<T: Storage<Data>> Internal for T {
     default fn _markets(&self) -> Vec<AccountId> {
         self.data().markets.clone()
     }
-    default fn _is_listed_market(&self, pool: AccountId) -> bool {
+    default fn _is_listed(&self, pool: AccountId) -> bool {
         let markets = self._markets();
         for market in markets {
             if market == pool {

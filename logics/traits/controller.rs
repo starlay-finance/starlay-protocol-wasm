@@ -177,6 +177,8 @@ pub trait Controller {
     fn close_factor_mantissa(&self) -> WrappedU256;
     #[ink(message)]
     fn liquidation_incentive_mantissa(&self) -> WrappedU256;
+    #[ink(message)]
+    fn is_listed(&self, pool: AccountId) -> bool;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
