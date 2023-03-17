@@ -344,6 +344,15 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         self._controller()
     }
 
+    default fn exchage_rate_stored(&self) -> WrappedU256 {
+        WrappedU256::from(self._exchange_rate_stored())
+    }
+
+    default fn exchange_rate_current(&mut self) -> Result<WrappedU256> {
+        self._accrue_interest()?;
+        Ok(self.exchage_rate_stored())
+    }
+
     default fn get_cash_prior(&self) -> Balance {
         self._get_cash_prior()
     }

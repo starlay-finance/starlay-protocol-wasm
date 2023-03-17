@@ -11,6 +11,8 @@ use openbrush::{
     },
 };
 
+use super::types::WrappedU256;
+
 #[openbrush::wrapper]
 pub type PoolRef = dyn Pool + PSP22;
 
@@ -64,6 +66,10 @@ pub trait Pool: PSP22 {
     fn borrow_balance_stored(&self, account: AccountId) -> Balance;
     #[ink(message)]
     fn get_accrual_block_timestamp(&self) -> Timestamp;
+    #[ink(message)]
+    fn exchage_rate_stored(&self) -> WrappedU256;
+    #[ink(message)]
+    fn exchange_rate_current(&mut self) -> Result<WrappedU256>;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
