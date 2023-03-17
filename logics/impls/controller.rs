@@ -633,7 +633,7 @@ impl<T: Storage<Data>> Internal for T {
         liquidate_calculate_seize_tokens(&LiquidateCalculateSeizeTokensInput {
             actual_repay_amount: _repay_amount,
             exchange_rate_mantissa: _exchange_rate_mantissa.into(),
-            liquidation_incentive_mantissa: self._liquidation_incentive_mantissa().mantissa.into(),
+            liquidation_incentive_mantissa: self._liquidation_incentive_mantissa().into(),
             price_borrowed_mantissa,
             price_collateral_mantissa,
         })
