@@ -139,6 +139,7 @@ pub trait Controller {
         &self,
         pool_borrowed: AccountId,
         pool_collateral: AccountId,
+        exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
     ) -> Result<Balance>;
 

@@ -1,4 +1,9 @@
-use super::exp_no_err::Exp;
+use core::ops::Mul;
+
+use super::exp_no_err::{
+    exp_scale,
+    Exp,
+};
 use crate::traits::types::WrappedU256;
 pub use crate::traits::{
     controller::*,
@@ -170,6 +175,7 @@ pub trait Internal {
         &self,
         pool_borrowed: AccountId,
         pool_collateral: AccountId,
+        exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
     ) -> Result<Balance>;
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
@@ -367,9 +373,15 @@ impl<T: Storage<Data>> Controller for T {
         &self,
         pool_borrowed: AccountId,
         pool_collateral: AccountId,
+        exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
     ) -> Result<Balance> {
-        self._liquidate_calculate_seize_tokens(pool_borrowed, pool_collateral, repay_amount)
+        self._liquidate_calculate_seize_tokens(
+            pool_borrowed,
+            pool_collateral,
+            exchange_rate_mantissa,
+            repay_amount,
+        )
     }
 
     default fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
@@ -613,9 +625,18 @@ impl<T: Storage<Data>> Internal for T {
         &self,
         _pool_borrowed: AccountId,
         _pool_collateral: AccountId,
+        _exchange_rate_mantissa: WrappedU256,
         _repay_amount: Balance,
     ) -> Result<Balance> {
-        todo!()
+        let (price_borrowed_mantissa, price_collateral_mantissa) =
+            (U256::one().mul(exp_scale()), U256::one().mul(exp_scale())); // TODO
+        liquidate_calculate_seize_tokens(&LiquidateCalculateSeizeTokensInput {
+            actual_repay_amount: _repay_amount,
+            exchange_rate_mantissa: _exchange_rate_mantissa.into(),
+            liquidation_incentive_mantissa: self._liquidation_incentive_mantissa().mantissa.into(),
+            price_borrowed_mantissa,
+            price_collateral_mantissa,
+        })
     }
     default fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
         self.data().oracle = new_oracle;
