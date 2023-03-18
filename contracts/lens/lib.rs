@@ -7,6 +7,7 @@ pub mod contract {
     use logics::traits::{
         controller::ControllerRef,
         pool::PoolRef,
+        price_oracle::PriceOracleRef,
         types::WrappedU256,
     };
     use openbrush::{
@@ -159,10 +160,12 @@ pub mod contract {
         }
 
         fn _pool_underlying_price(&self, pool: AccountId) -> PoolUnderlyingPrice {
-            // TODO
+            let controller = PoolRef::controller(&pool);
+            let underlying = PoolRef::underlying(&pool);
+            let oracle = ControllerRef::oracle(&controller);
             PoolUnderlyingPrice {
                 pool,
-                underlying_price: 0,
+                underlying_price: PriceOracleRef::get_price(&oracle, underlying),
             }
         }
     }
