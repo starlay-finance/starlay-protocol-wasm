@@ -25,10 +25,7 @@ pub mod contract {
             DEFAULT_ADMIN_ROLE,
         },
         modifiers,
-        traits::{
-            Storage,
-            ZERO_ADDRESS,
-        },
+        traits::Storage,
     };
 
     const CONTROLLER_ADMIN: RoleType = ink::selector_id!("CONTROLLER_ADMIN");
@@ -193,10 +190,13 @@ pub mod contract {
             impls::manager::Manager,
             traits::manager::Error,
         };
-        use openbrush::contracts::access_control::{
-            AccessControl,
-            AccessControlError,
-            DEFAULT_ADMIN_ROLE,
+        use openbrush::{
+            contracts::access_control::{
+                AccessControl,
+                AccessControlError,
+                DEFAULT_ADMIN_ROLE,
+            },
+            traits::ZERO_ADDRESS,
         };
 
         type Event = <ManagerContract as ink::reflect::ContractEventBase>::Type;
