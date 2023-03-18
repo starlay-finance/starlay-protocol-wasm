@@ -7,18 +7,30 @@ pub mod contract {
         EmitEvent,
         Env,
     };
-    use logics::impls::manager;
+    use logics::{
+        impls::manager::{
+            self,
+            Internal as ManagerInternal,
+        },
+        traits::manager::Result,
+    };
     use openbrush::{
         contracts::access_control::{
             self,
-            Internal,
+            Internal as AccessControlInternal,
             RoleType,
         },
+        modifiers,
         traits::{
             Storage,
             ZERO_ADDRESS,
         },
     };
+
+    const CONTROLLER_ADMIN: RoleType = ink::selector_id!("CONTROLLER_ADMIN");
+    const TOKEN_ADMIN: RoleType = ink::selector_id!("TOKEN_ADMIN");
+    const BORROW_CAP_GUARDIAN: RoleType = ink::selector_id!("BORROW_CAP_GUARDIAN");
+    const PAUSE_GUARDIAN: RoleType = ink::selector_id!("PAUSE_GUARDIAN");
 
     #[ink(storage)]
     #[derive(Storage)]
@@ -59,7 +71,13 @@ pub mod contract {
         admin: AccountId,
     }
 
-    impl manager::Manager for ManagerContract {}
+    impl manager::Manager for ManagerContract {
+        #[ink(message)]
+        #[modifiers(access_control::only_role(TOKEN_ADMIN))]
+        fn reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
+            self._reduce_reserves(pool, amount)
+        }
+    }
 
     impl access_control::AccessControl for ManagerContract {}
 
@@ -123,9 +141,13 @@ pub mod contract {
             },
             DefaultEnvironment,
         };
-        use logics::impls::manager::Manager;
+        use logics::{
+            impls::manager::Manager,
+            traits::manager::Error,
+        };
         use openbrush::contracts::access_control::{
             AccessControl,
+            AccessControlError,
             DEFAULT_ADMIN_ROLE,
         };
 
@@ -163,6 +185,44 @@ pub mod contract {
             assert_eq!(event.role, DEFAULT_ADMIN_ROLE);
             assert_eq!(event.grantee, accounts.bob);
             assert_eq!(event.grantor, None);
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn reduce_reserves_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
+            contract.reduce_reserves(ZERO_ADDRESS.into(), 100).unwrap();
+        }
+
+        #[ink::test]
+        fn reduce_reserves_fails_by_no_authority() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ManagerContract::new();
+            assert_eq!(
+                contract
+                    .reduce_reserves(ZERO_ADDRESS.into(), 100)
+                    .unwrap_err(),
+                Error::AccessControl(AccessControlError::MissingRole)
+            );
+
+            assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
+            assert!(contract
+                .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
+                .is_ok());
+            assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
+            assert_eq!(
+                contract
+                    .reduce_reserves(ZERO_ADDRESS.into(), 100)
+                    .unwrap_err(),
+                Error::AccessControl(AccessControlError::MissingRole)
+            );
         }
     }
 }

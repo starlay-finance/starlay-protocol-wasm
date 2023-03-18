@@ -1,6 +1,8 @@
 pub use crate::traits::manager::*;
+use crate::traits::pool::PoolRef;
 use openbrush::traits::{
     AccountId,
+    Balance,
     Storage,
 };
 
@@ -15,6 +17,7 @@ pub struct Data {
 pub trait Internal {
     fn _controller(&self) -> AccountId;
     fn _set_controller(&mut self, id: AccountId) -> Result<()>;
+    fn _reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
 }
 
 impl<T: Storage<Data>> Manager for T {
@@ -24,6 +27,9 @@ impl<T: Storage<Data>> Manager for T {
     default fn set_controller(&mut self, id: AccountId) -> Result<()> {
         self._set_controller(id)
     }
+    default fn reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
+        self._reduce_reserves(pool, amount)
+    }
 }
 
 impl<T: Storage<Data>> Internal for T {
@@ -32,6 +38,10 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _set_controller(&mut self, id: AccountId) -> Result<()> {
         self.data().controller = id;
+        Ok(())
+    }
+    default fn _reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
+        PoolRef::reduce_reserves(&pool, amount).unwrap();
         Ok(())
     }
 }
