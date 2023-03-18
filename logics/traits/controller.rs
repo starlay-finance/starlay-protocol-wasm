@@ -172,6 +172,8 @@ pub trait Controller {
     #[ink(message)]
     fn markets(&self) -> Vec<AccountId>;
     #[ink(message)]
+    fn collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256>;
+    #[ink(message)]
     fn mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     #[ink(message)]
     fn borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;

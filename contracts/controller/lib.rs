@@ -256,6 +256,7 @@ pub mod contract {
             let p1 = AccountId::from([0x01; 32]);
             assert!(contract.support_market(p1).is_ok());
             assert_eq!(contract.markets(), [p1]);
+            assert_eq!(contract.collateral_factor_mantissa(p1), None);
             assert_eq!(contract.mint_guardian_paused(p1), Some(false));
             assert_eq!(contract.borrow_guardian_paused(p1), Some(false));
             assert_eq!(contract.borrow_cap(p1), Some(0));
