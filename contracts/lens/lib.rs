@@ -39,7 +39,7 @@ pub mod contract {
         borrow_rate_per_sec: WrappedU256,
         collateral_factor_mantissa: u128,
         reserve_factor_mantissa: WrappedU256,
-        borrow_cap: u128,
+        borrow_cap: Option<u128>,
     }
 
     #[derive(Decode, Encode)]
@@ -140,8 +140,7 @@ pub mod contract {
                 collateral_factor_mantissa: 0,
                 // TODO ControllerRef::collateral_factor(&controller, pool),
                 reserve_factor_mantissa: PoolRef::reserve_factor_mantissa(&pool),
-                borrow_cap: 0,
-                // TODO ControllerRef::borrow_cap(&controller, pool),
+                borrow_cap: ControllerRef::borrow_cap(&controller, pool),
             }
         }
 
