@@ -31,7 +31,11 @@ describe('Pool spec', () => {
     const poolFactory = new Pool_factory(api, deployer)
     const pool = new Pool(
       (
-        await poolFactory.newFromAsset(token.address, controller.address)
+        await poolFactory.newFromAsset(
+          token.address,
+          controller.address,
+          zeroAddress,
+        )
       ).address,
       deployer,
       api,
