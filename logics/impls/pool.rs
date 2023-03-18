@@ -234,6 +234,7 @@ pub trait Internal {
         reserve_factor: WrappedU256,
     ) -> WrappedU256;
     fn _borrow_balance_stored(&self, account: AccountId) -> Balance;
+    fn _balance_of_underlying(&self, account: AccountId) -> Balance;
     fn _accural_block_timestamp(&self) -> Timestamp;
     fn _borrow_index(&self) -> Exp;
     fn _reserve_factor_mantissa(&self) -> WrappedU256;
@@ -381,6 +382,16 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
 
     default fn borrow_balance_stored(&self, account: AccountId) -> Balance {
         self._borrow_balance_stored(account)
+    }
+
+    default fn borrow_balance_current(&mut self, account: AccountId) -> Result<Balance> {
+        self._accrue_interest()?;
+        Ok(self._borrow_balance_stored(account))
+    }
+
+    default fn balance_of_underlying_current(&mut self, account: AccountId) -> Result<Balance> {
+        self._accrue_interest()?;
+        Ok(self._balance_of_underlying(account))
     }
 
     default fn borrow_rate_per_msec(&self) -> WrappedU256 {
@@ -811,6 +822,14 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             U256::from(snapshot.principal).mul(U256::from(borrow_index.mantissa));
         prinicipal_times_index
             .div(U256::from(snapshot.interest_index))
+            .as_u128()
+    }
+
+    default fn _balance_of_underlying(&self, account: AccountId) -> Balance {
+        let exchange_rate = self._exchange_rate_stored();
+        let balance_of_underlying = self._balance_of(&account);
+        U256::from(exchange_rate)
+            .mul(U256::from(balance_of_underlying))
             .as_u128()
     }
 

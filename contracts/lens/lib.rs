@@ -91,15 +91,19 @@ pub mod contract {
         }
 
         #[ink(message)]
-        pub fn pool_balances(&self, pool: AccountId) -> PoolBalances {
-            self._pool_balances(pool)
+        pub fn pool_balances(&self, pool: AccountId, account: AccountId) -> PoolBalances {
+            self._pool_balances(pool, account)
         }
 
         #[ink(message)]
-        pub fn pool_balances_all(&self, pools: Vec<AccountId>) -> Vec<PoolBalances> {
+        pub fn pool_balances_all(
+            &self,
+            pools: Vec<AccountId>,
+            account: AccountId,
+        ) -> Vec<PoolBalances> {
             pools
                 .iter()
-                .map(|pool| self._pool_balances(*pool))
+                .map(|pool| self._pool_balances(*pool, account))
                 .collect()
         }
 
@@ -140,15 +144,17 @@ pub mod contract {
             }
         }
 
-        fn _pool_balances(&self, pool: AccountId) -> PoolBalances {
-            // TODO
+        fn _pool_balances(&self, pool: AccountId, account: AccountId) -> PoolBalances {
+            let underlying = PoolRef::underlying(&pool);
             PoolBalances {
                 pool,
-                balance_of: 0,
-                balance_of_underlying: 0,
-                borrow_balance_current: 0,
-                token_balance: 0,
-                token_allowance: 0,
+                balance_of: PSP22Ref::balance_of(&pool, account),
+                balance_of_underlying: PoolRef::balance_of_underlying_current(&pool, account)
+                    .unwrap_or_default(),
+                borrow_balance_current: PoolRef::borrow_balance_current(&pool, account)
+                    .unwrap_or_default(),
+                token_balance: PSP22Ref::balance_of(&underlying, account),
+                token_allowance: PSP22Ref::allowance(&underlying, account, pool),
             }
         }
 
