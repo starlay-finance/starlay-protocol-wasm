@@ -12,13 +12,17 @@ pub mod contract {
             self,
             Internal as ManagerInternal,
         },
-        traits::manager::Result,
+        traits::{
+            manager::Result,
+            types::WrappedU256,
+        },
     };
     use openbrush::{
         contracts::access_control::{
             self,
             Internal as AccessControlInternal,
             RoleType,
+            DEFAULT_ADMIN_ROLE,
         },
         modifiers,
         traits::{
@@ -72,6 +76,52 @@ pub mod contract {
     }
 
     impl manager::Manager for ManagerContract {
+        #[ink(message)]
+        #[modifiers(access_control::only_role(DEFAULT_ADMIN_ROLE))]
+        fn set_controller(&mut self, id: AccountId) -> Result<()> {
+            self._set_controller(id)
+        }
+        #[ink(message)]
+        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
+        fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
+            self._set_price_oracle(new_oracle)
+        }
+        #[ink(message)]
+        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
+        fn support_market(&mut self, pool: AccountId) -> Result<()> {
+            self._support_market(pool)
+        }
+        #[ink(message)]
+        #[modifiers(access_control::only_role(PAUSE_GUARDIAN))]
+        fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
+            self._set_mint_guardian_paused(pool, paused)
+        }
+        #[ink(message)]
+        #[modifiers(access_control::only_role(PAUSE_GUARDIAN))]
+        fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
+            self._set_borrow_guardian_paused(pool, paused)
+        }
+        #[ink(message)]
+        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
+        fn set_close_factor_mantissa(
+            &mut self,
+            new_close_factor_mantissa: WrappedU256,
+        ) -> Result<()> {
+            self._set_close_factor_mantissa(new_close_factor_mantissa)
+        }
+        #[ink(message)]
+        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
+        fn set_liquidation_incentive_mantissa(
+            &mut self,
+            new_liquidation_incentive_mantissa: WrappedU256,
+        ) -> Result<()> {
+            self._set_liquidation_incentive_mantissa(new_liquidation_incentive_mantissa)
+        }
+        #[ink(message)]
+        #[modifiers(access_control::only_role(BORROW_CAP_GUARDIAN))]
+        fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()> {
+            self._set_borrow_cap(pool, new_cap)
+        }
         #[ink(message)]
         #[modifiers(access_control::only_role(TOKEN_ADMIN))]
         fn reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
@@ -185,6 +235,100 @@ pub mod contract {
             assert_eq!(event.role, DEFAULT_ADMIN_ROLE);
             assert_eq!(event.grantee, accounts.bob);
             assert_eq!(event.grantor, None);
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn set_price_oracle_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
+            contract.set_price_oracle(ZERO_ADDRESS.into()).unwrap();
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn support_market_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
+            contract.support_market(ZERO_ADDRESS.into()).unwrap();
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn set_mint_guardian_paused_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
+            contract
+                .set_mint_guardian_paused(ZERO_ADDRESS.into(), true)
+                .unwrap();
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn set_borrow_guardian_paused_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
+            contract
+                .set_borrow_guardian_paused(ZERO_ADDRESS.into(), true)
+                .unwrap();
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn set_close_factor_mantissa_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
+            contract
+                .set_close_factor_mantissa(WrappedU256::from(0))
+                .unwrap();
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn set_liquidation_incentive_mantissa_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
+            contract
+                .set_liquidation_incentive_mantissa(WrappedU256::from(0))
+                .unwrap();
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn set_borrow_cap_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ManagerContract::new();
+            assert!(contract
+                .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
+                .is_ok());
+            contract.set_borrow_cap(ZERO_ADDRESS.into(), 0).unwrap();
         }
 
         #[ink::test]
