@@ -184,6 +184,8 @@ pub trait Controller {
     #[ink(message)]
     fn borrow_cap(&self, pool: AccountId) -> Option<Balance>;
     #[ink(message)]
+    fn manager(&self) -> AccountId;
+    #[ink(message)]
     fn is_listed(&self, pool: AccountId) -> bool;
 }
 
@@ -197,6 +199,7 @@ pub enum Error {
     PriceError,
     TooMuchRepay,
     BorrowCapReached,
+    CallerIsNotManager,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

@@ -59,6 +59,8 @@ pub trait Pool: PSP22 {
     #[ink(message)]
     fn controller(&self) -> AccountId;
     #[ink(message)]
+    fn manager(&self) -> AccountId;
+    #[ink(message)]
     fn get_cash_prior(&self) -> Balance;
     #[ink(message)]
     fn total_borrows(&self) -> Balance;
@@ -99,6 +101,7 @@ pub enum Error {
     ReduceReservesCashNotAvailable,
     ReduceReservesCashValidation,
     BorrowRateIsAbsurdlyHigh,
+    CallerIsNotManager,
     PSP22(PSP22Error),
     Lang(LangError),
 }
