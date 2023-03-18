@@ -393,24 +393,24 @@ impl<T: Storage<Data>> Controller for T {
     }
 
     default fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._set_price_oracle(new_oracle)
     }
 
     default fn support_market(&mut self, pool: AccountId) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._support_market(&pool)?;
         self._emit_market_listed_event(pool);
         Ok(())
     }
 
     default fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._set_mint_guardian_paused(&pool, paused)
     }
 
     default fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._set_borrow_guardian_paused(&pool, paused)
     }
 
@@ -418,7 +418,7 @@ impl<T: Storage<Data>> Controller for T {
         &mut self,
         new_close_factor_mantissa: WrappedU256,
     ) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._set_close_factor_mantissa(new_close_factor_mantissa)
     }
 
@@ -426,12 +426,12 @@ impl<T: Storage<Data>> Controller for T {
         &mut self,
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._set_liquidation_incentive_mantissa(new_liquidation_incentive_mantissa)
     }
 
     default fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._set_borrow_cap(&pool, new_cap)
     }
 

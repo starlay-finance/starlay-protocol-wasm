@@ -216,6 +216,8 @@ pub trait Internal {
     ) -> Result<()>;
     fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()>;
 
+    fn _assert_manager(&self) -> Result<()>;
+
     fn _underlying(&self) -> AccountId;
     fn _controller(&self) -> AccountId;
     fn _manager(&self) -> AccountId;
@@ -709,6 +711,13 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         PSP22Ref::transfer(&self._underlying(), to, value, Vec::<u8>::new()).map_err(to_psp22_error)
     }
 
+    default fn _assert_manager(&self) -> Result<()> {
+        if Self::env().caller() != self._manager() {
+            return Err(Error::CallerIsNotManager)
+        }
+        Ok(())
+    }
+
     default fn _underlying(&self) -> AccountId {
         self.data::<Data>().underlying
     }
@@ -834,8 +843,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
 
     fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()> {
+        self._assert_manager()?;
+
         self._accrue_interest()?;
-        // TODO: assert admin
+
         let current_timestamp = Self::env().block_timestamp();
 
         if self._accural_block_timestamp() != current_timestamp {

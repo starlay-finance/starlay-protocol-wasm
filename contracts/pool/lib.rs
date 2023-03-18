@@ -194,7 +194,14 @@ pub mod contract {
                 panic!("controller is zero address");
             }
             let mut instance = Self::default();
-            instance._initialize(underlying, controller, name, symbol, decimals);
+            instance._initialize(
+                underlying,
+                controller,
+                Self::env().caller(),
+                name,
+                symbol,
+                decimals,
+            );
             instance
         }
 
@@ -217,7 +224,14 @@ pub mod contract {
             symbol.append(&mut base_symbol.unwrap());
 
             let mut instance = Self::default();
-            instance._initialize(underlying, controller, name, symbol, decimals);
+            instance._initialize(
+                underlying,
+                controller,
+                Self::env().caller(),
+                name,
+                symbol,
+                decimals,
+            );
             instance
         }
 
@@ -225,12 +239,14 @@ pub mod contract {
             &mut self,
             underlying: AccountId,
             controller: AccountId,
+            manager: AccountId,
             name: String,
             symbol: String,
             decimals: u8,
         ) {
             self.pool.underlying = underlying;
             self.pool.controller = controller;
+            self.pool.manager = manager;
             self.metadata.name = Some(name);
             self.metadata.symbol = Some(symbol);
             self.metadata.decimals = decimals;
@@ -272,7 +288,7 @@ pub mod contract {
             );
             assert_eq!(contract.underlying(), underlying);
             assert_eq!(contract.controller(), controller);
-            assert_eq!(contract.manager(), ZERO_ADDRESS.into());
+            assert_eq!(contract.manager(), accounts.bob);
             assert_eq!(contract.total_borrows(), 0);
         }
 
@@ -347,6 +363,27 @@ pub mod contract {
                     .repay_borrow_behalf(accounts.charlie, 0)
                     .unwrap_err(),
                 Error::NotImplemented
+            )
+        }
+
+        #[ink::test]
+        fn assert_manager_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let dummy_id = AccountId::from([0x01; 32]);
+            let mut contract = PoolContract::new(
+                dummy_id,
+                dummy_id,
+                String::from("Token Name"),
+                String::from("symbol"),
+                8,
+            );
+
+            set_caller(accounts.charlie);
+            assert_eq!(
+                contract.reduce_reserves(100).unwrap_err(),
+                Error::CallerIsNotManager
             )
         }
     }

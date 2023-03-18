@@ -30,7 +30,9 @@ pub mod contract {
     impl ControllerContract {
         #[ink(constructor)]
         pub fn new() -> Self {
-            Self::default()
+            let mut instance = Self::default();
+            instance.controller.manager = Self::env().caller();
+            instance
         }
     }
 
@@ -83,7 +85,7 @@ pub mod contract {
             let contract = ControllerContract::new();
             assert_eq!(contract.markets(), []);
             assert_eq!(contract.oracle(), ZERO_ADDRESS.into());
-            assert_eq!(contract.manager(), ZERO_ADDRESS.into());
+            assert_eq!(contract.manager(), accounts.bob);
             assert_eq!(contract.close_factor_mantissa(), WrappedU256::from(0));
             assert_eq!(
                 contract.liquidation_incentive_mantissa(),
@@ -299,6 +301,53 @@ pub mod contract {
             assert_eq!(contract.borrow_guardian_paused(pool), Some(true));
             assert!(contract.set_borrow_guardian_paused(pool, false).is_ok());
             assert_eq!(contract.borrow_guardian_paused(pool), Some(false));
+        }
+
+        #[ink::test]
+        fn assert_manager_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ControllerContract::new();
+
+            set_caller(accounts.charlie);
+            let dummy_id = AccountId::from([0xff; 32]);
+            assert_eq!(
+                contract.set_price_oracle(dummy_id).unwrap_err(),
+                Error::CallerIsNotManager
+            );
+            assert_eq!(
+                contract.support_market(dummy_id).unwrap_err(),
+                Error::CallerIsNotManager
+            );
+            assert_eq!(
+                contract
+                    .set_mint_guardian_paused(dummy_id, true)
+                    .unwrap_err(),
+                Error::CallerIsNotManager
+            );
+            assert_eq!(
+                contract
+                    .set_borrow_guardian_paused(dummy_id, true)
+                    .unwrap_err(),
+                Error::CallerIsNotManager
+            );
+            assert_eq!(
+                contract
+                    .set_close_factor_mantissa(WrappedU256::from(0))
+                    .unwrap_err(),
+                Error::CallerIsNotManager
+            );
+            assert_eq!(
+                contract
+                    .set_liquidation_incentive_mantissa(WrappedU256::from(0))
+                    .unwrap_err(),
+                Error::CallerIsNotManager
+            );
+            assert_eq!(
+                contract.set_borrow_cap(dummy_id, 0).unwrap_err(),
+                Error::CallerIsNotManager
+            );
         }
     }
 }
