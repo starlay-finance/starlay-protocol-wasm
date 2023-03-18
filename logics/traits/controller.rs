@@ -183,6 +183,8 @@ pub trait Controller {
     fn liquidation_incentive_mantissa(&self) -> WrappedU256;
     #[ink(message)]
     fn borrow_cap(&self, pool: AccountId) -> Option<Balance>;
+    #[ink(message)]
+    fn manager(&self) -> AccountId;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -195,6 +197,7 @@ pub enum Error {
     PriceError,
     TooMuchRepay,
     BorrowCapReached,
+    CallerIsNotManager,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

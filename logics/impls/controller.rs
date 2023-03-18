@@ -39,6 +39,7 @@ pub struct Data {
     pub close_factor_mantissa: WrappedU256,
     pub liquidation_incentive_mantissa: WrappedU256,
     pub borrow_caps: Mapping<AccountId, Balance>,
+    pub manager: AccountId,
 }
 
 fn liquidate_calculate_seize_tokens(input: &LiquidateCalculateSeizeTokensInput) -> Result<Balance> {
@@ -72,6 +73,7 @@ impl Default for Data {
             close_factor_mantissa: WrappedU256::from(U256::zero()),
             liquidation_incentive_mantissa: WrappedU256::from(U256::zero()),
             borrow_caps: Default::default(),
+            manager: ZERO_ADDRESS.into(),
         }
     }
 }
@@ -180,6 +182,7 @@ pub trait Internal {
         exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
     ) -> Result<Balance>;
+    fn _assert_manager(&self) -> Result<()>;
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
     fn _support_market(&mut self, pool: &AccountId) -> Result<()>;
     fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
@@ -200,6 +203,7 @@ pub trait Internal {
     fn _close_factor_mantissa(&self) -> WrappedU256;
     fn _liquidation_incentive_mantissa(&self) -> WrappedU256;
     fn _borrow_cap(&self, pool: AccountId) -> Option<Balance>;
+    fn _manager(&self) -> AccountId;
 
     // event emission
     fn _emit_market_listed_event(&self, pool: AccountId);
@@ -452,6 +456,9 @@ impl<T: Storage<Data>> Controller for T {
     default fn borrow_cap(&self, pool: AccountId) -> Option<Balance> {
         self._borrow_cap(pool)
     }
+    default fn manager(&self) -> AccountId {
+        self._manager()
+    }
 }
 
 impl<T: Storage<Data>> Internal for T {
@@ -659,6 +666,12 @@ impl<T: Storage<Data>> Internal for T {
             price_collateral_mantissa,
         })
     }
+    default fn _assert_manager(&self) -> Result<()> {
+        if Self::env().caller() != self._manager() {
+            return Err(Error::CallerIsNotManager)
+        }
+        Ok(())
+    }
     default fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
         self.data().oracle = new_oracle;
         Ok(())
@@ -733,6 +746,9 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _borrow_cap(&self, pool: AccountId) -> Option<Balance> {
         self.data().borrow_caps.get(&pool)
+    }
+    default fn _manager(&self) -> AccountId {
+        self.data().manager
     }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}

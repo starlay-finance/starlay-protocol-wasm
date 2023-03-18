@@ -83,6 +83,7 @@ pub mod contract {
             let contract = ControllerContract::new();
             assert_eq!(contract.markets(), []);
             assert_eq!(contract.oracle(), ZERO_ADDRESS.into());
+            assert_eq!(contract.manager(), ZERO_ADDRESS.into());
             assert_eq!(contract.close_factor_mantissa(), WrappedU256::from(0));
             assert_eq!(
                 contract.liquidation_incentive_mantissa(),

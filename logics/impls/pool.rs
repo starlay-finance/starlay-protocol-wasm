@@ -148,6 +148,7 @@ fn exchange_rate(
 pub struct Data {
     pub underlying: AccountId,
     pub controller: AccountId,
+    pub manager: AccountId,
     pub rate_model: AccountId,
     pub total_borrows: Balance,
     pub total_reserves: Balance,
@@ -162,6 +163,7 @@ impl Default for Data {
         Data {
             underlying: ZERO_ADDRESS.into(),
             controller: ZERO_ADDRESS.into(),
+            manager: ZERO_ADDRESS.into(),
             rate_model: ZERO_ADDRESS.into(),
             total_borrows: Default::default(),
             total_reserves: Default::default(),
@@ -216,6 +218,7 @@ pub trait Internal {
 
     fn _underlying(&self) -> AccountId;
     fn _controller(&self) -> AccountId;
+    fn _manager(&self) -> AccountId;
     fn _get_cash_prior(&self) -> Balance;
     fn _total_borrows(&self) -> Balance;
     fn _total_reserves(&self) -> Balance;
@@ -339,6 +342,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
 
     default fn controller(&self) -> AccountId {
         self._controller()
+    }
+
+    default fn manager(&self) -> AccountId {
+        self._manager()
     }
 
     default fn exchage_rate_stored(&self) -> WrappedU256 {
@@ -708,6 +715,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
     default fn _controller(&self) -> AccountId {
         self.data::<Data>().controller
+    }
+
+    default fn _manager(&self) -> AccountId {
+        self.data::<Data>().manager
     }
 
     default fn _get_cash_prior(&self) -> Balance {

@@ -272,6 +272,7 @@ pub mod contract {
             );
             assert_eq!(contract.underlying(), underlying);
             assert_eq!(contract.controller(), controller);
+            assert_eq!(contract.manager(), ZERO_ADDRESS.into());
             assert_eq!(contract.total_borrows(), 0);
         }
 
