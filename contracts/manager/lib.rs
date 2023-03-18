@@ -169,11 +169,9 @@ pub mod contract {
 
     impl ManagerContract {
         #[ink(constructor)]
-        pub fn new() -> Self {
+        pub fn new(controller: AccountId) -> Self {
             let mut instance = Self {
-                manager: manager::Data {
-                    controller: ZERO_ADDRESS.into(),
-                },
+                manager: manager::Data { controller },
                 access: access_control::Data::default(),
             };
             instance._init_with_caller();
@@ -225,7 +223,7 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let contract = ManagerContract::new();
+            let contract = ManagerContract::new(ZERO_ADDRESS.into());
 
             assert_eq!(contract.controller(), ZERO_ADDRESS.into());
             assert!(contract.has_role(DEFAULT_ADMIN_ROLE, accounts.bob));
@@ -244,7 +242,7 @@ pub mod contract {
         fn set_price_oracle_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
             contract.set_price_oracle(ZERO_ADDRESS.into()).unwrap();
         }
@@ -253,7 +251,7 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
             assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
             assert!(contract
@@ -272,7 +270,7 @@ pub mod contract {
         fn support_market_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
             contract.support_market(ZERO_ADDRESS.into()).unwrap();
         }
@@ -281,7 +279,7 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
             assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
             assert!(contract
@@ -300,7 +298,7 @@ pub mod contract {
         fn set_mint_guardian_paused_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
             contract
                 .set_mint_guardian_paused(ZERO_ADDRESS.into(), true)
@@ -311,7 +309,7 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
             assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
             assert!(contract
@@ -332,7 +330,7 @@ pub mod contract {
         fn set_borrow_guardian_paused_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
             contract
                 .set_borrow_guardian_paused(ZERO_ADDRESS.into(), true)
@@ -343,7 +341,7 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
             assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
             assert!(contract
@@ -364,7 +362,7 @@ pub mod contract {
         fn set_close_factor_mantissa_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
             contract
                 .set_close_factor_mantissa(WrappedU256::from(0))
@@ -375,7 +373,7 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
             assert!(contract
                 .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
@@ -396,7 +394,7 @@ pub mod contract {
         fn set_liquidation_incentive_mantissa_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
             contract
                 .set_liquidation_incentive_mantissa(WrappedU256::from(0))
@@ -407,7 +405,7 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
             assert!(contract
                 .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
@@ -428,7 +426,7 @@ pub mod contract {
         fn set_borrow_cap_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract
                 .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
                 .is_ok());
@@ -439,7 +437,7 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
             assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
             assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
@@ -456,7 +454,7 @@ pub mod contract {
         fn reduce_reserves_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
             contract.reduce_reserves(ZERO_ADDRESS.into(), 100).unwrap();
         }
@@ -465,7 +463,7 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let mut contract = ManagerContract::new();
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
             assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
             assert!(contract
                 .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
