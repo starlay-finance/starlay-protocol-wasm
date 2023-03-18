@@ -826,10 +826,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
 
     default fn _balance_of_underlying(&self, account: AccountId) -> Balance {
-        let exchange_rate = self._exchange_rate_stored();
+        let exchange_rate = Exp {
+            mantissa: self._exchange_rate_stored().into(),
+        };
         let balance_of_underlying = self._balance_of(&account);
-        U256::from(exchange_rate)
-            .mul(U256::from(balance_of_underlying))
+        exchange_rate
+            .mul_scalar_truncate(balance_of_underlying.into())
             .as_u128()
     }
 
