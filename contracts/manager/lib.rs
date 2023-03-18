@@ -3,29 +3,113 @@
 
 #[openbrush::contract]
 pub mod contract {
-    use logics::impls::manager::*;
-    use openbrush::traits::{
-        Storage,
-        ZERO_ADDRESS,
+    use ink::codegen::{
+        EmitEvent,
+        Env,
+    };
+    use logics::impls::manager;
+    use openbrush::{
+        contracts::access_control::{
+            self,
+            Internal,
+            RoleType,
+        },
+        traits::{
+            Storage,
+            ZERO_ADDRESS,
+        },
     };
 
     #[ink(storage)]
     #[derive(Storage)]
     pub struct ManagerContract {
         #[storage_field]
-        manager: Data,
+        manager: manager::Data,
+        #[storage_field]
+        access: access_control::Data,
     }
 
-    impl Manager for ManagerContract {}
+    #[ink(event)]
+    pub struct RoleAdminChanged {
+        #[ink(topic)]
+        role: RoleType,
+        #[ink(topic)]
+        previous_admin_role: RoleType,
+        #[ink(topic)]
+        new_admin_role: RoleType,
+    }
+
+    #[ink(event)]
+    pub struct RoleGranted {
+        #[ink(topic)]
+        role: RoleType,
+        #[ink(topic)]
+        grantee: AccountId,
+        #[ink(topic)]
+        grantor: Option<AccountId>,
+    }
+
+    #[ink(event)]
+    pub struct RoleRevoked {
+        #[ink(topic)]
+        role: RoleType,
+        #[ink(topic)]
+        account: AccountId,
+        #[ink(topic)]
+        admin: AccountId,
+    }
+
+    impl manager::Manager for ManagerContract {}
+
+    impl access_control::AccessControl for ManagerContract {}
+
+    impl access_control::Internal for ManagerContract {
+        fn _emit_role_admin_changed(
+            &mut self,
+            role: u32,
+            previous_admin_role: u32,
+            new_admin_role: u32,
+        ) {
+            self.env().emit_event(RoleAdminChanged {
+                role,
+                previous_admin_role,
+                new_admin_role,
+            })
+        }
+
+        fn _emit_role_granted(
+            &mut self,
+            role: u32,
+            grantee: AccountId,
+            grantor: Option<AccountId>,
+        ) {
+            self.env().emit_event(RoleGranted {
+                role,
+                grantee,
+                grantor,
+            })
+        }
+
+        fn _emit_role_revoked(&mut self, role: u32, account: AccountId, sender: AccountId) {
+            self.env().emit_event(RoleRevoked {
+                role,
+                account,
+                admin: sender,
+            })
+        }
+    }
 
     impl ManagerContract {
         #[ink(constructor)]
         pub fn new() -> Self {
-            Self {
-                manager: Data {
+            let mut instance = Self {
+                manager: manager::Data {
                     controller: ZERO_ADDRESS.into(),
                 },
-            }
+                access: access_control::Data::default(),
+            };
+            instance._init_with_caller();
+            instance
         }
     }
 
@@ -39,6 +123,13 @@ pub mod contract {
             },
             DefaultEnvironment,
         };
+        use logics::impls::manager::Manager;
+        use openbrush::contracts::access_control::{
+            AccessControl,
+            DEFAULT_ADMIN_ROLE,
+        };
+
+        type Event = <ManagerContract as ink::reflect::ContractEventBase>::Type;
 
         fn default_accounts() -> DefaultAccounts<DefaultEnvironment> {
             test::default_accounts::<DefaultEnvironment>()
@@ -46,13 +137,32 @@ pub mod contract {
         fn set_caller(id: AccountId) {
             test::set_caller::<DefaultEnvironment>(id);
         }
+        fn get_emitted_events() -> Vec<test::EmittedEvent> {
+            test::recorded_events().collect::<Vec<_>>()
+        }
+        fn decode_role_granted_event(event: test::EmittedEvent) -> RoleGranted {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..]);
+            match decoded_event {
+                Ok(Event::RoleGranted(x)) => return x,
+                _ => panic!("unexpected event kind: expected RoleGranted event"),
+            }
+        }
 
         #[ink::test]
         fn new_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let _contract = ManagerContract::new();
+            let contract = ManagerContract::new();
+
+            assert_eq!(contract.controller(), ZERO_ADDRESS.into());
+            assert!(contract.has_role(DEFAULT_ADMIN_ROLE, accounts.bob));
+            let events = get_emitted_events();
+            assert_eq!(events.len(), 1);
+            let event = decode_role_granted_event(events[0].clone());
+            assert_eq!(event.role, DEFAULT_ADMIN_ROLE);
+            assert_eq!(event.grantee, accounts.bob);
+            assert_eq!(event.grantor, None);
         }
     }
 }
