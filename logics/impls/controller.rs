@@ -1,4 +1,9 @@
-use super::exp_no_err::Exp;
+use core::ops::Mul;
+
+use super::exp_no_err::{
+    exp_scale,
+    Exp,
+};
 use crate::traits::types::WrappedU256;
 pub use crate::traits::{
     controller::*,
@@ -17,7 +22,13 @@ use openbrush::{
 use primitive_types::U256;
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
-
+struct LiquidateCalculateSeizeTokensInput {
+    price_borrowed_mantissa: U256,
+    price_collateral_mantissa: U256,
+    exchange_rate_mantissa: U256,
+    liquidation_incentive_mantissa: U256,
+    actual_repay_amount: Balance,
+}
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
@@ -27,6 +38,28 @@ pub struct Data {
     pub oracle: AccountId,
     pub close_factor_mantissa: WrappedU256,
     pub liquidation_incentive_mantissa: WrappedU256,
+    pub borrow_caps: Mapping<AccountId, Balance>,
+}
+
+fn liquidate_calculate_seize_tokens(input: &LiquidateCalculateSeizeTokensInput) -> Result<Balance> {
+    if input.price_borrowed_mantissa.is_zero() || input.price_collateral_mantissa.is_zero() {
+        return Err(Error::PriceError)
+    }
+    let numerator = Exp {
+        mantissa: WrappedU256::from(input.liquidation_incentive_mantissa),
+    }
+    .mul(Exp {
+        mantissa: WrappedU256::from(input.price_borrowed_mantissa),
+    });
+    let denominator = Exp {
+        mantissa: WrappedU256::from(input.price_collateral_mantissa),
+    }
+    .mul(Exp {
+        mantissa: WrappedU256::from(input.exchange_rate_mantissa),
+    });
+    let ratio = numerator.div(denominator);
+    let seize_tokens = ratio.mul_scalar_truncate(U256::from(input.actual_repay_amount));
+    Ok(seize_tokens.as_u128())
 }
 
 impl Default for Data {
@@ -38,6 +71,7 @@ impl Default for Data {
             oracle: ZERO_ADDRESS.into(),
             close_factor_mantissa: WrappedU256::from(U256::zero()),
             liquidation_incentive_mantissa: WrappedU256::from(U256::zero()),
+            borrow_caps: Default::default(),
         }
     }
 }
@@ -143,6 +177,7 @@ pub trait Internal {
         &self,
         pool_borrowed: AccountId,
         pool_collateral: AccountId,
+        exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
     ) -> Result<Balance>;
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
@@ -154,6 +189,7 @@ pub trait Internal {
         &mut self,
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()>;
+    fn _set_borrow_cap(&mut self, pool: &AccountId, new_cap: Balance) -> Result<()>;
 
     // view function
     fn _markets(&self) -> Vec<AccountId>;
@@ -163,6 +199,7 @@ pub trait Internal {
     fn _oracle(&self) -> AccountId;
     fn _close_factor_mantissa(&self) -> WrappedU256;
     fn _liquidation_incentive_mantissa(&self) -> WrappedU256;
+    fn _borrow_cap(&self, pool: AccountId) -> Option<Balance>;
 
     // event emission
     fn _emit_market_listed_event(&self, pool: AccountId);
@@ -340,9 +377,15 @@ impl<T: Storage<Data>> Controller for T {
         &self,
         pool_borrowed: AccountId,
         pool_collateral: AccountId,
+        exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
     ) -> Result<Balance> {
-        self._liquidate_calculate_seize_tokens(pool_borrowed, pool_collateral, repay_amount)
+        self._liquidate_calculate_seize_tokens(
+            pool_borrowed,
+            pool_collateral,
+            exchange_rate_mantissa,
+            repay_amount,
+        )
     }
 
     default fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
@@ -383,6 +426,11 @@ impl<T: Storage<Data>> Controller for T {
         self._set_liquidation_incentive_mantissa(new_liquidation_incentive_mantissa)
     }
 
+    default fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()> {
+        // TODO: assertion check - ownership
+        self._set_borrow_cap(&pool, new_cap)
+    }
+
     default fn markets(&self) -> Vec<AccountId> {
         self._markets()
     }
@@ -400,6 +448,9 @@ impl<T: Storage<Data>> Controller for T {
     }
     default fn liquidation_incentive_mantissa(&self) -> WrappedU256 {
         self._liquidation_incentive_mantissa()
+    }
+    default fn borrow_cap(&self, pool: AccountId) -> Option<Balance> {
+        self._borrow_cap(pool)
     }
     default fn is_listed(&self, pool: AccountId) -> bool {
         self._is_listed(pool)
@@ -453,14 +504,23 @@ impl<T: Storage<Data>> Internal for T {
         &self,
         pool: AccountId,
         _borrower: AccountId,
-        _borrow_amount: Balance,
+        borrow_amount: Balance,
     ) -> Result<()> {
         if let Some(true) | None = self._borrow_guardian_paused(pool) {
             return Err(Error::BorrowIsPaused)
         }
         // TODO: assertion check - check to already entry market by borrower
         // TODO: assertion check - check oracle price for underlying asset
-        // TODO: assertion check - borrow cap
+
+        let borrow_cap = self._borrow_cap(pool).unwrap();
+        // borrow cap of 0 corresponds to unlimited borrowing
+        if borrow_cap != 0 {
+            let total_borrow = PoolRef::total_borrows(&pool);
+            if total_borrow > borrow_cap - borrow_amount {
+                return Err(Error::BorrowCapReached)
+            }
+        }
+
         // TODO: assertion check - HypotheticalAccountLiquidity
 
         // TODO: keep the flywheel moving
@@ -589,9 +649,18 @@ impl<T: Storage<Data>> Internal for T {
         &self,
         _pool_borrowed: AccountId,
         _pool_collateral: AccountId,
+        _exchange_rate_mantissa: WrappedU256,
         _repay_amount: Balance,
     ) -> Result<Balance> {
-        todo!()
+        let (price_borrowed_mantissa, price_collateral_mantissa) =
+            (U256::one().mul(exp_scale()), U256::one().mul(exp_scale())); // TODO
+        liquidate_calculate_seize_tokens(&LiquidateCalculateSeizeTokensInput {
+            actual_repay_amount: _repay_amount,
+            exchange_rate_mantissa: _exchange_rate_mantissa.into(),
+            liquidation_incentive_mantissa: self._liquidation_incentive_mantissa().into(),
+            price_borrowed_mantissa,
+            price_collateral_mantissa,
+        })
     }
     default fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
         self.data().oracle = new_oracle;
@@ -603,6 +672,7 @@ impl<T: Storage<Data>> Internal for T {
         // set default states
         self._set_mint_guardian_paused(pool, false)?;
         self._set_borrow_guardian_paused(pool, false)?;
+        self._set_borrow_cap(pool, 0)?;
 
         Ok(())
     }
@@ -630,6 +700,10 @@ impl<T: Storage<Data>> Internal for T {
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()> {
         self.data().liquidation_incentive_mantissa = new_liquidation_incentive_mantissa;
+        Ok(())
+    }
+    default fn _set_borrow_cap(&mut self, pool: &AccountId, new_cap: Balance) -> Result<()> {
+        self.data().borrow_caps.insert(pool, &new_cap);
         Ok(())
     }
 
@@ -660,6 +734,109 @@ impl<T: Storage<Data>> Internal for T {
     default fn _liquidation_incentive_mantissa(&self) -> WrappedU256 {
         self.data::<Data>().liquidation_incentive_mantissa
     }
+    default fn _borrow_cap(&self, pool: AccountId) -> Option<Balance> {
+        self.data().borrow_caps.get(&pool)
+    }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use core::ops::{
+        Div,
+        Mul,
+    };
+
+    use crate::impls::exp_no_err::exp_scale;
+
+    use super::Exp;
+
+    use super::*;
+    use primitive_types::U256;
+    fn mts(val: u128) -> U256 {
+        U256::from(val).mul(exp_scale())
+    }
+    #[test]
+    fn test_liquidate_calculate_seize_tokens_price_is_zero() {
+        struct Case<'a> {
+            input: &'a LiquidateCalculateSeizeTokensInput,
+            want_err: Error,
+        }
+        let cases: &[Case] = &[
+            Case {
+                input: &LiquidateCalculateSeizeTokensInput {
+                    price_borrowed_mantissa: U256::one(),
+                    price_collateral_mantissa: U256::zero(),
+                    exchange_rate_mantissa: U256::one(),
+                    liquidation_incentive_mantissa: U256::one(),
+                    actual_repay_amount: 1,
+                },
+                want_err: Error::PriceError,
+            },
+            Case {
+                input: &LiquidateCalculateSeizeTokensInput {
+                    price_borrowed_mantissa: U256::zero(),
+                    price_collateral_mantissa: U256::one(),
+                    exchange_rate_mantissa: U256::one(),
+                    liquidation_incentive_mantissa: U256::one(),
+                    actual_repay_amount: 1,
+                },
+                want_err: Error::PriceError,
+            },
+        ];
+        for case in cases {
+            let result = liquidate_calculate_seize_tokens(case.input.into());
+            assert_eq!(result.err().unwrap(), case.want_err);
+        }
+    }
+    #[test]
+    fn test_liquidate_calculate_seize_tokens() {
+        struct Case<'a> {
+            input: &'a LiquidateCalculateSeizeTokensInput,
+        }
+        let cases: &[Case] = &[
+            Case {
+                input: &LiquidateCalculateSeizeTokensInput {
+                    price_borrowed_mantissa: mts(100),
+                    price_collateral_mantissa: mts(200),
+                    exchange_rate_mantissa: mts(10).div(U256::from(100)),
+                    liquidation_incentive_mantissa: mts(10).div(U256::from(100)),
+                    actual_repay_amount: 1,
+                },
+            },
+            Case {
+                input: &LiquidateCalculateSeizeTokensInput {
+                    price_borrowed_mantissa: mts(233),
+                    price_collateral_mantissa: mts(957),
+                    exchange_rate_mantissa: mts(20).div(U256::from(100)),
+                    liquidation_incentive_mantissa: mts(10).div(U256::from(100)),
+                    actual_repay_amount: 123,
+                },
+            },
+            Case {
+                input: &LiquidateCalculateSeizeTokensInput {
+                    price_borrowed_mantissa: mts(99827),
+                    price_collateral_mantissa: mts(99823),
+                    exchange_rate_mantissa: mts(23).div(U256::from(100)),
+                    liquidation_incentive_mantissa: mts(11).div(U256::from(100)),
+                    actual_repay_amount: 1237,
+                },
+            },
+        ];
+        for case in cases {
+            let got = liquidate_calculate_seize_tokens(case.input);
+            //  seize_amount = actual_repay_amount * liquidation_incentive * price_borrowed / price_collateral
+
+            //  seize_tokens = seize_amount / exchange_rate
+            //   = actual_repay_amount * (liquidation_incentive * price_borrowed) / (price_collateral * exchange_rate)
+            let input = case.input;
+            let want = U256::from(input.actual_repay_amount)
+                .mul(input.liquidation_incentive_mantissa)
+                .mul(input.price_borrowed_mantissa)
+                .div(input.price_collateral_mantissa)
+                .div(input.exchange_rate_mantissa);
+            assert_eq!(got.unwrap(), want.as_u128());
+        }
+    }
 }

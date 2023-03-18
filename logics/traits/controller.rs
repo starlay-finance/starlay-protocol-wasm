@@ -139,6 +139,7 @@ pub trait Controller {
         &self,
         pool_borrowed: AccountId,
         pool_collateral: AccountId,
+        exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
     ) -> Result<Balance>;
 
@@ -164,6 +165,9 @@ pub trait Controller {
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()>;
 
+    #[ink(message)]
+    fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()>;
+
     // view function
     #[ink(message)]
     fn markets(&self) -> Vec<AccountId>;
@@ -178,6 +182,8 @@ pub trait Controller {
     #[ink(message)]
     fn liquidation_incentive_mantissa(&self) -> WrappedU256;
     #[ink(message)]
+    fn borrow_cap(&self, pool: AccountId) -> Option<Balance>;
+    #[ink(message)]
     fn is_listed(&self, pool: AccountId) -> bool;
 }
 
@@ -188,7 +194,9 @@ pub enum Error {
     BorrowIsPaused,
     MarketNotListed,
     ControllerMismatch,
+    PriceError,
     TooMuchRepay,
+    BorrowCapReached,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

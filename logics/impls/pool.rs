@@ -652,8 +652,15 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let actual_repay_amount = self
             ._repay_borrow(liquidator, borrower, repay_amount)
             .unwrap();
-
-        let seize_tokens = 0; // TODO: seize_token's amount (seize_tokens) calculated
+        let exchange_rate = self._exchange_rate_stored();
+        let seize_tokens = ControllerRef::liquidate_calculate_seize_tokens(
+            &self._controller(),
+            contract_addr,
+            collateral,
+            WrappedU256::from(exchange_rate),
+            actual_repay_amount,
+        )
+        .unwrap();
         if collateral == contract_addr {
             self._seize(contract_addr, liquidator, borrower, seize_tokens)
                 .unwrap();
