@@ -2,11 +2,17 @@ import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 
 import Controller_factory from '../types/constructors/controller'
+import DefaultInterestRateModel_factory from '../types/constructors/default_interest_rate_model'
+import Lens_factory from '../types/constructors/lens'
 import Pool_factory from '../types/constructors/pool'
+import PriceOracle_factory from '../types/constructors/price_oracle'
 import PSP22Token_factory from '../types/constructors/psp22_token'
 
 import Controller from '../types/contracts/controller'
+import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
+import Lens from '../types/contracts/lens'
 import Pool from '../types/contracts/pool'
+import PriceOracle from '../types/contracts/price_oracle'
 import PSP22Token from '../types/contracts/psp22_token'
 
 type FactoryArgs = {
@@ -36,6 +42,45 @@ export const deployPool = async ({
   const factory = new Pool_factory(api, signer)
   const contract = await factory.new(...args)
   return new Pool(contract.address, signer, api)
+}
+
+export const deployPoolFromAsset = async ({
+  api,
+  signer,
+  args,
+}: FactoryArgs & {
+  args: Parameters<Pool_factory['newFromAsset']>
+}): Promise<Pool> => {
+  const factory = new Pool_factory(api, signer)
+  const contract = await factory.newFromAsset(...args)
+  return new Pool(contract.address, signer, api)
+}
+
+export const deployDefaultInterestRateModel = async ({
+  api,
+  signer,
+}: FactoryArgs): Promise<DefaultInterestRateModel> => {
+  const factory = new DefaultInterestRateModel_factory(api, signer)
+  const contract = await factory.new()
+  return new DefaultInterestRateModel(contract.address, signer, api)
+}
+
+export const deployPriceOracle = async ({
+  api,
+  signer,
+}: FactoryArgs): Promise<PriceOracle> => {
+  const factory = new PriceOracle_factory(api, signer)
+  const contract = await factory.new()
+  return new PriceOracle(contract.address, signer, api)
+}
+
+export const deployLens = async ({
+  api,
+  signer,
+}: FactoryArgs): Promise<Lens> => {
+  const factory = new Lens_factory(api, signer)
+  const contract = await factory.new()
+  return new Lens(contract.address, signer, api)
 }
 
 // Mocks

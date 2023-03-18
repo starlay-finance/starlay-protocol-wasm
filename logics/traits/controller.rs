@@ -185,6 +185,8 @@ pub trait Controller {
     fn borrow_cap(&self, pool: AccountId) -> Option<Balance>;
     #[ink(message)]
     fn manager(&self) -> AccountId;
+    #[ink(message)]
+    fn is_listed(&self, pool: AccountId) -> bool;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]

@@ -225,7 +225,21 @@ pub trait Internal {
     fn _total_borrows(&self) -> Balance;
     fn _total_reserves(&self) -> Balance;
     fn _rate_model(&self) -> AccountId;
+    fn _borrow_rate_per_msec(
+        &self,
+        cash: Balance,
+        borrows: Balance,
+        reserves: Balance,
+    ) -> WrappedU256;
+    fn _supply_rate_per_msec(
+        &self,
+        cash: Balance,
+        borrows: Balance,
+        reserves: Balance,
+        reserve_factor: WrappedU256,
+    ) -> WrappedU256;
     fn _borrow_balance_stored(&self, account: AccountId) -> Balance;
+    fn _balance_of_underlying(&self, account: AccountId) -> Balance;
     fn _accural_block_timestamp(&self) -> Timestamp;
     fn _borrow_index(&self) -> Exp;
     fn _reserve_factor_mantissa(&self) -> WrappedU256;
@@ -367,12 +381,45 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         self._total_borrows()
     }
 
+    default fn total_reserves(&self) -> Balance {
+        self._total_reserves()
+    }
+
     default fn reduce_reserves(&mut self, amount: Balance) -> Result<()> {
         self._reduce_reserves(Self::env().caller(), amount)
     }
 
     default fn borrow_balance_stored(&self, account: AccountId) -> Balance {
         self._borrow_balance_stored(account)
+    }
+
+    default fn borrow_balance_current(&mut self, account: AccountId) -> Result<Balance> {
+        self._accrue_interest()?;
+        Ok(self._borrow_balance_stored(account))
+    }
+
+    default fn balance_of_underlying_current(&mut self, account: AccountId) -> Result<Balance> {
+        self._accrue_interest()?;
+        Ok(self._balance_of_underlying(account))
+    }
+
+    default fn borrow_rate_per_msec(&self) -> WrappedU256 {
+        let cash = self._get_cash_prior();
+        let borrows = self._total_borrows();
+        let reserves = self._total_reserves();
+        self._borrow_rate_per_msec(cash, borrows, reserves)
+    }
+
+    default fn supply_rate_per_msec(&self) -> WrappedU256 {
+        let cash = self._get_cash_prior();
+        let borrows = self._total_borrows();
+        let reserves = self._total_reserves();
+        let reserve_factor = self._reserve_factor_mantissa();
+        self._supply_rate_per_msec(cash, borrows, reserves, reserve_factor)
+    }
+
+    default fn reserve_factor_mantissa(&self) -> WrappedU256 {
+        self._reserve_factor_mantissa()
     }
 }
 
@@ -385,12 +432,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         if accural.eq(&at) {
             return Ok(())
         }
-        let balance = PSP22Ref::balance_of(&self._underlying(), Self::env().account_id());
+        let cash = self._get_cash_prior();
         let borrows = self._total_borrows();
         let reserves = self._total_reserves();
         let idx = self._borrow_index();
         let borrow_rate =
-            InterestRateModelRef::get_borrow_rate(&self._rate_model(), balance, borrows, reserves);
+            InterestRateModelRef::get_borrow_rate(&self._rate_model(), cash, borrows, reserves);
         let out = calculate_interest(&CalculateInterestInput {
             total_borrows: borrows,
             total_reserves: reserves,
@@ -742,6 +789,31 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         self.data::<Data>().rate_model
     }
 
+    default fn _borrow_rate_per_msec(
+        &self,
+        cash: Balance,
+        borrows: Balance,
+        reserves: Balance,
+    ) -> WrappedU256 {
+        InterestRateModelRef::get_borrow_rate(&self._rate_model(), cash, borrows, reserves)
+    }
+
+    default fn _supply_rate_per_msec(
+        &self,
+        cash: Balance,
+        borrows: Balance,
+        reserves: Balance,
+        reserve_factor_mantissa: WrappedU256,
+    ) -> WrappedU256 {
+        InterestRateModelRef::get_supply_rate(
+            &self._rate_model(),
+            cash,
+            borrows,
+            reserves,
+            reserve_factor_mantissa,
+        )
+    }
+
     default fn _accural_block_timestamp(&self) -> Timestamp {
         Timestamp::from(self.data::<Data>().accural_block_timestamp)
     }
@@ -770,6 +842,16 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             U256::from(snapshot.principal).mul(U256::from(borrow_index.mantissa));
         prinicipal_times_index
             .div(U256::from(snapshot.interest_index))
+            .as_u128()
+    }
+
+    default fn _balance_of_underlying(&self, account: AccountId) -> Balance {
+        let exchange_rate = Exp {
+            mantissa: self._exchange_rate_stored().into(),
+        };
+        let balance_of_underlying = self._balance_of(&account);
+        exchange_rate
+            .mul_scalar_truncate(balance_of_underlying.into())
             .as_u128()
     }
 
@@ -842,7 +924,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     ) {
     }
 
-    fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()> {
+    default fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()> {
         self._assert_manager()?;
 
         self._accrue_interest()?;
@@ -866,7 +948,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         Ok(())
     }
 
-    fn _exchange_rate_stored(&self) -> U256 {
+    default fn _exchange_rate_stored(&self) -> U256 {
         exchange_rate(
             self.total_supply(),
             self._get_cash_prior(),

@@ -183,6 +183,7 @@ pub mod contract {
         pub fn new(
             underlying: AccountId,
             controller: AccountId,
+            rate_model: AccountId,
             name: String,
             symbol: String,
             decimals: u8,
@@ -198,6 +199,7 @@ pub mod contract {
                 underlying,
                 controller,
                 Self::env().caller(),
+                rate_model,
                 name,
                 symbol,
                 decimals,
@@ -206,7 +208,11 @@ pub mod contract {
         }
 
         #[ink(constructor)]
-        pub fn new_from_asset(underlying: AccountId, controller: AccountId) -> Self {
+        pub fn new_from_asset(
+            underlying: AccountId,
+            controller: AccountId,
+            rate_model: AccountId,
+        ) -> Self {
             if underlying.is_zero() {
                 panic!("underlying is zero address");
             }
@@ -228,6 +234,7 @@ pub mod contract {
                 underlying,
                 controller,
                 Self::env().caller(),
+                rate_model,
                 name,
                 symbol,
                 decimals,
@@ -240,6 +247,7 @@ pub mod contract {
             underlying: AccountId,
             controller: AccountId,
             manager: AccountId,
+            rate_model: AccountId,
             name: String,
             symbol: String,
             decimals: u8,
@@ -247,6 +255,7 @@ pub mod contract {
             self.pool.underlying = underlying;
             self.pool.controller = controller;
             self.pool.manager = manager;
+            self.pool.rate_model = rate_model;
             self.metadata.name = Some(name);
             self.metadata.symbol = Some(symbol);
             self.metadata.decimals = decimals;
@@ -279,9 +288,11 @@ pub mod contract {
 
             let underlying = AccountId::from([0x01; 32]);
             let controller = AccountId::from([0x02; 32]);
+            let rate_model = AccountId::from([0x03; 32]);
             let contract = PoolContract::new(
                 underlying,
                 controller,
+                rate_model,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -302,6 +313,7 @@ pub mod contract {
             PoolContract::new(
                 ZERO_ADDRESS.into(),
                 controller,
+                ZERO_ADDRESS.into(),
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -318,6 +330,7 @@ pub mod contract {
             PoolContract::new(
                 underlying,
                 ZERO_ADDRESS.into(),
+                ZERO_ADDRESS.into(),
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -331,6 +344,7 @@ pub mod contract {
 
             let dummy_id = AccountId::from([0x01; 32]);
             let mut contract = PoolContract::new(
+                dummy_id,
                 dummy_id,
                 dummy_id,
                 String::from("Token Name"),
@@ -353,6 +367,7 @@ pub mod contract {
             let mut contract = PoolContract::new(
                 dummy_id,
                 dummy_id,
+                dummy_id,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -373,6 +388,7 @@ pub mod contract {
 
             let dummy_id = AccountId::from([0x01; 32]);
             let mut contract = PoolContract::new(
+                dummy_id,
                 dummy_id,
                 dummy_id,
                 String::from("Token Name"),
