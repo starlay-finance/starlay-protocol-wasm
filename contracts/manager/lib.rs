@@ -248,6 +248,22 @@ pub mod contract {
             assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
             contract.set_price_oracle(ZERO_ADDRESS.into()).unwrap();
         }
+        #[ink::test]
+        fn set_price_oracle_fails_by_no_authority() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
+            assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
+            assert!(contract
+                .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
+                .is_ok());
+            assert_eq!(
+                contract.set_price_oracle(ZERO_ADDRESS.into()).unwrap_err(),
+                Error::AccessControl(AccessControlError::MissingRole)
+            );
+        }
 
         #[ink::test]
         #[should_panic(
@@ -259,6 +275,22 @@ pub mod contract {
             let mut contract = ManagerContract::new();
             assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
             contract.support_market(ZERO_ADDRESS.into()).unwrap();
+        }
+        #[ink::test]
+        fn support_market_fails_by_no_authority() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
+            assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
+            assert!(contract
+                .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
+                .is_ok());
+            assert_eq!(
+                contract.support_market(ZERO_ADDRESS.into()).unwrap_err(),
+                Error::AccessControl(AccessControlError::MissingRole)
+            );
         }
 
         #[ink::test]
@@ -274,6 +306,24 @@ pub mod contract {
                 .set_mint_guardian_paused(ZERO_ADDRESS.into(), true)
                 .unwrap();
         }
+        #[ink::test]
+        fn set_mint_guardian_paused_fails_by_no_authority() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
+            assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
+            assert!(contract
+                .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
+                .is_ok());
+            assert_eq!(
+                contract
+                    .set_mint_guardian_paused(ZERO_ADDRESS.into(), true)
+                    .unwrap_err(),
+                Error::AccessControl(AccessControlError::MissingRole)
+            );
+        }
 
         #[ink::test]
         #[should_panic(
@@ -287,6 +337,24 @@ pub mod contract {
             contract
                 .set_borrow_guardian_paused(ZERO_ADDRESS.into(), true)
                 .unwrap();
+        }
+        #[ink::test]
+        fn set_borrow_guardian_paused_fails_by_no_authority() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
+            assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
+            assert!(contract
+                .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
+                .is_ok());
+            assert_eq!(
+                contract
+                    .set_borrow_guardian_paused(ZERO_ADDRESS.into(), true)
+                    .unwrap_err(),
+                Error::AccessControl(AccessControlError::MissingRole)
+            );
         }
 
         #[ink::test]
@@ -302,6 +370,24 @@ pub mod contract {
                 .set_close_factor_mantissa(WrappedU256::from(0))
                 .unwrap();
         }
+        #[ink::test]
+        fn set_close_factor_mantissa_fails_by_no_authority() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
+            assert!(contract
+                .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
+                .is_ok());
+            assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
+            assert_eq!(
+                contract
+                    .set_close_factor_mantissa(WrappedU256::from(0))
+                    .unwrap_err(),
+                Error::AccessControl(AccessControlError::MissingRole)
+            );
+        }
 
         #[ink::test]
         #[should_panic(
@@ -315,6 +401,24 @@ pub mod contract {
             contract
                 .set_liquidation_incentive_mantissa(WrappedU256::from(0))
                 .unwrap();
+        }
+        #[ink::test]
+        fn set_liquidation_incentive_mantissa_fails_by_no_authority() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
+            assert!(contract
+                .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
+                .is_ok());
+            assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
+            assert_eq!(
+                contract
+                    .set_liquidation_incentive_mantissa(WrappedU256::from(0))
+                    .unwrap_err(),
+                Error::AccessControl(AccessControlError::MissingRole)
+            );
         }
 
         #[ink::test]
@@ -330,6 +434,20 @@ pub mod contract {
                 .is_ok());
             contract.set_borrow_cap(ZERO_ADDRESS.into(), 0).unwrap();
         }
+        #[ink::test]
+        fn set_borrow_cap_fails_by_no_authority() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ManagerContract::new();
+            assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
+            assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
+            assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
+            assert_eq!(
+                contract.set_borrow_cap(ZERO_ADDRESS.into(), 0).unwrap_err(),
+                Error::AccessControl(AccessControlError::MissingRole)
+            );
+        }
 
         #[ink::test]
         #[should_panic(
@@ -342,20 +460,12 @@ pub mod contract {
             assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
             contract.reduce_reserves(ZERO_ADDRESS.into(), 100).unwrap();
         }
-
         #[ink::test]
         fn reduce_reserves_fails_by_no_authority() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
             let mut contract = ManagerContract::new();
-            assert_eq!(
-                contract
-                    .reduce_reserves(ZERO_ADDRESS.into(), 100)
-                    .unwrap_err(),
-                Error::AccessControl(AccessControlError::MissingRole)
-            );
-
             assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
             assert!(contract
                 .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
