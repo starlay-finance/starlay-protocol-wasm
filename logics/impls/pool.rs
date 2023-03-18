@@ -902,7 +902,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     ) {
     }
 
-    fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()> {
+    default fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()> {
         self._accrue_interest()?;
         // TODO: assert admin
         let current_timestamp = Self::env().block_timestamp();
@@ -924,7 +924,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         Ok(())
     }
 
-    fn _exchange_rate_stored(&self) -> U256 {
+    default fn _exchange_rate_stored(&self) -> U256 {
         exchange_rate(
             self.total_supply(),
             self._get_cash_prior(),
