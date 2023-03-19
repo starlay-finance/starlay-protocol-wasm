@@ -25,7 +25,7 @@ describe('Pool spec', () => {
     const controller = await deployController({
       api,
       signer: deployer,
-      args: [],
+      args: [deployer.address],
     })
 
     const poolFactory = new Pool_factory(api, deployer)
@@ -318,6 +318,7 @@ describe('Pool spec', () => {
           await poolFactory.newFromAsset(
             secondToken.address,
             secondToken.address,
+            zeroAddress,
           )
         ).address,
         deployer,
@@ -403,6 +404,7 @@ describe('Pool spec', () => {
           await poolFactory.newFromAsset(
             secondToken.address,
             secondToken.address,
+            zeroAddress,
           )
         ).address,
         args.deployer,
