@@ -151,6 +151,13 @@ pub trait Controller {
     fn support_market(&mut self, pool: AccountId) -> Result<()>;
 
     #[ink(message)]
+    fn set_collateral_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        new_collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()>;
+
+    #[ink(message)]
     fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()>;
 
     #[ink(message)]
@@ -171,6 +178,8 @@ pub trait Controller {
     // view function
     #[ink(message)]
     fn markets(&self) -> Vec<AccountId>;
+    #[ink(message)]
+    fn collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256>;
     #[ink(message)]
     fn mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     #[ink(message)]

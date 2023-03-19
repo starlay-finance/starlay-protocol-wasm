@@ -33,6 +33,7 @@ struct LiquidateCalculateSeizeTokensInput {
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
     pub markets: Vec<AccountId>,
+    pub collateral_factor_mantissa: Mapping<AccountId, WrappedU256>,
     pub mint_guardian_paused: Mapping<AccountId, bool>,
     pub borrow_guardian_paused: Mapping<AccountId, bool>,
     pub oracle: AccountId,
@@ -67,6 +68,7 @@ impl Default for Data {
     fn default() -> Self {
         Self {
             markets: Default::default(),
+            collateral_factor_mantissa: Default::default(),
             mint_guardian_paused: Default::default(),
             borrow_guardian_paused: Default::default(),
             oracle: ZERO_ADDRESS.into(),
@@ -185,6 +187,11 @@ pub trait Internal {
     fn _assert_manager(&self) -> Result<()>;
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
     fn _support_market(&mut self, pool: &AccountId) -> Result<()>;
+    fn _set_collateral_factor_mantissa(
+        &mut self,
+        pool: &AccountId,
+        new_collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()>;
     fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
     fn _set_borrow_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
     fn _set_close_factor_mantissa(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()>;
@@ -196,6 +203,7 @@ pub trait Internal {
 
     // view function
     fn _markets(&self) -> Vec<AccountId>;
+    fn _collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256>;
     fn _is_listed(&self, pool: AccountId) -> bool;
     fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
@@ -404,6 +412,15 @@ impl<T: Storage<Data>> Controller for T {
         Ok(())
     }
 
+    default fn set_collateral_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        new_collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        self._assert_manager()?;
+        self._set_collateral_factor_mantissa(&pool, new_collateral_factor_mantissa)
+    }
+
     default fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
         self._assert_manager()?;
         self._set_mint_guardian_paused(&pool, paused)
@@ -437,6 +454,9 @@ impl<T: Storage<Data>> Controller for T {
 
     default fn markets(&self) -> Vec<AccountId> {
         self._markets()
+    }
+    default fn collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256> {
+        self._collateral_factor_mantissa(pool)
     }
     default fn mint_guardian_paused(&self, pool: AccountId) -> Option<bool> {
         self._mint_guardian_paused(pool)
@@ -684,9 +704,20 @@ impl<T: Storage<Data>> Internal for T {
 
         // set default states
         self._set_mint_guardian_paused(pool, false)?;
+        self._set_collateral_factor_mantissa(pool, WrappedU256::from(0))?;
         self._set_borrow_guardian_paused(pool, false)?;
         self._set_borrow_cap(pool, 0)?;
 
+        Ok(())
+    }
+    default fn _set_collateral_factor_mantissa(
+        &mut self,
+        pool: &AccountId,
+        new_collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        self.data()
+            .collateral_factor_mantissa
+            .insert(pool, &new_collateral_factor_mantissa);
         Ok(())
     }
     default fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()> {
@@ -731,6 +762,9 @@ impl<T: Storage<Data>> Internal for T {
             }
         }
         return false
+    }
+    default fn _collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256> {
+        self.data().collateral_factor_mantissa.get(&pool)
     }
     default fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool> {
         self.data().mint_guardian_paused.get(&pool)
