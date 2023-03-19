@@ -56,8 +56,8 @@ describe('Manager spec', () => {
       await manager.tx.grantRole(Roles.CONTROLLER_ADMIN, deployer.address)
       await manager.tx.setPriceOracle(oracleAddr)
 
-      // const { value: value2 } = await controller.query.priceOracle()
-      // expect(value2.ok).toEqual(oracleAddr)
+      const { value: value2 } = await controller.query.oracle()
+      expect(value2.ok).toEqual(oracleAddr)
     })
     it('.set_borrow_cap', async () => {
       const { deployer, manager, controller } = await setup()
