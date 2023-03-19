@@ -1,3 +1,4 @@
+import { encodeAddress } from '@polkadot/keyring'
 import { deployController, deployManager } from './testContractsHelper'
 import { zeroAddress } from './testHelpers'
 
@@ -26,7 +27,7 @@ describe('Manager spec', () => {
     })
 
     // initialize
-    await manager.withSigner(deployer).tx.setController(controller.address)
+    await manager.tx.setController(controller.address)
 
     return { deployer, manager, controller }
   }
@@ -41,5 +42,55 @@ describe('Manager spec', () => {
     // connections
     expect((await controller.query.manager()).value.ok).toBe(manager.address)
     expect((await manager.query.controller()).value.ok).toBe(controller.address)
+  })
+
+  describe('call Controller', () => {
+    it('.set_price_oracle', async () => {
+      const { deployer, manager, controller } = await setup()
+      const oracleAddr = encodeAddress(
+        '0x0000000000000000000000000000000000000000000000000000000000000000',
+      )
+      const { value: value1 } = await manager.query.setPriceOracle(oracleAddr)
+      expect(value1.ok.err).toStrictEqual({ accessControl: 'MissingRole' })
+
+      await manager.tx.grantRole(Roles.CONTROLLER_ADMIN, deployer.address)
+      await manager.tx.setPriceOracle(oracleAddr)
+
+      // const { value: value2 } = await controller.query.priceOracle()
+      // expect(value2.ok).toEqual(oracleAddr)
+    })
+    it('.set_borrow_cap', async () => {
+      const { deployer, manager, controller } = await setup()
+      const poolAddr = encodeAddress(
+        '0x0000000000000000000000000000000000000000000000000000000000000000',
+      )
+      const { value: value1 } = await manager.query.setBorrowCap(poolAddr, 10)
+      expect(value1.ok.err).toStrictEqual({ accessControl: 'MissingRole' })
+
+      await manager.tx.grantRole(Roles.BORROW_CAP_GUARDIAN, deployer.address)
+      await manager.tx.setBorrowCap(poolAddr, 10)
+
+      const { value: value2 } = await controller.query.borrowCap(poolAddr)
+      expect(value2.ok).toEqual(10)
+    })
+    it('.set_price_oracle', async () => {
+      const { deployer, manager, controller } = await setup()
+      const poolAddr = encodeAddress(
+        '0x0000000000000000000000000000000000000000000000000000000000000000',
+      )
+      const { value: value1 } = await manager.query.setMintGuardianPaused(
+        poolAddr,
+        true,
+      )
+      expect(value1.ok.err).toStrictEqual({ accessControl: 'MissingRole' })
+
+      await manager.tx.grantRole(Roles.PAUSE_GUARDIAN, deployer.address)
+      await manager.tx.setMintGuardianPaused(poolAddr, true)
+
+      const { value: value2 } = await controller.query.mintGuardianPaused(
+        poolAddr,
+      )
+      expect(value2.ok).toEqual(true)
+    })
   })
 })
