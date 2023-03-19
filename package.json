@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@727-ventures/typechain-compiler": "0.5.16",
+    "@727-ventures/typechain-polkadot": "^0.6.11",
     "@727-ventures/typechain-types": "0.0.22",
     "@types/jest": "^29.4.0",
     "@typescript-eslint/eslint-plugin": "^5.54.0",
@@ -20,11 +21,12 @@
     "ts-node": "^10.9.1"
   },
   "scripts": {
-    "compile": "typechain-compiler --toolchain nightly-2023-03-05",
+    "compile": "typechain-compiler --toolchain nightly-2023-03-05 --nt && yarn generate",
     "compile:release": "typechain-compiler --release --toolchain nightly-2023-03-05",
     "test:typechain": "jest --testPathPattern \".spec.ts$\" --runInBand",
     "test:single": "jest",
     "test": "yarn compile && yarn test:typechain",
+    "generate": "typechain-polkadot --in artifacts --out types --plugins typechain/plugins",
     "lint": "prettier --check . && eslint . && cargo check",
     "lint:fix": "prettier --write . && eslint . --fix && cargo fmt --all",
     "deploy": "ts-node scripts/deploy.ts"
