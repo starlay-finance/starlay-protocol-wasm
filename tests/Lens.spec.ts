@@ -28,7 +28,7 @@ const setup = async () => {
   const controller = await deployController({
     api,
     signer: deployer,
-    args: [],
+    args: [deployer.address],
   })
 
   const interestRateModel = await deployDefaultInterestRateModel({
@@ -89,12 +89,11 @@ describe('Lens', () => {
       expect(res.totalBorrows.toNumber()).toBe(0)
       expect(res.totalSupply.toNumber()).toBe(0)
       expect(res.totalReserves.toNumber()).toBe(0)
-      // TODO U256 types
-      expect(res.exchangeRateCurrent).toEqual(0)
-      expect(res.supplyRatePerSec).toEqual(0)
-      expect(res.borrowRatePerSec).toEqual(0)
+      expect(res.exchangeRateCurrent.toHuman()).toEqual('0')
+      expect(res.supplyRatePerSec.toHuman()).toEqual('0')
+      expect(res.borrowRatePerSec.toHuman()).toEqual('0')
       expect(res.collateralFactorMantissa.toNumber()).toEqual(0)
-      expect(res.reserveFactorMantissa).toEqual(0)
+      expect(res.reserveFactorMantissa.toHuman()).toEqual('0')
       // expect(res.borrowCap).toBeNull()
       expect(res.borrowCap).toBe(0)
     })
