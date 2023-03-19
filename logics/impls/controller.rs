@@ -187,6 +187,11 @@ pub trait Internal {
     fn _assert_manager(&self) -> Result<()>;
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
     fn _support_market(&mut self, pool: &AccountId) -> Result<()>;
+    fn _set_collateral_factor_mantissa(
+        &mut self,
+        pool: &AccountId,
+        new_collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()>;
     fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
     fn _set_borrow_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
     fn _set_close_factor_mantissa(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()>;
@@ -690,9 +695,20 @@ impl<T: Storage<Data>> Internal for T {
 
         // set default states
         self._set_mint_guardian_paused(pool, false)?;
+        self._set_collateral_factor_mantissa(pool, WrappedU256::from(0))?;
         self._set_borrow_guardian_paused(pool, false)?;
         self._set_borrow_cap(pool, 0)?;
 
+        Ok(())
+    }
+    default fn _set_collateral_factor_mantissa(
+        &mut self,
+        pool: &AccountId,
+        new_collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        self.data()
+            .collateral_factor_mantissa
+            .insert(pool, &new_collateral_factor_mantissa);
         Ok(())
     }
     default fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()> {
