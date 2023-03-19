@@ -326,6 +326,12 @@ pub mod contract {
             );
             assert_eq!(
                 contract
+                    .set_collateral_factor_mantissa(dummy_id, WrappedU256::from(0))
+                    .unwrap_err(),
+                Error::CallerIsNotManager
+            );
+            assert_eq!(
+                contract
                     .set_mint_guardian_paused(dummy_id, true)
                     .unwrap_err(),
                 Error::CallerIsNotManager

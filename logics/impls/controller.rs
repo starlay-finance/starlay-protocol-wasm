@@ -412,6 +412,15 @@ impl<T: Storage<Data>> Controller for T {
         Ok(())
     }
 
+    default fn set_collateral_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        new_collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        self._assert_manager()?;
+        self._set_collateral_factor_mantissa(&pool, new_collateral_factor_mantissa)
+    }
+
     default fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
         self._assert_manager()?;
         self._set_mint_guardian_paused(&pool, paused)
