@@ -10,7 +10,7 @@ describe('Controller spec', () => {
     const controller = await deployController({
       api,
       signer: deployer,
-      args: [],
+      args: [deployer.address],
     })
 
     return { controller }

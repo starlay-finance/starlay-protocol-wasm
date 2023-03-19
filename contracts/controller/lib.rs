@@ -29,9 +29,9 @@ pub mod contract {
 
     impl ControllerContract {
         #[ink(constructor)]
-        pub fn new() -> Self {
+        pub fn new(manager: AccountId) -> Self {
             let mut instance = Self::default();
-            instance.controller.manager = Self::env().caller();
+            instance.controller.manager = manager;
             instance
         }
     }
@@ -82,7 +82,7 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let contract = ControllerContract::new();
+            let contract = ControllerContract::new(accounts.bob);
             assert_eq!(contract.markets(), []);
             assert_eq!(contract.oracle(), ZERO_ADDRESS.into());
             assert_eq!(contract.manager(), accounts.bob);
@@ -97,7 +97,7 @@ pub mod contract {
         fn mint_allowed_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert!(contract.support_market(pool).is_ok());
@@ -108,7 +108,7 @@ pub mod contract {
         fn mint_allowed_fail_when_not_supported() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let contract = ControllerContract::new();
+            let contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert_eq!(
@@ -121,7 +121,7 @@ pub mod contract {
         fn mint_allowed_fail_when_paused() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert!(contract.support_market(pool).is_ok());
@@ -136,7 +136,7 @@ pub mod contract {
         fn borrow_allowed_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert!(contract.support_market(pool).is_ok());
@@ -147,7 +147,7 @@ pub mod contract {
         fn borrow_allowed_fail_when_not_supported() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let contract = ControllerContract::new();
+            let contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert_eq!(
@@ -160,7 +160,7 @@ pub mod contract {
         fn borrow_allowed_fail_when_paused() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert!(contract.support_market(pool).is_ok());
@@ -176,7 +176,7 @@ pub mod contract {
         // fn liquidate_borrow_allowed_works() {
         //     let accounts = default_accounts();
         //     set_caller(accounts.bob);
-        //     let mut contract = ControllerContract::new();
+        //     let mut contract = ControllerContract::new(accounts.bob);
 
         //     let pool1 = AccountId::from([0x01; 32]);
         //     let pool2 = AccountId::from([0x02; 32]);
@@ -191,7 +191,7 @@ pub mod contract {
         fn liquidate_borrow_allowed_fail() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             // not in market
             let pool1 = AccountId::from([0x01; 32]);
@@ -227,7 +227,7 @@ pub mod contract {
         fn seize_allowed_fail() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             // not in market
             let pool1 = AccountId::from([0x01; 32]);
@@ -251,7 +251,7 @@ pub mod contract {
         fn support_market_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let p1 = AccountId::from([0x01; 32]);
             assert!(contract.support_market(p1).is_ok());
@@ -275,7 +275,7 @@ pub mod contract {
         fn mint_guardian_paused_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert_eq!(contract.mint_guardian_paused(pool), None);
@@ -293,7 +293,7 @@ pub mod contract {
         fn borrow_guardian_paused_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert_eq!(contract.borrow_guardian_paused(pool), None);
@@ -312,7 +312,7 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             set_caller(accounts.charlie);
             let dummy_id = AccountId::from([0xff; 32]);
