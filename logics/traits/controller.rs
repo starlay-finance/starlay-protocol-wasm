@@ -209,6 +209,7 @@ pub enum Error {
     TooMuchRepay,
     BorrowCapReached,
     CallerIsNotManager,
+    InvalidCollateralFactor,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

@@ -45,6 +45,11 @@ pub mod contract {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use core::ops::{
+            Add,
+            Div,
+            Mul,
+        };
         use ink::env::{
             test::{
                 self,
@@ -54,8 +59,12 @@ pub mod contract {
             },
             DefaultEnvironment,
         };
-        use logics::traits::types::WrappedU256;
+        use logics::{
+            impls::exp_no_err::exp_scale,
+            traits::types::WrappedU256,
+        };
         use openbrush::traits::ZERO_ADDRESS;
+        use primitive_types::U256;
 
         type Event = <ControllerContract as ink::reflect::ContractEventBase>::Type;
 
@@ -269,6 +278,31 @@ pub mod contract {
             let p2 = AccountId::from([0x02; 32]);
             assert!(contract.support_market(p2).is_ok());
             assert_eq!(contract.markets(), [p1, p2]);
+        }
+
+        #[ink::test]
+        fn set_collateral_factor_mantissa_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new(accounts.bob);
+            let pool_addr = AccountId::from([0x01; 32]);
+            assert_eq!(contract.collateral_factor_mantissa(pool_addr), None);
+
+            let max = exp_scale().mul(U256::from(90)).div(U256::from(100));
+            assert!(contract
+                .set_collateral_factor_mantissa(pool_addr, WrappedU256::from(max))
+                .is_ok());
+            assert_eq!(
+                contract.collateral_factor_mantissa(pool_addr),
+                Some(WrappedU256::from(max))
+            );
+
+            assert_eq!(
+                contract
+                    .set_collateral_factor_mantissa(pool_addr, WrappedU256::from(max.add(1)))
+                    .unwrap_err(),
+                Error::InvalidCollateralFactor
+            );
         }
 
         #[ink::test]
