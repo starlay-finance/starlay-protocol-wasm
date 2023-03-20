@@ -1,4 +1,7 @@
-use core::ops::Mul;
+use core::ops::{
+    Div,
+    Mul,
+};
 
 use super::exp_no_err::{
     exp_scale,
@@ -62,6 +65,11 @@ fn liquidate_calculate_seize_tokens(input: &LiquidateCalculateSeizeTokensInput) 
     let ratio = numerator.div(denominator);
     let seize_tokens = ratio.mul_scalar_truncate(U256::from(input.actual_repay_amount));
     Ok(seize_tokens.as_u128())
+}
+
+fn collateral_factor_max_mantissa() -> U256 {
+    // 90%
+    exp_scale().mul(U256::from(90)).div(U256::from(100))
 }
 
 impl Default for Data {
@@ -715,6 +723,10 @@ impl<T: Storage<Data>> Internal for T {
         pool: &AccountId,
         new_collateral_factor_mantissa: WrappedU256,
     ) -> Result<()> {
+        if U256::from(new_collateral_factor_mantissa).gt(&collateral_factor_max_mantissa()) {
+            return Err(Error::InvalidCollateralFactor)
+        }
+
         self.data()
             .collateral_factor_mantissa
             .insert(pool, &new_collateral_factor_mantissa);
