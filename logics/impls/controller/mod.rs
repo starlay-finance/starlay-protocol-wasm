@@ -1,8 +1,3 @@
-use core::ops::{
-    Div,
-    Mul,
-};
-
 use super::exp_no_err::{
     exp_scale,
     Exp,
@@ -12,6 +7,7 @@ pub use crate::traits::{
     controller::*,
     pool::PoolRef,
 };
+use core::ops::Mul;
 use ink::prelude::vec::Vec;
 use openbrush::{
     storage::Mapping,
@@ -24,14 +20,15 @@ use openbrush::{
 };
 use primitive_types::U256;
 
+mod utils;
+use self::utils::{
+    collateral_factor_max_mantissa,
+    liquidate_calculate_seize_tokens,
+    LiquidateCalculateSeizeTokensInput,
+};
+
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
-struct LiquidateCalculateSeizeTokensInput {
-    price_borrowed_mantissa: U256,
-    price_collateral_mantissa: U256,
-    exchange_rate_mantissa: U256,
-    liquidation_incentive_mantissa: U256,
-    actual_repay_amount: Balance,
-}
+
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
@@ -44,32 +41,6 @@ pub struct Data {
     pub liquidation_incentive_mantissa: WrappedU256,
     pub borrow_caps: Mapping<AccountId, Balance>,
     pub manager: AccountId,
-}
-
-fn liquidate_calculate_seize_tokens(input: &LiquidateCalculateSeizeTokensInput) -> Result<Balance> {
-    if input.price_borrowed_mantissa.is_zero() || input.price_collateral_mantissa.is_zero() {
-        return Err(Error::PriceError)
-    }
-    let numerator = Exp {
-        mantissa: WrappedU256::from(input.liquidation_incentive_mantissa),
-    }
-    .mul(Exp {
-        mantissa: WrappedU256::from(input.price_borrowed_mantissa),
-    });
-    let denominator = Exp {
-        mantissa: WrappedU256::from(input.price_collateral_mantissa),
-    }
-    .mul(Exp {
-        mantissa: WrappedU256::from(input.exchange_rate_mantissa),
-    });
-    let ratio = numerator.div(denominator);
-    let seize_tokens = ratio.mul_scalar_truncate(U256::from(input.actual_repay_amount));
-    Ok(seize_tokens.as_u128())
-}
-
-fn collateral_factor_max_mantissa() -> U256 {
-    // 90%
-    exp_scale().mul(U256::from(90)).div(U256::from(100))
 }
 
 impl Default for Data {
@@ -801,104 +772,4 @@ impl<T: Storage<Data>> Internal for T {
     }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}
-}
-
-#[cfg(test)]
-mod tests {
-    use core::ops::{
-        Div,
-        Mul,
-    };
-
-    use crate::impls::exp_no_err::exp_scale;
-
-    use super::Exp;
-
-    use super::*;
-    use primitive_types::U256;
-    fn mts(val: u128) -> U256 {
-        U256::from(val).mul(exp_scale())
-    }
-    #[test]
-    fn test_liquidate_calculate_seize_tokens_price_is_zero() {
-        struct Case<'a> {
-            input: &'a LiquidateCalculateSeizeTokensInput,
-            want_err: Error,
-        }
-        let cases: &[Case] = &[
-            Case {
-                input: &LiquidateCalculateSeizeTokensInput {
-                    price_borrowed_mantissa: U256::one(),
-                    price_collateral_mantissa: U256::zero(),
-                    exchange_rate_mantissa: U256::one(),
-                    liquidation_incentive_mantissa: U256::one(),
-                    actual_repay_amount: 1,
-                },
-                want_err: Error::PriceError,
-            },
-            Case {
-                input: &LiquidateCalculateSeizeTokensInput {
-                    price_borrowed_mantissa: U256::zero(),
-                    price_collateral_mantissa: U256::one(),
-                    exchange_rate_mantissa: U256::one(),
-                    liquidation_incentive_mantissa: U256::one(),
-                    actual_repay_amount: 1,
-                },
-                want_err: Error::PriceError,
-            },
-        ];
-        for case in cases {
-            let result = liquidate_calculate_seize_tokens(case.input.into());
-            assert_eq!(result.err().unwrap(), case.want_err);
-        }
-    }
-    #[test]
-    fn test_liquidate_calculate_seize_tokens() {
-        struct Case<'a> {
-            input: &'a LiquidateCalculateSeizeTokensInput,
-        }
-        let cases: &[Case] = &[
-            Case {
-                input: &LiquidateCalculateSeizeTokensInput {
-                    price_borrowed_mantissa: mts(100),
-                    price_collateral_mantissa: mts(200),
-                    exchange_rate_mantissa: mts(10).div(U256::from(100)),
-                    liquidation_incentive_mantissa: mts(10).div(U256::from(100)),
-                    actual_repay_amount: 1,
-                },
-            },
-            Case {
-                input: &LiquidateCalculateSeizeTokensInput {
-                    price_borrowed_mantissa: mts(233),
-                    price_collateral_mantissa: mts(957),
-                    exchange_rate_mantissa: mts(20).div(U256::from(100)),
-                    liquidation_incentive_mantissa: mts(10).div(U256::from(100)),
-                    actual_repay_amount: 123,
-                },
-            },
-            Case {
-                input: &LiquidateCalculateSeizeTokensInput {
-                    price_borrowed_mantissa: mts(99827),
-                    price_collateral_mantissa: mts(99823),
-                    exchange_rate_mantissa: mts(23).div(U256::from(100)),
-                    liquidation_incentive_mantissa: mts(11).div(U256::from(100)),
-                    actual_repay_amount: 1237,
-                },
-            },
-        ];
-        for case in cases {
-            let got = liquidate_calculate_seize_tokens(case.input);
-            //  seize_amount = actual_repay_amount * liquidation_incentive * price_borrowed / price_collateral
-
-            //  seize_tokens = seize_amount / exchange_rate
-            //   = actual_repay_amount * (liquidation_incentive * price_borrowed) / (price_collateral * exchange_rate)
-            let input = case.input;
-            let want = U256::from(input.actual_repay_amount)
-                .mul(input.liquidation_incentive_mantissa)
-                .mul(input.price_borrowed_mantissa)
-                .div(input.price_collateral_mantissa)
-                .div(input.exchange_rate_mantissa);
-            assert_eq!(got.unwrap(), want.as_u128());
-        }
-    }
 }
