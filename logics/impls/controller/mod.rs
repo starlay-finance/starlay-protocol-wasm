@@ -40,14 +40,6 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 pub struct AccountLiquidityLocalVars {
     sum_collateral: U256,
     sum_borrow_plus_effect: U256,
-    token_balance: Balance,
-    borrow_balance: Balance,
-    exchange_rate_mantissa: U256,
-    oracle_price_mantissa: U256,
-    collateral_factor: U256,
-    exchange_rate: U256,
-    oracle_price: U256,
-    token_to_denom: U256,
 }
 
 #[derive(Debug)]
@@ -842,55 +834,51 @@ impl<T: Storage<Data>> Internal for T {
             // Read the balances and exchange rate from the pool
             let (token_balance, borrow_balance, exchange_rate_mantissa) =
                 PoolRef::get_account_snapshot(&asset, account);
-            vars.token_balance = token_balance;
-            vars.borrow_balance = borrow_balance;
-            vars.exchange_rate_mantissa = exchange_rate_mantissa;
 
-            vars.collateral_factor = U256::from(self._collateral_factor_mantissa(asset).unwrap());
-            vars.exchange_rate = vars.exchange_rate_mantissa;
+            let collateral_factor = Exp {
+                mantissa: WrappedU256::from(self._collateral_factor_mantissa(asset).unwrap()),
+            };
+            let exchange_rate = Exp {
+                mantissa: WrappedU256::from(exchange_rate_mantissa),
+            };
 
             // Get the normalized price of the asset
-            vars.oracle_price_mantissa =
-                U256::from(PriceOracleRef::get_underlying_price(&self._oracle(), asset));
-            vars.oracle_price = vars.oracle_price_mantissa;
+            let oracle_price = Exp {
+                mantissa: WrappedU256::from(U256::from(PriceOracleRef::get_underlying_price(
+                    &self._oracle(),
+                    asset,
+                ))),
+            }; // TODO: with mantissa?
 
             // Pre-compute a conversion factor from tokens -> base token (normalized price value)
-            vars.token_to_denom = vars
-                .collateral_factor
-                .mul(vars.exchange_rate)
-                .mul(vars.oracle_price);
+            let token_to_denom = collateral_factor.mul(exchange_rate).mul(oracle_price);
 
             // sumCollateral += tokensToDenom * cTokenBalance
-            vars.sum_collateral = vars
-                .token_to_denom
-                .mul(U256::from(vars.token_balance))
-                .div(exp_scale())
-                .add(vars.sum_collateral);
+            vars.sum_collateral = token_to_denom
+                .clone()
+                .mul_scalar_truncate_add_uint(U256::from(token_balance), vars.sum_collateral);
 
             // sumBorrowPlusEffects += oraclePrice * borrowBalance
-            vars.sum_borrow_plus_effect = vars
-                .oracle_price
-                .mul(U256::from(vars.borrow_balance))
-                .div(exp_scale())
-                .add(vars.sum_borrow_plus_effect);
+            vars.sum_borrow_plus_effect = oracle_price.clone().mul_scalar_truncate_add_uint(
+                U256::from(borrow_balance),
+                vars.sum_borrow_plus_effect,
+            );
 
             // Calculate effects of interacting with cTokenModify
             if asset == token_modify {
                 // redeem effect
                 // sumBorrowPlusEffects += tokensToDenom * redeemTokens
-                vars.sum_borrow_plus_effect = vars
-                    .token_to_denom
-                    .mul(U256::from(redeem_tokens))
-                    .div(exp_scale())
-                    .add(vars.sum_borrow_plus_effect);
+                vars.sum_borrow_plus_effect = token_to_denom.clone().mul_scalar_truncate_add_uint(
+                    U256::from(redeem_tokens),
+                    vars.sum_borrow_plus_effect,
+                );
 
                 // borrow effect
                 // sumBorrowPlusEffects += oraclePrice * borrowAmount
-                vars.sum_borrow_plus_effect = vars
-                    .oracle_price
-                    .mul(U256::from(borrow_amount))
-                    .div(exp_scale())
-                    .add(vars.sum_borrow_plus_effect);
+                vars.sum_borrow_plus_effect = oracle_price.clone().mul_scalar_truncate_add_uint(
+                    U256::from(borrow_amount),
+                    vars.sum_borrow_plus_effect,
+                );
             }
         }
 
