@@ -1,20 +1,25 @@
 pub use crate::traits::price_oracle::*;
-use openbrush::traits::{
-    AccountId,
-    Storage,
+use openbrush::{
+    storage::Mapping,
+    traits::{
+        AccountId,
+        Storage,
+    },
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
-
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
-    // TODO
+    fixed_prices: Mapping<AccountId, u128>,
 }
+
+pub const PRICE_PRECISION: u128 = 10_u128.pow(18);
 
 pub trait Internal {
     fn _get_price(&self, asset: AccountId) -> u128;
     fn _get_underlying_price(&self, asset: AccountId) -> u128;
+    fn _set_fixed_price(&mut self, asset: AccountId, price: u128) -> Result<()>;
 }
 
 impl<T: Storage<Data>> PriceOracle for T {
@@ -23,6 +28,9 @@ impl<T: Storage<Data>> PriceOracle for T {
     }
     default fn get_underlying_price(&self, asset: AccountId) -> u128 {
         self._get_underlying_price(asset)
+    }
+    default fn set_fixed_price(&mut self, asset: AccountId, value: u128) -> Result<()> {
+        self._set_fixed_price(asset, value)
     }
 }
 
@@ -34,5 +42,9 @@ impl<T: Storage<Data>> Internal for T {
     default fn _get_underlying_price(&self, _asset: AccountId) -> u128 {
         // TODO
         0
+    }
+    default fn _set_fixed_price(&mut self, asset: AccountId, value: u128) -> Result<()> {
+        self.data().fixed_prices.insert(&asset, &value);
+        Ok(())
     }
 }
