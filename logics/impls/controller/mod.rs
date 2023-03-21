@@ -213,6 +213,7 @@ pub trait Internal {
     fn _borrow_cap(&self, pool: AccountId) -> Option<Balance>;
     fn _manager(&self) -> AccountId;
 
+    fn _account_assets(&self, account: AccountId) -> Vec<AccountId>;
     fn _get_hypothetical_account_liquidity(
         &self,
         account: AccountId,
@@ -489,6 +490,9 @@ impl<T: Storage<Data>> Controller for T {
     }
     default fn is_listed(&self, pool: AccountId) -> bool {
         self._is_listed(pool)
+    }
+    default fn account_assets(&self, account: AccountId) -> Vec<AccountId> {
+        self._account_assets(account)
     }
     default fn get_hypothetical_account_liquidity(
         &self,
@@ -809,6 +813,20 @@ impl<T: Storage<Data>> Internal for T {
         self.data().manager
     }
 
+    default fn _account_assets(&self, account: AccountId) -> Vec<AccountId> {
+        let mut account_assets = Vec::<AccountId>::new();
+        let markets = self._markets();
+        for pool in markets {
+            let (balance, borrowed, _) = PoolRef::get_account_snapshot(&pool, account);
+
+            // whether deposits or loans exist
+            if balance > 0 || borrowed > 0 {
+                account_assets.push(pool);
+            }
+        }
+        return account_assets
+    }
+
     default fn _get_hypothetical_account_liquidity(
         &self,
         account: AccountId,
@@ -819,7 +837,7 @@ impl<T: Storage<Data>> Internal for T {
         let mut vars = AccountLiquidityLocalVars::default();
 
         // For each asset the account is in
-        let account_assets = Vec::<AccountId>::new();
+        let account_assets = self._account_assets(account);
         for asset in account_assets {
             // Read the balances and exchange rate from the pool
             let (token_balance, borrow_balance, exchange_rate_mantissa) =

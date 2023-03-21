@@ -198,6 +198,8 @@ pub trait Controller {
     #[ink(message)]
     fn is_listed(&self, pool: AccountId) -> bool;
     #[ink(message)]
+    fn account_assets(&self, account: AccountId) -> Vec<AccountId>;
+    #[ink(message)]
     fn get_hypothetical_account_liquidity(
         &self,
         account: AccountId,
