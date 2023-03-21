@@ -19,7 +19,9 @@ pub mod contract {
         #[ink(constructor)]
         pub fn new() -> Self {
             Self {
-                price_oracle: Data {},
+                price_oracle: Data {
+                    fixed_prices: Default::default(),
+                },
             }
         }
     }

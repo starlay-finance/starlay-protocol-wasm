@@ -840,10 +840,9 @@ impl<T: Storage<Data>> Internal for T {
 
             // Get the normalized price of the asset
             let oracle_price = Exp {
-                mantissa: WrappedU256::from(U256::from(PriceOracleRef::get_underlying_price(
-                    &self._oracle(),
-                    asset,
-                ))),
+                mantissa: WrappedU256::from(U256::from(
+                    PriceOracleRef::get_underlying_price(&self._oracle(), asset).unwrap(),
+                )),
             }; // TODO: with mantissa?
 
             // Pre-compute a conversion factor from tokens -> base token (normalized price value)
