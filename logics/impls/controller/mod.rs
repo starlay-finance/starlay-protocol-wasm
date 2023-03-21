@@ -2,10 +2,13 @@ use super::exp_no_err::{
     exp_scale,
     Exp,
 };
-use crate::traits::types::WrappedU256;
 pub use crate::traits::{
     controller::*,
     pool::PoolRef,
+};
+use crate::traits::{
+    price_oracle::PriceOracleRef,
+    types::WrappedU256,
 };
 use core::ops::Mul;
 use ink::prelude::vec::Vec;
@@ -28,6 +31,12 @@ use self::utils::{
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
+
+#[derive(Default)]
+pub struct AccountLiquidityLocalVars {
+    sum_collateral: U256,
+    sum_borrow_plus_effect: U256,
+}
 
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
@@ -191,6 +200,15 @@ pub trait Internal {
     fn _liquidation_incentive_mantissa(&self) -> WrappedU256;
     fn _borrow_cap(&self, pool: AccountId) -> Option<Balance>;
     fn _manager(&self) -> AccountId;
+
+    fn _account_assets(&self, account: AccountId) -> Vec<AccountId>;
+    fn _get_hypothetical_account_liquidity(
+        &self,
+        account: AccountId,
+        token: AccountId,
+        redeem_tokens: Balance,
+        borrow_amount: Balance,
+    ) -> (U256, U256);
 
     // event emission
     fn _emit_market_listed_event(&self, pool: AccountId);
@@ -460,6 +478,18 @@ impl<T: Storage<Data>> Controller for T {
     }
     default fn is_listed(&self, pool: AccountId) -> bool {
         self._is_listed(pool)
+    }
+    default fn account_assets(&self, account: AccountId) -> Vec<AccountId> {
+        self._account_assets(account)
+    }
+    default fn get_hypothetical_account_liquidity(
+        &self,
+        account: AccountId,
+        token: AccountId,
+        redeem_tokens: Balance,
+        borrow_amount: Balance,
+    ) -> (U256, U256) {
+        self._get_hypothetical_account_liquidity(account, token, redeem_tokens, borrow_amount)
     }
 }
 
@@ -769,6 +799,98 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _manager(&self) -> AccountId {
         self.data().manager
+    }
+
+    default fn _account_assets(&self, account: AccountId) -> Vec<AccountId> {
+        let mut account_assets = Vec::<AccountId>::new();
+        let markets = self._markets();
+        for pool in markets {
+            let (balance, borrowed, _) = PoolRef::get_account_snapshot(&pool, account);
+
+            // whether deposits or loans exist
+            if balance > 0 || borrowed > 0 {
+                account_assets.push(pool);
+            }
+        }
+        return account_assets
+    }
+
+    default fn _get_hypothetical_account_liquidity(
+        &self,
+        account: AccountId,
+        token_modify: AccountId,
+        redeem_tokens: Balance,
+        borrow_amount: Balance,
+    ) -> (U256, U256) {
+        let mut vars = AccountLiquidityLocalVars::default();
+
+        // For each asset the account is in
+        let account_assets = self._account_assets(account);
+        for asset in account_assets {
+            // Read the balances and exchange rate from the pool
+            let (token_balance, borrow_balance, exchange_rate_mantissa) =
+                PoolRef::get_account_snapshot(&asset, account);
+
+            let collateral_factor = Exp {
+                mantissa: WrappedU256::from(self._collateral_factor_mantissa(asset).unwrap()),
+            };
+            let exchange_rate = Exp {
+                mantissa: WrappedU256::from(exchange_rate_mantissa),
+            };
+
+            // Get the normalized price of the asset
+            let oracle_price = Exp {
+                mantissa: WrappedU256::from(U256::from(
+                    PriceOracleRef::get_underlying_price(&self._oracle(), asset).unwrap(),
+                )),
+            }; // TODO: with mantissa?
+
+            // Pre-compute a conversion factor from tokens -> base token (normalized price value)
+            let token_to_denom = collateral_factor
+                .mul(exchange_rate)
+                .mul(oracle_price.clone());
+
+            // sumCollateral += tokensToDenom * cTokenBalance
+            vars.sum_collateral = token_to_denom
+                .clone()
+                .mul_scalar_truncate_add_uint(U256::from(token_balance), vars.sum_collateral);
+
+            // sumBorrowPlusEffects += oraclePrice * borrowBalance
+            vars.sum_borrow_plus_effect = oracle_price.clone().mul_scalar_truncate_add_uint(
+                U256::from(borrow_balance),
+                vars.sum_borrow_plus_effect,
+            );
+
+            // Calculate effects of interacting with cTokenModify
+            if asset == token_modify {
+                // redeem effect
+                // sumBorrowPlusEffects += tokensToDenom * redeemTokens
+                vars.sum_borrow_plus_effect = token_to_denom.clone().mul_scalar_truncate_add_uint(
+                    U256::from(redeem_tokens),
+                    vars.sum_borrow_plus_effect,
+                );
+
+                // borrow effect
+                // sumBorrowPlusEffects += oraclePrice * borrowAmount
+                vars.sum_borrow_plus_effect = oracle_price.clone().mul_scalar_truncate_add_uint(
+                    U256::from(borrow_amount),
+                    vars.sum_borrow_plus_effect,
+                );
+            }
+        }
+
+        // These are safe, as the underflow condition is checked first
+        if vars.sum_collateral > vars.sum_borrow_plus_effect {
+            return (
+                vars.sum_collateral - vars.sum_borrow_plus_effect,
+                U256::from(0),
+            )
+        } else {
+            return (
+                U256::from(0),
+                vars.sum_borrow_plus_effect - vars.sum_collateral,
+            )
+        }
     }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}

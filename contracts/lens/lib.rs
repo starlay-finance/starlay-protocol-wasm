@@ -164,7 +164,7 @@ pub mod contract {
             let oracle = ControllerRef::oracle(&controller);
             PoolUnderlyingPrice {
                 pool,
-                underlying_price: PriceOracleRef::get_price(&oracle, underlying),
+                underlying_price: PriceOracleRef::get_price(&oracle, underlying).unwrap(),
             }
         }
     }

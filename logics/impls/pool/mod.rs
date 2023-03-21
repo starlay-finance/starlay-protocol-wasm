@@ -302,6 +302,14 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         self._reduce_reserves(Self::env().caller(), amount)
     }
 
+    default fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256) {
+        (
+            self._balance_of(&account),
+            self._borrow_balance_stored(account),
+            self._exchange_rate_stored(),
+        )
+    }
+
     default fn borrow_balance_stored(&self, account: AccountId) -> Balance {
         self._borrow_balance_stored(account)
     }

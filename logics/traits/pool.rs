@@ -10,6 +10,7 @@ use openbrush::{
         Timestamp,
     },
 };
+use primitive_types::U256;
 
 use super::types::WrappedU256;
 
@@ -66,6 +67,8 @@ pub trait Pool: PSP22 {
     fn total_borrows(&self) -> Balance;
     #[ink(message)]
     fn total_reserves(&self) -> Balance;
+    #[ink(message)]
+    fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256);
     #[ink(message)]
     fn borrow_balance_stored(&self, account: AccountId) -> Balance;
     #[ink(message)]

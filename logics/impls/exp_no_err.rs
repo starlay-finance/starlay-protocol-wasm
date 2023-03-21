@@ -27,6 +27,7 @@ fn mantissa_one() -> U256 {
     exp_scale()
 }
 
+#[derive(Clone)]
 pub struct Exp {
     pub mantissa: WrappedU256,
 }

@@ -3,6 +3,7 @@ use openbrush::traits::{
     AccountId,
     Balance,
 };
+use primitive_types::U256;
 
 use super::types::WrappedU256;
 
@@ -196,6 +197,16 @@ pub trait Controller {
     fn manager(&self) -> AccountId;
     #[ink(message)]
     fn is_listed(&self, pool: AccountId) -> bool;
+    #[ink(message)]
+    fn account_assets(&self, account: AccountId) -> Vec<AccountId>;
+    #[ink(message)]
+    fn get_hypothetical_account_liquidity(
+        &self,
+        account: AccountId,
+        token: AccountId,
+        redeem_tokens: Balance,
+        borrow_amount: Balance,
+    ) -> (U256, U256);
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
