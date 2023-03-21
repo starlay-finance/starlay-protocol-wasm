@@ -14,16 +14,24 @@ pub struct Data {
 
 pub trait Internal {
     fn _get_price(&self, asset: AccountId) -> u128;
+    fn _get_underlying_price(&self, asset: AccountId) -> u128;
 }
 
 impl<T: Storage<Data>> PriceOracle for T {
     default fn get_price(&self, asset: AccountId) -> u128 {
         self._get_price(asset)
     }
+    default fn get_underlying_price(&self, asset: AccountId) -> u128 {
+        self._get_underlying_price(asset)
+    }
 }
 
 impl<T: Storage<Data>> Internal for T {
     default fn _get_price(&self, _asset: AccountId) -> u128 {
+        // TODO
+        0
+    }
+    default fn _get_underlying_price(&self, _asset: AccountId) -> u128 {
         // TODO
         0
     }

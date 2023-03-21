@@ -850,9 +850,8 @@ impl<T: Storage<Data>> Internal for T {
             vars.exchange_rate = vars.exchange_rate_mantissa;
 
             // Get the normalized price of the asset
-            // TODO: get underlying
             vars.oracle_price_mantissa =
-                U256::from(PriceOracleRef::get_price(&self._oracle(), asset));
+                U256::from(PriceOracleRef::get_underlying_price(&self._oracle(), asset));
             vars.oracle_price = vars.oracle_price_mantissa;
 
             // Pre-compute a conversion factor from tokens -> base token (normalized price value)

@@ -7,4 +7,6 @@ pub type PriceOracleRef = dyn PriceOracle;
 pub trait PriceOracle {
     #[ink(message)]
     fn get_price(&self, asset: AccountId) -> u128;
+    #[ink(message)]
+    fn get_underlying_price(&self, asset: AccountId) -> u128;
 }
