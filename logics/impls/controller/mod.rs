@@ -10,11 +10,7 @@ use crate::traits::{
     price_oracle::PriceOracleRef,
     types::WrappedU256,
 };
-use core::ops::{
-    Add,
-    Div,
-    Mul,
-};
+use core::ops::Mul;
 use ink::prelude::vec::Vec;
 use openbrush::{
     storage::Mapping,
@@ -851,7 +847,9 @@ impl<T: Storage<Data>> Internal for T {
             }; // TODO: with mantissa?
 
             // Pre-compute a conversion factor from tokens -> base token (normalized price value)
-            let token_to_denom = collateral_factor.mul(exchange_rate).mul(oracle_price);
+            let token_to_denom = collateral_factor
+                .mul(exchange_rate)
+                .mul(oracle_price.clone());
 
             // sumCollateral += tokensToDenom * cTokenBalance
             vars.sum_collateral = token_to_denom
