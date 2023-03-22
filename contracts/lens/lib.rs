@@ -114,6 +114,23 @@ pub mod contract {
         }
 
         #[ink(message)]
+        pub fn underlying_balance(&self, pool: AccountId, account: AccountId) -> Balance {
+            self._underlying_balance(&pool, account)
+        }
+
+        #[ink(message)]
+        pub fn underlying_balance_all(
+            &self,
+            pools: Vec<AccountId>,
+            account: AccountId,
+        ) -> Vec<Balance> {
+            pools
+                .iter()
+                .map(|pool| self._underlying_balance(pool, account))
+                .collect()
+        }
+
+        #[ink(message)]
         pub fn pool_underlying_price(&self, pool: AccountId) -> PoolUnderlyingPrice {
             self._pool_underlying_price(pool)
         }
@@ -178,6 +195,11 @@ pub mod contract {
                 pool,
                 underlying_price: PriceOracleRef::get_price(&oracle, underlying).unwrap(),
             }
+        }
+
+        fn _underlying_balance(&self, pool: &AccountId, account: AccountId) -> Balance {
+            let underlying = PoolRef::underlying(pool);
+            PSP22Ref::balance_of(&underlying, account)
         }
     }
 

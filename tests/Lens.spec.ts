@@ -173,4 +173,13 @@ describe('Lens', () => {
       expect(res.underlyingPrice.toNumber()).toBe(0)
     })
   })
+
+  it('UnderlyingBalance', async () => {
+    const pool = pools[0]
+    const {
+      value: { ok: res },
+    } = await lens.query.underlyingBalance(pool.address, signer.address)
+
+    expect(res.toNumber()).toBe(0)
+  })
 })
