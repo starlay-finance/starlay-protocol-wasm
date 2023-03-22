@@ -1,13 +1,18 @@
-use core::ops::Mul;
-
 use super::exp_no_err::{
     exp_scale,
     Exp,
 };
-use crate::traits::types::WrappedU256;
 pub use crate::traits::{
     controller::*,
     pool::PoolRef,
+};
+use crate::traits::{
+    price_oracle::PriceOracleRef,
+    types::WrappedU256,
+};
+use core::ops::{
+    Mul,
+    Sub,
 };
 use ink::prelude::vec::Vec;
 use openbrush::{
@@ -21,57 +26,48 @@ use openbrush::{
 };
 use primitive_types::U256;
 
+mod utils;
+use self::utils::{
+    collateral_factor_max_mantissa,
+    get_hypothetical_account_liquidity,
+    liquidate_calculate_seize_tokens,
+    GetHypotheticalAccountLiquidityInput,
+    HypotheticalAccountLiquidityCalculationParam,
+    LiquidateCalculateSeizeTokensInput,
+};
+
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
-struct LiquidateCalculateSeizeTokensInput {
-    price_borrowed_mantissa: U256,
-    price_collateral_mantissa: U256,
-    exchange_rate_mantissa: U256,
-    liquidation_incentive_mantissa: U256,
-    actual_repay_amount: Balance,
-}
+
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
     pub markets: Vec<AccountId>,
+    pub collateral_factor_mantissa: Mapping<AccountId, WrappedU256>,
     pub mint_guardian_paused: Mapping<AccountId, bool>,
     pub borrow_guardian_paused: Mapping<AccountId, bool>,
+    pub seize_guardian_paused: bool,
+    pub transfer_guardian_paused: bool,
     pub oracle: AccountId,
     pub close_factor_mantissa: WrappedU256,
     pub liquidation_incentive_mantissa: WrappedU256,
     pub borrow_caps: Mapping<AccountId, Balance>,
-}
-
-fn liquidate_calculate_seize_tokens(input: &LiquidateCalculateSeizeTokensInput) -> Result<Balance> {
-    if input.price_borrowed_mantissa.is_zero() || input.price_collateral_mantissa.is_zero() {
-        return Err(Error::PriceError)
-    }
-    let numerator = Exp {
-        mantissa: WrappedU256::from(input.liquidation_incentive_mantissa),
-    }
-    .mul(Exp {
-        mantissa: WrappedU256::from(input.price_borrowed_mantissa),
-    });
-    let denominator = Exp {
-        mantissa: WrappedU256::from(input.price_collateral_mantissa),
-    }
-    .mul(Exp {
-        mantissa: WrappedU256::from(input.exchange_rate_mantissa),
-    });
-    let ratio = numerator.div(denominator);
-    let seize_tokens = ratio.mul_scalar_truncate(U256::from(input.actual_repay_amount));
-    Ok(seize_tokens.as_u128())
+    pub manager: AccountId,
 }
 
 impl Default for Data {
     fn default() -> Self {
         Self {
             markets: Default::default(),
+            collateral_factor_mantissa: Default::default(),
             mint_guardian_paused: Default::default(),
             borrow_guardian_paused: Default::default(),
+            seize_guardian_paused: Default::default(),
+            transfer_guardian_paused: Default::default(),
             oracle: ZERO_ADDRESS.into(),
             close_factor_mantissa: WrappedU256::from(U256::zero()),
             liquidation_incentive_mantissa: WrappedU256::from(U256::zero()),
             borrow_caps: Default::default(),
+            manager: ZERO_ADDRESS.into(),
         }
     }
 }
@@ -180,10 +176,18 @@ pub trait Internal {
         exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
     ) -> Result<Balance>;
+    fn _assert_manager(&self) -> Result<()>;
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
     fn _support_market(&mut self, pool: &AccountId) -> Result<()>;
+    fn _set_collateral_factor_mantissa(
+        &mut self,
+        pool: &AccountId,
+        new_collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()>;
     fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
     fn _set_borrow_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
+    fn _set_seize_guardian_paused(&mut self, paused: bool) -> Result<()>;
+    fn _set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()>;
     fn _set_close_factor_mantissa(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()>;
     fn _set_liquidation_incentive_mantissa(
         &mut self,
@@ -193,13 +197,27 @@ pub trait Internal {
 
     // view function
     fn _markets(&self) -> Vec<AccountId>;
-    fn _is_listed_market(&self, pool: AccountId) -> bool;
+    fn _collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256>;
+    fn _is_listed(&self, pool: AccountId) -> bool;
     fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
+    fn _seize_guardian_paused(&self) -> bool;
+    fn _transfer_guardian_paused(&self) -> bool;
     fn _oracle(&self) -> AccountId;
     fn _close_factor_mantissa(&self) -> WrappedU256;
     fn _liquidation_incentive_mantissa(&self) -> WrappedU256;
     fn _borrow_cap(&self, pool: AccountId) -> Option<Balance>;
+    fn _manager(&self) -> AccountId;
+
+    fn _account_assets(&self, account: AccountId) -> Vec<AccountId>;
+    fn _get_account_liquidity(&self, account: AccountId) -> (U256, U256);
+    fn _get_hypothetical_account_liquidity(
+        &self,
+        account: AccountId,
+        token: AccountId,
+        redeem_tokens: Balance,
+        borrow_amount: Balance,
+    ) -> (U256, U256);
 
     // event emission
     fn _emit_market_listed_event(&self, pool: AccountId);
@@ -389,32 +407,51 @@ impl<T: Storage<Data>> Controller for T {
     }
 
     default fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._set_price_oracle(new_oracle)
     }
 
     default fn support_market(&mut self, pool: AccountId) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._support_market(&pool)?;
         self._emit_market_listed_event(pool);
         Ok(())
     }
 
+    default fn set_collateral_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        new_collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        self._assert_manager()?;
+        self._set_collateral_factor_mantissa(&pool, new_collateral_factor_mantissa)
+    }
+
     default fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._set_mint_guardian_paused(&pool, paused)
     }
 
     default fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._set_borrow_guardian_paused(&pool, paused)
+    }
+
+    default fn set_seize_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        self._assert_manager()?;
+        self._set_seize_guardian_paused(paused)
+    }
+
+    default fn set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        self._assert_manager()?;
+        self._set_transfer_guardian_paused(paused)
     }
 
     default fn set_close_factor_mantissa(
         &mut self,
         new_close_factor_mantissa: WrappedU256,
     ) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._set_close_factor_mantissa(new_close_factor_mantissa)
     }
 
@@ -422,23 +459,32 @@ impl<T: Storage<Data>> Controller for T {
         &mut self,
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._set_liquidation_incentive_mantissa(new_liquidation_incentive_mantissa)
     }
 
     default fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()> {
-        // TODO: assertion check - ownership
+        self._assert_manager()?;
         self._set_borrow_cap(&pool, new_cap)
     }
 
     default fn markets(&self) -> Vec<AccountId> {
         self._markets()
     }
+    default fn collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256> {
+        self._collateral_factor_mantissa(pool)
+    }
     default fn mint_guardian_paused(&self, pool: AccountId) -> Option<bool> {
         self._mint_guardian_paused(pool)
     }
     default fn borrow_guardian_paused(&self, pool: AccountId) -> Option<bool> {
         self._borrow_guardian_paused(pool)
+    }
+    default fn seize_guardian_paused(&self) -> bool {
+        self._seize_guardian_paused()
+    }
+    default fn transfer_guardian_paused(&self) -> bool {
+        self._transfer_guardian_paused()
     }
     default fn oracle(&self) -> AccountId {
         self._oracle()
@@ -451,6 +497,27 @@ impl<T: Storage<Data>> Controller for T {
     }
     default fn borrow_cap(&self, pool: AccountId) -> Option<Balance> {
         self._borrow_cap(pool)
+    }
+    default fn manager(&self) -> AccountId {
+        self._manager()
+    }
+    default fn is_listed(&self, pool: AccountId) -> bool {
+        self._is_listed(pool)
+    }
+    default fn account_assets(&self, account: AccountId) -> Vec<AccountId> {
+        self._account_assets(account)
+    }
+    default fn get_account_liquidity(&self, account: AccountId) -> (U256, U256) {
+        self._get_account_liquidity(account)
+    }
+    default fn get_hypothetical_account_liquidity(
+        &self,
+        account: AccountId,
+        token: AccountId,
+        redeem_tokens: Balance,
+        borrow_amount: Balance,
+    ) -> (U256, U256) {
+        self._get_hypothetical_account_liquidity(account, token, redeem_tokens, borrow_amount)
     }
 }
 
@@ -506,7 +573,6 @@ impl<T: Storage<Data>> Internal for T {
         if let Some(true) | None = self._borrow_guardian_paused(pool) {
             return Err(Error::BorrowIsPaused)
         }
-        // TODO: assertion check - check to already entry market by borrower
         // TODO: assertion check - check oracle price for underlying asset
 
         let borrow_cap = self._borrow_cap(pool).unwrap();
@@ -561,7 +627,7 @@ impl<T: Storage<Data>> Internal for T {
         borrower: AccountId,
         repay_amount: Balance,
     ) -> Result<()> {
-        if !self._is_listed_market(pool_borrowed) || !self._is_listed_market(pool_collateral) {
+        if !self._is_listed(pool_borrowed) || !self._is_listed(pool_collateral) {
             return Err(Error::MarketNotListed)
         }
 
@@ -599,9 +665,11 @@ impl<T: Storage<Data>> Internal for T {
         _borrower: AccountId,
         _seize_tokens: Balance,
     ) -> Result<()> {
-        // TODO: assertion check - check paused status
+        if self._seize_guardian_paused() {
+            return Err(Error::SeizeIsPaused)
+        }
 
-        if !self._is_listed_market(pool_collateral) || !self._is_listed_market(pool_borrowed) {
+        if !self._is_listed(pool_collateral) || !self._is_listed(pool_borrowed) {
             return Err(Error::MarketNotListed)
         }
         let p_collateral_ctrler = PoolRef::controller(&pool_collateral);
@@ -631,6 +699,10 @@ impl<T: Storage<Data>> Internal for T {
         _dst: AccountId,
         _transfer_tokens: Balance,
     ) -> Result<()> {
+        if self._transfer_guardian_paused() {
+            return Err(Error::TransferIsPaused)
+        }
+
         todo!()
     }
     default fn _transfer_verify(
@@ -659,6 +731,12 @@ impl<T: Storage<Data>> Internal for T {
             price_collateral_mantissa,
         })
     }
+    default fn _assert_manager(&self) -> Result<()> {
+        if Self::env().caller() != self._manager() {
+            return Err(Error::CallerIsNotManager)
+        }
+        Ok(())
+    }
     default fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
         self.data().oracle = new_oracle;
         Ok(())
@@ -668,9 +746,24 @@ impl<T: Storage<Data>> Internal for T {
 
         // set default states
         self._set_mint_guardian_paused(pool, false)?;
+        self._set_collateral_factor_mantissa(pool, WrappedU256::from(0))?;
         self._set_borrow_guardian_paused(pool, false)?;
         self._set_borrow_cap(pool, 0)?;
 
+        Ok(())
+    }
+    default fn _set_collateral_factor_mantissa(
+        &mut self,
+        pool: &AccountId,
+        new_collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        if U256::from(new_collateral_factor_mantissa).gt(&collateral_factor_max_mantissa()) {
+            return Err(Error::InvalidCollateralFactor)
+        }
+
+        self.data()
+            .collateral_factor_mantissa
+            .insert(pool, &new_collateral_factor_mantissa);
         Ok(())
     }
     default fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()> {
@@ -683,6 +776,14 @@ impl<T: Storage<Data>> Internal for T {
         paused: bool,
     ) -> Result<()> {
         self.data().borrow_guardian_paused.insert(pool, &paused);
+        Ok(())
+    }
+    default fn _set_seize_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        self.data().seize_guardian_paused = paused;
+        Ok(())
+    }
+    default fn _set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        self.data().transfer_guardian_paused = paused;
         Ok(())
     }
     default fn _set_close_factor_mantissa(
@@ -707,7 +808,7 @@ impl<T: Storage<Data>> Internal for T {
     default fn _markets(&self) -> Vec<AccountId> {
         self.data().markets.clone()
     }
-    default fn _is_listed_market(&self, pool: AccountId) -> bool {
+    default fn _is_listed(&self, pool: AccountId) -> bool {
         let markets = self._markets();
         for market in markets {
             if market == pool {
@@ -716,11 +817,20 @@ impl<T: Storage<Data>> Internal for T {
         }
         return false
     }
+    default fn _collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256> {
+        self.data().collateral_factor_mantissa.get(&pool)
+    }
     default fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool> {
         self.data().mint_guardian_paused.get(&pool)
     }
     default fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool> {
         self.data().borrow_guardian_paused.get(&pool)
+    }
+    default fn _seize_guardian_paused(&self) -> bool {
+        self.data().seize_guardian_paused
+    }
+    default fn _transfer_guardian_paused(&self) -> bool {
+        self.data().transfer_guardian_paused
     }
     default fn _oracle(&self) -> AccountId {
         self.data().oracle
@@ -734,106 +844,81 @@ impl<T: Storage<Data>> Internal for T {
     default fn _borrow_cap(&self, pool: AccountId) -> Option<Balance> {
         self.data().borrow_caps.get(&pool)
     }
+    default fn _manager(&self) -> AccountId {
+        self.data().manager
+    }
+
+    default fn _account_assets(&self, account: AccountId) -> Vec<AccountId> {
+        let mut account_assets = Vec::<AccountId>::new();
+        let markets = self._markets();
+        for pool in markets {
+            let (balance, borrowed, _) = PoolRef::get_account_snapshot(&pool, account);
+
+            // whether deposits or loans exist
+            if balance > 0 || borrowed > 0 {
+                account_assets.push(pool);
+            }
+        }
+        return account_assets
+    }
+
+    default fn _get_account_liquidity(&self, account: AccountId) -> (U256, U256) {
+        self._get_hypothetical_account_liquidity(account, ZERO_ADDRESS.into(), 0, 0)
+    }
+
+    default fn _get_hypothetical_account_liquidity(
+        &self,
+        account: AccountId,
+        token_modify: AccountId,
+        redeem_tokens: Balance,
+        borrow_amount: Balance,
+    ) -> (U256, U256) {
+        // For each asset the account is in
+        let account_assets = self._account_assets(account);
+        let mut asset_params = Vec::<HypotheticalAccountLiquidityCalculationParam>::new();
+
+        // Prepare parameters for calculation
+        for asset in &account_assets {
+            // Read the balances and exchange rate from the pool
+            let (token_balance, borrow_balance, exchange_rate_mantissa) =
+                PoolRef::get_account_snapshot(asset, account);
+
+            // Get the normalized price of the asset
+            let oracle_price = Exp {
+                mantissa: WrappedU256::from(U256::from(
+                    PriceOracleRef::get_underlying_price(&self._oracle(), *asset).unwrap(),
+                )),
+            };
+
+            asset_params.push(HypotheticalAccountLiquidityCalculationParam {
+                asset: *asset,
+                token_balance,
+                borrow_balance,
+                exchange_rate_mantissa: Exp {
+                    mantissa: WrappedU256::from(exchange_rate_mantissa),
+                },
+                collateral_factor_mantissa: Exp {
+                    mantissa: self._collateral_factor_mantissa(*asset).unwrap(),
+                },
+                oracle_price_mantissa: oracle_price.clone(),
+            });
+        }
+
+        let (sum_collateral, sum_borrow_plus_effect) =
+            get_hypothetical_account_liquidity(GetHypotheticalAccountLiquidityInput {
+                asset_params,
+                token_modify,
+                redeem_tokens,
+                borrow_amount,
+            });
+
+        // These are safe, as the underflow condition is checked first
+        if sum_collateral > sum_borrow_plus_effect {
+            return (sum_collateral.sub(sum_borrow_plus_effect), U256::from(0))
+        } else {
+            return (U256::from(0), sum_borrow_plus_effect.sub(sum_collateral))
+        }
+    }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}
-}
-
-#[cfg(test)]
-mod tests {
-    use core::ops::{
-        Div,
-        Mul,
-    };
-
-    use crate::impls::exp_no_err::exp_scale;
-
-    use super::Exp;
-
-    use super::*;
-    use primitive_types::U256;
-    fn mts(val: u128) -> U256 {
-        U256::from(val).mul(exp_scale())
-    }
-    #[test]
-    fn test_liquidate_calculate_seize_tokens_price_is_zero() {
-        struct Case<'a> {
-            input: &'a LiquidateCalculateSeizeTokensInput,
-            want_err: Error,
-        }
-        let cases: &[Case] = &[
-            Case {
-                input: &LiquidateCalculateSeizeTokensInput {
-                    price_borrowed_mantissa: U256::one(),
-                    price_collateral_mantissa: U256::zero(),
-                    exchange_rate_mantissa: U256::one(),
-                    liquidation_incentive_mantissa: U256::one(),
-                    actual_repay_amount: 1,
-                },
-                want_err: Error::PriceError,
-            },
-            Case {
-                input: &LiquidateCalculateSeizeTokensInput {
-                    price_borrowed_mantissa: U256::zero(),
-                    price_collateral_mantissa: U256::one(),
-                    exchange_rate_mantissa: U256::one(),
-                    liquidation_incentive_mantissa: U256::one(),
-                    actual_repay_amount: 1,
-                },
-                want_err: Error::PriceError,
-            },
-        ];
-        for case in cases {
-            let result = liquidate_calculate_seize_tokens(case.input.into());
-            assert_eq!(result.err().unwrap(), case.want_err);
-        }
-    }
-    #[test]
-    fn test_liquidate_calculate_seize_tokens() {
-        struct Case<'a> {
-            input: &'a LiquidateCalculateSeizeTokensInput,
-        }
-        let cases: &[Case] = &[
-            Case {
-                input: &LiquidateCalculateSeizeTokensInput {
-                    price_borrowed_mantissa: mts(100),
-                    price_collateral_mantissa: mts(200),
-                    exchange_rate_mantissa: mts(10).div(U256::from(100)),
-                    liquidation_incentive_mantissa: mts(10).div(U256::from(100)),
-                    actual_repay_amount: 1,
-                },
-            },
-            Case {
-                input: &LiquidateCalculateSeizeTokensInput {
-                    price_borrowed_mantissa: mts(233),
-                    price_collateral_mantissa: mts(957),
-                    exchange_rate_mantissa: mts(20).div(U256::from(100)),
-                    liquidation_incentive_mantissa: mts(10).div(U256::from(100)),
-                    actual_repay_amount: 123,
-                },
-            },
-            Case {
-                input: &LiquidateCalculateSeizeTokensInput {
-                    price_borrowed_mantissa: mts(99827),
-                    price_collateral_mantissa: mts(99823),
-                    exchange_rate_mantissa: mts(23).div(U256::from(100)),
-                    liquidation_incentive_mantissa: mts(11).div(U256::from(100)),
-                    actual_repay_amount: 1237,
-                },
-            },
-        ];
-        for case in cases {
-            let got = liquidate_calculate_seize_tokens(case.input);
-            //  seize_amount = actual_repay_amount * liquidation_incentive * price_borrowed / price_collateral
-
-            //  seize_tokens = seize_amount / exchange_rate
-            //   = actual_repay_amount * (liquidation_incentive * price_borrowed) / (price_collateral * exchange_rate)
-            let input = case.input;
-            let want = U256::from(input.actual_repay_amount)
-                .mul(input.liquidation_incentive_mantissa)
-                .mul(input.price_borrowed_mantissa)
-                .div(input.price_collateral_mantissa)
-                .div(input.exchange_rate_mantissa);
-            assert_eq!(got.unwrap(), want.as_u128());
-        }
-    }
 }

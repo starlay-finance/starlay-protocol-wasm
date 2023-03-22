@@ -1,5 +1,5 @@
 [package]
-name = "controller"
+name = "lens"
 version = "0.0.1"
 authors = ["Starlay Finance"]
 edition = "2021"
@@ -16,7 +16,6 @@ scale-info = { version = "2.3", default-features = false, features = [
 
 openbrush = { version = "3.0.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false }
 logics = { path = "../../logics", default-features = false }
-primitive-types = { version = "0.11.1", default-features = false, features = ["codec"] }
 
 [lib]
 path = "lib.rs"

@@ -10,7 +10,7 @@ describe('Controller spec', () => {
     const controller = await deployController({
       api,
       signer: deployer,
-      args: [],
+      args: [deployer.address],
     })
 
     return { controller }
@@ -23,11 +23,11 @@ describe('Controller spec', () => {
     expect((await controller.query.oracle()).value.ok).toEqual(zeroAddress)
     const closeFactorMantissa = (await controller.query.closeFactorMantissa())
       .value.ok
-    expect(closeFactorMantissa).toEqual(0)
+    expect(closeFactorMantissa.toNumber()).toEqual(0)
     const liquidationIncentiveMantissa = (
       await controller.query.liquidationIncentiveMantissa()
     ).value.ok
-    expect(liquidationIncentiveMantissa).toEqual(0)
+    expect(liquidationIncentiveMantissa.toNumber()).toEqual(0)
   })
 
   it('.set_close_factor_mantissa', async () => {

@@ -10,6 +10,7 @@ use openbrush::{
         Timestamp,
     },
 };
+use primitive_types::U256;
 
 use super::types::WrappedU256;
 
@@ -59,17 +60,33 @@ pub trait Pool: PSP22 {
     #[ink(message)]
     fn controller(&self) -> AccountId;
     #[ink(message)]
+    fn manager(&self) -> AccountId;
+    #[ink(message)]
     fn get_cash_prior(&self) -> Balance;
     #[ink(message)]
     fn total_borrows(&self) -> Balance;
     #[ink(message)]
+    fn total_reserves(&self) -> Balance;
+    #[ink(message)]
+    fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256);
+    #[ink(message)]
     fn borrow_balance_stored(&self, account: AccountId) -> Balance;
     #[ink(message)]
+    fn borrow_balance_current(&mut self, account: AccountId) -> Result<Balance>;
+    #[ink(message)]
+    fn balance_of_underlying_current(&mut self, account: AccountId) -> Result<Balance>;
+    #[ink(message)]
     fn get_accrual_block_timestamp(&self) -> Timestamp;
+    #[ink(message)]
+    fn borrow_rate_per_msec(&self) -> WrappedU256;
+    #[ink(message)]
+    fn supply_rate_per_msec(&self) -> WrappedU256;
     #[ink(message)]
     fn exchage_rate_stored(&self) -> WrappedU256;
     #[ink(message)]
     fn exchange_rate_current(&mut self) -> Result<WrappedU256>;
+    #[ink(message)]
+    fn reserve_factor_mantissa(&self) -> WrappedU256;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -87,6 +104,7 @@ pub enum Error {
     ReduceReservesCashNotAvailable,
     ReduceReservesCashValidation,
     BorrowRateIsAbsurdlyHigh,
+    CallerIsNotManager,
     PSP22(PSP22Error),
     Lang(LangError),
 }

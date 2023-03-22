@@ -3,6 +3,7 @@ use openbrush::traits::{
     AccountId,
     Balance,
 };
+use primitive_types::U256;
 
 use super::types::WrappedU256;
 
@@ -151,10 +152,23 @@ pub trait Controller {
     fn support_market(&mut self, pool: AccountId) -> Result<()>;
 
     #[ink(message)]
+    fn set_collateral_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        new_collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()>;
+
+    #[ink(message)]
     fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()>;
 
     #[ink(message)]
     fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()>;
+
+    #[ink(message)]
+    fn set_seize_guardian_paused(&mut self, paused: bool) -> Result<()>;
+
+    #[ink(message)]
+    fn set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()>;
 
     #[ink(message)]
     fn set_close_factor_mantissa(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()>;
@@ -172,9 +186,15 @@ pub trait Controller {
     #[ink(message)]
     fn markets(&self) -> Vec<AccountId>;
     #[ink(message)]
+    fn collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256>;
+    #[ink(message)]
     fn mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     #[ink(message)]
     fn borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
+    #[ink(message)]
+    fn seize_guardian_paused(&self) -> bool;
+    #[ink(message)]
+    fn transfer_guardian_paused(&self) -> bool;
     #[ink(message)]
     fn oracle(&self) -> AccountId;
     #[ink(message)]
@@ -183,6 +203,22 @@ pub trait Controller {
     fn liquidation_incentive_mantissa(&self) -> WrappedU256;
     #[ink(message)]
     fn borrow_cap(&self, pool: AccountId) -> Option<Balance>;
+    #[ink(message)]
+    fn manager(&self) -> AccountId;
+    #[ink(message)]
+    fn is_listed(&self, pool: AccountId) -> bool;
+    #[ink(message)]
+    fn account_assets(&self, account: AccountId) -> Vec<AccountId>;
+    #[ink(message)]
+    fn get_account_liquidity(&self, account: AccountId) -> (U256, U256);
+    #[ink(message)]
+    fn get_hypothetical_account_liquidity(
+        &self,
+        account: AccountId,
+        token: AccountId,
+        redeem_tokens: Balance,
+        borrow_amount: Balance,
+    ) -> (U256, U256);
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -190,11 +226,15 @@ pub trait Controller {
 pub enum Error {
     MintIsPaused,
     BorrowIsPaused,
+    SeizeIsPaused,
+    TransferIsPaused,
     MarketNotListed,
     ControllerMismatch,
     PriceError,
     TooMuchRepay,
     BorrowCapReached,
+    CallerIsNotManager,
+    InvalidCollateralFactor,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

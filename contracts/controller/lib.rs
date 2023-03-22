@@ -29,8 +29,10 @@ pub mod contract {
 
     impl ControllerContract {
         #[ink(constructor)]
-        pub fn new() -> Self {
-            Self::default()
+        pub fn new(manager: AccountId) -> Self {
+            let mut instance = Self::default();
+            instance.controller.manager = manager;
+            instance
         }
     }
 
@@ -43,6 +45,11 @@ pub mod contract {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use core::ops::{
+            Add,
+            Div,
+            Mul,
+        };
         use ink::env::{
             test::{
                 self,
@@ -52,8 +59,12 @@ pub mod contract {
             },
             DefaultEnvironment,
         };
-        use logics::traits::types::WrappedU256;
+        use logics::{
+            impls::exp_no_err::exp_scale,
+            traits::types::WrappedU256,
+        };
         use openbrush::traits::ZERO_ADDRESS;
+        use primitive_types::U256;
 
         type Event = <ControllerContract as ink::reflect::ContractEventBase>::Type;
 
@@ -80,9 +91,12 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let contract = ControllerContract::new();
+            let contract = ControllerContract::new(accounts.bob);
             assert_eq!(contract.markets(), []);
+            assert_eq!(contract.seize_guardian_paused(), false);
+            assert_eq!(contract.transfer_guardian_paused(), false);
             assert_eq!(contract.oracle(), ZERO_ADDRESS.into());
+            assert_eq!(contract.manager(), accounts.bob);
             assert_eq!(contract.close_factor_mantissa(), WrappedU256::from(0));
             assert_eq!(
                 contract.liquidation_incentive_mantissa(),
@@ -94,7 +108,7 @@ pub mod contract {
         fn mint_allowed_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert!(contract.support_market(pool).is_ok());
@@ -105,7 +119,7 @@ pub mod contract {
         fn mint_allowed_fail_when_not_supported() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let contract = ControllerContract::new();
+            let contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert_eq!(
@@ -118,7 +132,7 @@ pub mod contract {
         fn mint_allowed_fail_when_paused() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert!(contract.support_market(pool).is_ok());
@@ -133,7 +147,7 @@ pub mod contract {
         fn borrow_allowed_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert!(contract.support_market(pool).is_ok());
@@ -144,7 +158,7 @@ pub mod contract {
         fn borrow_allowed_fail_when_not_supported() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let contract = ControllerContract::new();
+            let contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert_eq!(
@@ -157,7 +171,7 @@ pub mod contract {
         fn borrow_allowed_fail_when_paused() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert!(contract.support_market(pool).is_ok());
@@ -173,7 +187,7 @@ pub mod contract {
         // fn liquidate_borrow_allowed_works() {
         //     let accounts = default_accounts();
         //     set_caller(accounts.bob);
-        //     let mut contract = ControllerContract::new();
+        //     let mut contract = ControllerContract::new(accounts.bob);
 
         //     let pool1 = AccountId::from([0x01; 32]);
         //     let pool2 = AccountId::from([0x02; 32]);
@@ -188,7 +202,7 @@ pub mod contract {
         fn liquidate_borrow_allowed_fail() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             // not in market
             let pool1 = AccountId::from([0x01; 32]);
@@ -224,7 +238,7 @@ pub mod contract {
         fn seize_allowed_fail() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             // not in market
             let pool1 = AccountId::from([0x01; 32]);
@@ -248,11 +262,15 @@ pub mod contract {
         fn support_market_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let p1 = AccountId::from([0x01; 32]);
             assert!(contract.support_market(p1).is_ok());
             assert_eq!(contract.markets(), [p1]);
+            assert_eq!(
+                contract.collateral_factor_mantissa(p1),
+                Some(WrappedU256::from(0))
+            );
             assert_eq!(contract.mint_guardian_paused(p1), Some(false));
             assert_eq!(contract.borrow_guardian_paused(p1), Some(false));
             assert_eq!(contract.borrow_cap(p1), Some(0));
@@ -265,10 +283,35 @@ pub mod contract {
         }
 
         #[ink::test]
+        fn set_collateral_factor_mantissa_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new(accounts.bob);
+            let pool_addr = AccountId::from([0x01; 32]);
+            assert_eq!(contract.collateral_factor_mantissa(pool_addr), None);
+
+            let max = exp_scale().mul(U256::from(90)).div(U256::from(100));
+            assert!(contract
+                .set_collateral_factor_mantissa(pool_addr, WrappedU256::from(max))
+                .is_ok());
+            assert_eq!(
+                contract.collateral_factor_mantissa(pool_addr),
+                Some(WrappedU256::from(max))
+            );
+
+            assert_eq!(
+                contract
+                    .set_collateral_factor_mantissa(pool_addr, WrappedU256::from(max.add(1)))
+                    .unwrap_err(),
+                Error::InvalidCollateralFactor
+            );
+        }
+
+        #[ink::test]
         fn mint_guardian_paused_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert_eq!(contract.mint_guardian_paused(pool), None);
@@ -286,7 +329,7 @@ pub mod contract {
         fn borrow_guardian_paused_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
-            let mut contract = ControllerContract::new();
+            let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
             assert_eq!(contract.borrow_guardian_paused(pool), None);
@@ -298,6 +341,54 @@ pub mod contract {
             assert_eq!(contract.borrow_guardian_paused(pool), Some(true));
             assert!(contract.set_borrow_guardian_paused(pool, false).is_ok());
             assert_eq!(contract.borrow_guardian_paused(pool), Some(false));
+        }
+
+        #[ink::test]
+        fn seize_guardian_paused_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new(accounts.bob);
+
+            assert_eq!(contract.seize_guardian_paused(), false);
+            assert!(contract.set_seize_guardian_paused(true).is_ok());
+            assert_eq!(contract.seize_guardian_paused(), true);
+        }
+
+        #[ink::test]
+        fn transfer_guardian_paused_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new(accounts.bob);
+
+            assert_eq!(contract.transfer_guardian_paused(), false);
+            assert!(contract.set_transfer_guardian_paused(true).is_ok());
+            assert_eq!(contract.transfer_guardian_paused(), true);
+        }
+
+        #[ink::test]
+        fn assert_manager_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ControllerContract::new(accounts.bob);
+
+            set_caller(accounts.charlie);
+            let dummy_id = AccountId::from([0xff; 32]);
+            let admin_funcs: Vec<Result<()>> = vec![
+                contract.set_price_oracle(dummy_id),
+                contract.support_market(dummy_id),
+                contract.set_collateral_factor_mantissa(dummy_id, WrappedU256::from(0)),
+                contract.set_mint_guardian_paused(dummy_id, true),
+                contract.set_borrow_guardian_paused(dummy_id, true),
+                contract.set_seize_guardian_paused(true),
+                contract.set_transfer_guardian_paused(true),
+                contract.set_close_factor_mantissa(WrappedU256::from(0)),
+                contract.set_liquidation_incentive_mantissa(WrappedU256::from(0)),
+                contract.set_borrow_cap(dummy_id, 0),
+            ];
+            for func in admin_funcs {
+                assert_eq!(func.unwrap_err(), Error::CallerIsNotManager);
+            }
         }
     }
 }

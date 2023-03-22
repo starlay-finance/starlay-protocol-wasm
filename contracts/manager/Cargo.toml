@@ -1,5 +1,5 @@
 [package]
-name = "controller"
+name = "manager"
 version = "0.0.1"
 authors = ["Starlay Finance"]
 edition = "2021"
@@ -14,9 +14,8 @@ scale-info = { version = "2.3", default-features = false, features = [
     "derive",
 ], optional = true }
 
-openbrush = { version = "3.0.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false }
+openbrush = { version = "3.0.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false, features = ["access_control"] }
 logics = { path = "../../logics", default-features = false }
-primitive-types = { version = "0.11.1", default-features = false, features = ["codec"] }
 
 [lib]
 path = "lib.rs"
@@ -26,6 +25,3 @@ crate-type = ["cdylib", "rlib"]
 default = ["std"]
 std = ["ink/std", "scale/std", "scale-info/std", "openbrush/std", "logics/std"]
 ink-as-dependency = []
-
-[profile.release]
-overflow-checks = false
