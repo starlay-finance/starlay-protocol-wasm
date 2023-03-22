@@ -410,7 +410,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     ) -> Result<()> {
         let exchange_rate = Exp {
             mantissa: WrappedU256::from(self._exchange_rate_stored()),
-        }; // TODO: calculate exchange rate & redeem amount
+        };
         let (redeem_tokens, redeem_amount) = match (redeem_tokens_in, redeem_amount_in) {
             (tokens, _) if tokens > 0 => {
                 (
