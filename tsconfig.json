@@ -13,6 +13,6 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["tests/**/*.ts", "typechain/**/*.ts"],
+  "include": ["tests/**/*.ts", "scripts/**/**/*.ts", "typechain/**/*.ts"],
   "exclude": ["node_modules/"]
 }

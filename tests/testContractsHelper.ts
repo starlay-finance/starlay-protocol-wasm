@@ -98,6 +98,7 @@ export const deployLens = async ({
 }
 
 // Mocks
+// eslint-disable-next-line @typescript-eslint/naming-convention
 export const deployPSP22Token = async ({
   api,
   signer,
