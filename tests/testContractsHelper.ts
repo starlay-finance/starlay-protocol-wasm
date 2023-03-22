@@ -61,9 +61,12 @@ export const deployPoolFromAsset = async ({
 export const deployDefaultInterestRateModel = async ({
   api,
   signer,
-}: FactoryArgs): Promise<DefaultInterestRateModel> => {
+  args,
+}: FactoryArgs & {
+  args: Parameters<DefaultInterestRateModel_factory['new']>
+}): Promise<DefaultInterestRateModel> => {
   const factory = new DefaultInterestRateModel_factory(api, signer)
-  const contract = await factory.new()
+  const contract = await factory.new(...args)
   return new DefaultInterestRateModel(contract.address, signer, api)
 }
 

@@ -20,13 +20,18 @@ pub mod contract {
 
     impl DefaultInterestRateModelContract {
         #[ink(constructor)]
-        pub fn new() -> Self {
+        pub fn new(
+            base_rate_per_year: WrappedU256,
+            multiplier_per_year_slope_1: WrappedU256,
+            multiplier_per_year_slope_2: WrappedU256,
+            kink: WrappedU256,
+        ) -> Self {
             Self {
                 model: Data::new(
-                    WrappedU256::from(0),
-                    WrappedU256::from(0),
-                    WrappedU256::from(0),
-                    WrappedU256::from(0),
+                    base_rate_per_year,
+                    multiplier_per_year_slope_1,
+                    multiplier_per_year_slope_2,
+                    kink,
                 ),
             }
         }
@@ -42,6 +47,7 @@ pub mod contract {
             },
             DefaultEnvironment,
         };
+        use logics::traits::types::WrappedU256;
 
         fn default_accounts() -> DefaultAccounts<DefaultEnvironment> {
             test::default_accounts::<DefaultEnvironment>()
@@ -55,7 +61,12 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
-            let _contract = DefaultInterestRateModelContract::new();
+            let _contract = DefaultInterestRateModelContract::new(
+                WrappedU256::from(0),
+                WrappedU256::from(0),
+                WrappedU256::from(0),
+                WrappedU256::from(0),
+            );
         }
     }
 }

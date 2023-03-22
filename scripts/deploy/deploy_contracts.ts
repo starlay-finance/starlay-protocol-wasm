@@ -1,5 +1,6 @@
 import { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
+import { BN } from '@polkadot/util'
 import PSP22Token from '../../types/contracts/psp22_token'
 import { deployer, provider } from '../helper/wallet_helper'
 import { DUMMY_TOKENS, Token } from '../tokens'
@@ -35,10 +36,24 @@ const deployContracts = async (env: Env) => {
   })
   await waitForTx(await manager.tx.setController(controller.address, args))
   for (const token of await deployDummyTokens(api, signer)) {
-    const rateModel = await deployDefaultInterestRateModel({
+    const {
+      baseRatePerYear,
+      multiplierPerYearSlope1,
+      multiplierPerYearSlope2,
+      kink,
+    } = token.token.rateModel
+    const toParam = (m: BN) => [m.toString()]
+
+    const rateModelContract = await deployDefaultInterestRateModel({
       api,
       signer,
-      args: [args],
+      args: [
+        toParam(baseRatePerYear),
+        toParam(multiplierPerYearSlope1),
+        toParam(multiplierPerYearSlope2),
+        toParam(kink),
+        args,
+      ],
     })
     await deployPool({
       api,
@@ -46,7 +61,7 @@ const deployContracts = async (env: Env) => {
       args: [
         token.contract.address,
         controller.address,
-        rateModel.address,
+        rateModelContract.address,
         [resolvePoolName(token.token.name)],
         [token.token.symbol],
         token.token.decimal,
