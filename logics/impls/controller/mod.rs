@@ -13,6 +13,7 @@ use crate::traits::{
 use core::ops::{
     Add,
     Mul,
+    Sub,
 };
 use ink::prelude::vec::Vec;
 use openbrush::{
@@ -35,12 +36,6 @@ use self::utils::{
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
-
-#[derive(Default)]
-pub struct AccountLiquidityLocalVars {
-    sum_collateral: U256,
-    sum_borrow_plus_effect: U256,
-}
 
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
@@ -869,7 +864,8 @@ impl<T: Storage<Data>> Internal for T {
         redeem_tokens: Balance,
         borrow_amount: Balance,
     ) -> (U256, U256) {
-        let mut vars = AccountLiquidityLocalVars::default();
+        let mut sum_collateral = U256::from(0);
+        let mut sum_borrow_plus_effect = U256::from(0);
 
         // For each asset the account is in
         let account_assets = self._account_assets(account);
@@ -895,43 +891,35 @@ impl<T: Storage<Data>> Internal for T {
                     Exp {
                         mantissa: self._collateral_factor_mantissa(asset).unwrap(),
                     },
-                    Exp {
-                        mantissa: WrappedU256::from(exchange_rate_mantissa),
-                    },
+                    oracle_price.clone(),
                 );
 
-            vars.sum_collateral = vars.sum_collateral.add(collateral);
-            vars.sum_borrow_plus_effect = vars.sum_borrow_plus_effect.add(borrow_plus_effect);
+            sum_collateral = sum_collateral.add(collateral);
+            sum_borrow_plus_effect = sum_borrow_plus_effect.add(borrow_plus_effect);
 
             // Calculate effects of interacting with cTokenModify
             if asset == token_modify {
                 // redeem effect
                 // sumBorrowPlusEffects += tokensToDenom * redeemTokens
-                vars.sum_borrow_plus_effect = token_to_denom.clone().mul_scalar_truncate_add_uint(
+                sum_borrow_plus_effect = token_to_denom.clone().mul_scalar_truncate_add_uint(
                     U256::from(redeem_tokens),
-                    vars.sum_borrow_plus_effect,
+                    sum_borrow_plus_effect,
                 );
 
                 // borrow effect
                 // sumBorrowPlusEffects += oraclePrice * borrowAmount
-                vars.sum_borrow_plus_effect = oracle_price.clone().mul_scalar_truncate_add_uint(
+                sum_borrow_plus_effect = oracle_price.clone().mul_scalar_truncate_add_uint(
                     U256::from(borrow_amount),
-                    vars.sum_borrow_plus_effect,
+                    sum_borrow_plus_effect,
                 );
             }
         }
 
         // These are safe, as the underflow condition is checked first
-        if vars.sum_collateral > vars.sum_borrow_plus_effect {
-            return (
-                vars.sum_collateral - vars.sum_borrow_plus_effect,
-                U256::from(0),
-            )
+        if sum_collateral > sum_borrow_plus_effect {
+            return (sum_collateral.sub(sum_borrow_plus_effect), U256::from(0))
         } else {
-            return (
-                U256::from(0),
-                vars.sum_borrow_plus_effect - vars.sum_collateral,
-            )
+            return (U256::from(0), sum_borrow_plus_effect.sub(sum_collateral))
         }
     }
 
