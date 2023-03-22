@@ -7,11 +7,19 @@ use crate::{
     traits::types::WrappedU256,
 };
 use core::ops::{
+    Add,
     Div,
     Mul,
 };
-use openbrush::traits::Balance;
+use openbrush::{
+    storage::Mapping,
+    traits::{
+        AccountId,
+        Balance,
+    },
+};
 use primitive_types::U256;
+use std::collections::HashMap;
 
 pub struct LiquidateCalculateSeizeTokensInput {
     pub price_borrowed_mantissa: U256,
@@ -47,6 +55,70 @@ pub fn liquidate_calculate_seize_tokens(
 pub fn collateral_factor_max_mantissa() -> U256 {
     // 90%
     exp_scale().mul(U256::from(90)).div(U256::from(100))
+}
+
+#[derive(Debug)]
+pub struct GetHypotheticalAccountLiquidityInput {
+    pub account_assets: Vec<AccountId>,
+    pub asset_params: HashMap<AccountId, HypotheticalAccountLiquidityCalculationParam>,
+    pub token_modify: AccountId,
+    pub redeem_tokens: Balance,
+    pub borrow_amount: Balance,
+}
+#[derive(Clone, Debug)]
+pub struct HypotheticalAccountLiquidityCalculationParam {
+    pub token_balance: Balance,
+    pub borrow_balance: Balance,
+    pub exchange_rate_mantissa: Exp,
+    pub collateral_factor_mantissa: Exp,
+    pub oracle_price_mantissa: Exp,
+}
+pub fn get_hypothetical_account_liquidity(
+    input: GetHypotheticalAccountLiquidityInput,
+) -> (U256, U256) {
+    let mut sum_collateral = U256::from(0);
+    let mut sum_borrow_plus_effect = U256::from(0);
+
+    let GetHypotheticalAccountLiquidityInput {
+        account_assets,
+        asset_params,
+        token_modify,
+        redeem_tokens,
+        borrow_amount,
+    } = input;
+
+    for asset in account_assets {
+        let param = asset_params.get(&asset).unwrap();
+        let (token_to_denom, collateral, borrow_plus_effect) =
+            get_hypothetical_account_liquidity_per_asset(
+                param.token_balance,
+                param.borrow_balance,
+                param.exchange_rate_mantissa.clone(),
+                param.collateral_factor_mantissa.clone(),
+                param.oracle_price_mantissa.clone(),
+            );
+
+        sum_collateral = sum_collateral.add(collateral);
+        sum_borrow_plus_effect = sum_borrow_plus_effect.add(borrow_plus_effect);
+
+        // Calculate effects of interacting with cTokenModify
+        if asset == token_modify {
+            // redeem effect
+            // sumBorrowPlusEffects += tokensToDenom * redeemTokens
+            sum_borrow_plus_effect = token_to_denom
+                .clone()
+                .mul_scalar_truncate_add_uint(U256::from(redeem_tokens), sum_borrow_plus_effect);
+
+            // borrow effect
+            // sumBorrowPlusEffects += oraclePrice * borrowAmount
+            sum_borrow_plus_effect = param
+                .oracle_price_mantissa
+                .clone()
+                .mul_scalar_truncate_add_uint(U256::from(borrow_amount), sum_borrow_plus_effect);
+        }
+    }
+
+    (sum_collateral, sum_borrow_plus_effect)
 }
 
 pub fn get_hypothetical_account_liquidity_per_asset(
@@ -170,7 +242,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_hypothetical_account_liqudity_per_asset() {
+    fn test_get_hypothetical_account_liquidity_per_asset() {
         struct Case {
             input: Input,
             expected: Expected,
