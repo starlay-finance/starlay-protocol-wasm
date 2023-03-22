@@ -1,3 +1,4 @@
+import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
 import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 
@@ -23,7 +24,19 @@ export const deployController = async ({
 }): Promise<Controller> => {
   const factory = new Controller_factory(api, signer)
   const contract = await factory.new(...args)
-  return new Controller(contract.address, signer, api)
+  const result = new Controller(contract.address, signer, api)
+  afterDeployment(result.name, contract)
+  return result
+}
+
+const afterDeployment = (
+  name: string,
+  contract: {
+    result: SignAndSendSuccessResponse
+    address: string
+  },
+) => {
+  console.log(name + ' deployed at:' + contract.address)
 }
 
 export const deployPool = async ({
@@ -35,10 +48,13 @@ export const deployPool = async ({
 }): Promise<Pool> => {
   const factory = new Pool_factory(api, signer)
   const contract = await factory.new(...args)
-  return new Pool(contract.address, signer, api)
+  const result = new Pool(contract.address, signer, api)
+  afterDeployment(result.name, contract)
+  return result
 }
 
 // Mocks
+// eslint-disable-next-line @typescript-eslint/naming-convention
 export const deployPSP22Token = async ({
   api,
   signer,

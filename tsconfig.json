@@ -13,6 +13,6 @@
     "resolveJsonModule": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["tests/**/*.ts"],
+  "include": ["tests/**/*.ts", "scripts/**/**/*.ts"],
   "exclude": ["node_modules/"]
 }
