@@ -143,18 +143,6 @@ pub mod contract {
             );
         }
 
-        // TODO
-        // #[ink::test]
-        // fn borrow_allowed_works() {
-        //     let accounts = default_accounts();
-        //     set_caller(accounts.bob);
-        //     let mut contract = ControllerContract::new(accounts.bob);
-
-        //     let pool = AccountId::from([0x01; 32]);
-        //     assert!(contract.support_market(pool).is_ok());
-        //     assert!(contract.borrow_allowed(pool, accounts.bob, 0).is_ok());
-        // }
-
         #[ink::test]
         fn borrow_allowed_fail_when_not_supported() {
             let accounts = default_accounts();
@@ -182,22 +170,6 @@ pub mod contract {
                 Error::BorrowIsPaused
             );
         }
-
-        // TODO
-        // #[ink::test]
-        // fn liquidate_borrow_allowed_works() {
-        //     let accounts = default_accounts();
-        //     set_caller(accounts.bob);
-        //     let mut contract = ControllerContract::new(accounts.bob);
-
-        //     let pool1 = AccountId::from([0x01; 32]);
-        //     let pool2 = AccountId::from([0x02; 32]);
-        //     assert!(contract.support_market(pool1).is_ok());
-        //     assert!(contract.support_market(pool2).is_ok());
-        //     assert!(contract
-        //         .liquidate_borrow_allowed(pool1, pool2, ZERO_ADDRESS.into(), ZERO_ADDRESS.into(), 0)
-        //         .is_ok())
-        // }
 
         #[ink::test]
         fn liquidate_borrow_allowed_fail() {
