@@ -1,4 +1,3 @@
-import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
 import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 
@@ -32,19 +31,7 @@ export const deployController = async ({
 }): Promise<Controller> => {
   const factory = new Controller_factory(api, signer)
   const contract = await factory.new(...args)
-  const result = new Controller(contract.address, signer, api)
-  afterDeployment(result.name, contract)
-  return result
-}
-
-const afterDeployment = (
-  name: string,
-  contract: {
-    result: SignAndSendSuccessResponse
-    address: string
-  },
-) => {
-  console.log(name + ' deployed at:' + contract.address)
+  return new Controller(contract.address, signer, api)
 }
 
 export const deployPool = async ({
@@ -56,9 +43,7 @@ export const deployPool = async ({
 }): Promise<Pool> => {
   const factory = new Pool_factory(api, signer)
   const contract = await factory.new(...args)
-  const result = new Pool(contract.address, signer, api)
-  afterDeployment(result.name, contract)
-  return result
+  return new Pool(contract.address, signer, api)
 }
 
 export const deployPoolFromAsset = async ({
