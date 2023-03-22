@@ -1,15 +1,19 @@
 import { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
-import { deployController } from '../../tests/testContractsHelper'
 import PSP22Token from '../../types/contracts/psp22_token'
 import { deployer, provider } from '../helper/wallet_helper'
 import { DUMMY_TOKENS, Token } from '../tokens'
 import { Env } from './../env'
 import {
   defaultArgs,
+  deployController,
   deployDefaultInterestRateModel,
+  deployLens,
+  deployManager,
   deployPool,
   deployPSP22Token,
+  waitForTx,
+  ZERO_ADDRESS,
 } from './../helper/deploy_helper'
 
 const main = async () => {
@@ -18,16 +22,23 @@ const main = async () => {
 const deployContracts = async (env: Env) => {
   const api = await provider(env)
   const signer = await deployer(env)
+  const args = defaultArgs(api)
+  const manager = await deployManager({
+    api,
+    signer,
+    args: [ZERO_ADDRESS, args],
+  })
   const controller = await deployController({
     api,
     signer,
-    args: [defaultArgs(api)],
+    args: [manager.address, args],
   })
+  await waitForTx(await manager.tx.setController(controller.address, args))
   for (const token of await deployDummyTokens(api, signer)) {
-    await deployDefaultInterestRateModel({
+    const rateModel = await deployDefaultInterestRateModel({
       api,
       signer,
-      args: [defaultArgs(api)],
+      args: [args],
     })
     await deployPool({
       api,
@@ -35,13 +46,15 @@ const deployContracts = async (env: Env) => {
       args: [
         token.contract.address,
         controller.address,
+        rateModel.address,
         [resolvePoolName(token.token.name)],
         [token.token.symbol],
         token.token.decimal,
-        defaultArgs(api),
+        args,
       ],
     })
   }
+  await deployLens({ api, signer, args: [args] })
 }
 
 const resolvePoolName = (token: string) => {
