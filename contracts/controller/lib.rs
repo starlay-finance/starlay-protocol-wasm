@@ -93,6 +93,8 @@ pub mod contract {
 
             let contract = ControllerContract::new(accounts.bob);
             assert_eq!(contract.markets(), []);
+            assert_eq!(contract.seize_guardian_paused(), false);
+            assert_eq!(contract.transfer_guardian_paused(), false);
             assert_eq!(contract.oracle(), ZERO_ADDRESS.into());
             assert_eq!(contract.manager(), accounts.bob);
             assert_eq!(contract.close_factor_mantissa(), WrappedU256::from(0));
@@ -342,6 +344,28 @@ pub mod contract {
         }
 
         #[ink::test]
+        fn seize_guardian_paused_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new(accounts.bob);
+
+            assert_eq!(contract.seize_guardian_paused(), false);
+            assert!(contract.set_seize_guardian_paused(true).is_ok());
+            assert_eq!(contract.seize_guardian_paused(), true);
+        }
+
+        #[ink::test]
+        fn transfer_guardian_paused_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new(accounts.bob);
+
+            assert_eq!(contract.transfer_guardian_paused(), false);
+            assert!(contract.set_transfer_guardian_paused(true).is_ok());
+            assert_eq!(contract.transfer_guardian_paused(), true);
+        }
+
+        #[ink::test]
         fn assert_manager_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
@@ -356,6 +380,8 @@ pub mod contract {
                 contract.set_collateral_factor_mantissa(dummy_id, WrappedU256::from(0)),
                 contract.set_mint_guardian_paused(dummy_id, true),
                 contract.set_borrow_guardian_paused(dummy_id, true),
+                contract.set_seize_guardian_paused(true),
+                contract.set_transfer_guardian_paused(true),
                 contract.set_close_factor_mantissa(WrappedU256::from(0)),
                 contract.set_liquidation_incentive_mantissa(WrappedU256::from(0)),
                 contract.set_borrow_cap(dummy_id, 0),
