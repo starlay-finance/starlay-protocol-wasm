@@ -545,7 +545,6 @@ impl<T: Storage<Data>> Internal for T {
         if let Some(true) | None = self._borrow_guardian_paused(pool) {
             return Err(Error::BorrowIsPaused)
         }
-        // TODO: assertion check - check to already entry market by borrower
         // TODO: assertion check - check oracle price for underlying asset
 
         let borrow_cap = self._borrow_cap(pool).unwrap();
