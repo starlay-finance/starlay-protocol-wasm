@@ -35,9 +35,9 @@ pub mod contract {
         total_borrows: Balance,
         total_reserves: Balance,
         exchange_rate_current: WrappedU256,
-        supply_rate_per_sec: WrappedU256,
-        borrow_rate_per_sec: WrappedU256,
-        collateral_factor_mantissa: u128,
+        supply_rate_per_msec: WrappedU256,
+        borrow_rate_per_msec: WrappedU256,
+        collateral_factor_mantissa: WrappedU256,
         reserve_factor_mantissa: WrappedU256,
         borrow_cap: Option<u128>,
     }
@@ -135,10 +135,13 @@ pub mod contract {
                 total_borrows: PoolRef::total_borrows(&pool),
                 total_reserves: PoolRef::total_reserves(&pool),
                 exchange_rate_current: PoolRef::exchange_rate_current(&pool).unwrap_or_default(),
-                supply_rate_per_sec: PoolRef::supply_rate_per_msec(&pool),
-                borrow_rate_per_sec: PoolRef::borrow_rate_per_msec(&pool),
-                collateral_factor_mantissa: 0,
-                // TODO ControllerRef::collateral_factor(&controller, pool),
+                supply_rate_per_msec: PoolRef::supply_rate_per_msec(&pool),
+                borrow_rate_per_msec: PoolRef::borrow_rate_per_msec(&pool),
+                collateral_factor_mantissa: ControllerRef::collateral_factor_mantissa(
+                    &controller,
+                    pool,
+                )
+                .unwrap_or_default(),
                 reserve_factor_mantissa: PoolRef::reserve_factor_mantissa(&pool),
                 borrow_cap: ControllerRef::borrow_cap(&controller, pool),
             }
