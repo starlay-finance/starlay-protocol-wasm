@@ -11,12 +11,12 @@ use core::ops::{
     Div,
     Mul,
 };
+use ink::prelude::vec::Vec;
 use openbrush::traits::{
     AccountId,
     Balance,
 };
 use primitive_types::U256;
-use std::collections::HashMap;
 
 pub struct LiquidateCalculateSeizeTokensInput {
     pub price_borrowed_mantissa: U256,
@@ -56,14 +56,14 @@ pub fn collateral_factor_max_mantissa() -> U256 {
 
 #[derive(Debug)]
 pub struct GetHypotheticalAccountLiquidityInput {
-    pub account_assets: Vec<AccountId>,
-    pub asset_params: HashMap<AccountId, HypotheticalAccountLiquidityCalculationParam>,
+    pub asset_params: Vec<HypotheticalAccountLiquidityCalculationParam>,
     pub token_modify: AccountId,
     pub redeem_tokens: Balance,
     pub borrow_amount: Balance,
 }
 #[derive(Clone, Debug)]
 pub struct HypotheticalAccountLiquidityCalculationParam {
+    pub asset: AccountId,
     pub token_balance: Balance,
     pub borrow_balance: Balance,
     pub exchange_rate_mantissa: Exp,
@@ -77,15 +77,13 @@ pub fn get_hypothetical_account_liquidity(
     let mut sum_borrow_plus_effect = U256::from(0);
 
     let GetHypotheticalAccountLiquidityInput {
-        account_assets,
         asset_params,
         token_modify,
         redeem_tokens,
         borrow_amount,
     } = input;
 
-    for asset in account_assets {
-        let param = asset_params.get(&asset).unwrap();
+    for param in asset_params {
         let (token_to_denom, collateral, borrow_plus_effect) =
             get_hypothetical_account_liquidity_per_asset(
                 param.token_balance,
@@ -99,7 +97,7 @@ pub fn get_hypothetical_account_liquidity(
         sum_borrow_plus_effect = sum_borrow_plus_effect.add(borrow_plus_effect);
 
         // Calculate effects of interacting with cTokenModify
-        if asset == token_modify {
+        if param.asset == token_modify {
             // redeem effect
             // sumBorrowPlusEffects += tokensToDenom * redeemTokens
             sum_borrow_plus_effect = token_to_denom

@@ -25,7 +25,6 @@ use openbrush::{
     },
 };
 use primitive_types::U256;
-use std::collections::HashMap;
 
 mod utils;
 use self::utils::{
@@ -868,8 +867,7 @@ impl<T: Storage<Data>> Internal for T {
     ) -> (U256, U256) {
         // For each asset the account is in
         let account_assets = self._account_assets(account);
-        let mut asset_params =
-            HashMap::<AccountId, HypotheticalAccountLiquidityCalculationParam>::new();
+        let mut asset_params = Vec::<HypotheticalAccountLiquidityCalculationParam>::new();
 
         // Prepare parameters for calculation
         for asset in &account_assets {
@@ -884,25 +882,22 @@ impl<T: Storage<Data>> Internal for T {
                 )),
             };
 
-            asset_params.insert(
-                *asset,
-                HypotheticalAccountLiquidityCalculationParam {
-                    token_balance,
-                    borrow_balance,
-                    exchange_rate_mantissa: Exp {
-                        mantissa: WrappedU256::from(exchange_rate_mantissa),
-                    },
-                    collateral_factor_mantissa: Exp {
-                        mantissa: self._collateral_factor_mantissa(*asset).unwrap(),
-                    },
-                    oracle_price_mantissa: oracle_price.clone(),
+            asset_params.push(HypotheticalAccountLiquidityCalculationParam {
+                asset: *asset,
+                token_balance,
+                borrow_balance,
+                exchange_rate_mantissa: Exp {
+                    mantissa: WrappedU256::from(exchange_rate_mantissa),
                 },
-            );
+                collateral_factor_mantissa: Exp {
+                    mantissa: self._collateral_factor_mantissa(*asset).unwrap(),
+                },
+                oracle_price_mantissa: oracle_price.clone(),
+            });
         }
 
         let (sum_collateral, sum_borrow_plus_effect) =
             get_hypothetical_account_liquidity(GetHypotheticalAccountLiquidityInput {
-                account_assets,
                 asset_params,
                 token_modify,
                 redeem_tokens,
