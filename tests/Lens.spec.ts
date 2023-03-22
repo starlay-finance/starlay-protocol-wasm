@@ -56,7 +56,7 @@ const setup = async () => {
   const pool2 = await deployPoolFromAsset({
     api,
     signer: deployer,
-    args: [token1.address, controller.address, interestRateModel.address],
+    args: [token2.address, controller.address, interestRateModel.address],
   })
 
   const priceOracle = await deployPriceOracle({
