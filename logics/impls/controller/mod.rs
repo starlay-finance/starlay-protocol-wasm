@@ -547,11 +547,15 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _redeem_allowed(
         &self,
-        _pool: AccountId,
-        _redeemer: AccountId,
-        _redeem_amount: Balance,
+        pool: AccountId,
+        redeemer: AccountId,
+        redeem_amount: Balance,
     ) -> Result<()> {
-        // TODO: assertion check - liquidity check to guard against shortfall
+        let (_, shortfall) =
+            self._get_hypothetical_account_liquidity(redeemer, pool, redeem_amount, 0);
+        if !shortfall.is_zero() {
+            return Err(Error::InsufficientLiquidity)
+        }
 
         Ok(())
     }
@@ -567,12 +571,13 @@ impl<T: Storage<Data>> Internal for T {
     default fn _borrow_allowed(
         &self,
         pool: AccountId,
-        _borrower: AccountId,
+        borrower: AccountId,
         borrow_amount: Balance,
     ) -> Result<()> {
         if let Some(true) | None = self._borrow_guardian_paused(pool) {
             return Err(Error::BorrowIsPaused)
         }
+
         // TODO: assertion check - check oracle price for underlying asset
 
         let borrow_cap = self._borrow_cap(pool).unwrap();
@@ -584,7 +589,11 @@ impl<T: Storage<Data>> Internal for T {
             }
         }
 
-        // TODO: assertion check - HypotheticalAccountLiquidity
+        let (_, shortfall) =
+            self._get_hypothetical_account_liquidity(borrower, pool, 0, borrow_amount);
+        if !shortfall.is_zero() {
+            return Err(Error::InsufficientLiquidity)
+        }
 
         // TODO: keep the flywheel moving
 
@@ -631,10 +640,13 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::MarketNotListed)
         }
 
-        // TODO: calculate account's liquidity
-        //   The borrower must have shortfall in order to be liquidatable
+        // The borrower must have shortfall in order to be liquidatable
+        let (_, shortfall) = self._get_account_liquidity(borrower);
+        if shortfall.is_zero() {
+            return Err(Error::InsufficientShortfall)
+        }
 
-        //   The liquidator may not repay more than what is allowed by the closeFactor
+        // The liquidator may not repay more than what is allowed by the closeFactor
         let bollow_balance = PoolRef::borrow_balance_stored(&pool_borrowed, borrower);
         let max_close = Exp {
             mantissa: self._close_factor_mantissa(),
