@@ -390,13 +390,17 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         if self._accural_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         };
-        // TODO: calculate exchange rate & mint amount
-        let actual_mint_amount = mint_amount;
+
+        self._mint_to(minter, mint_amount).unwrap();
+        let actual_mint_amount = U256::from(mint_amount)
+            .mul(self._exchange_rate_stored())
+            .div(exp_scale())
+            .as_u128();
         self._transfer_underlying_from(minter, contract_addr, actual_mint_amount)
             .unwrap();
-        self._mint_to(minter, mint_amount).unwrap();
 
         self._emit_mint_event(minter, actual_mint_amount, mint_amount);
+
         // skip post-process because nothing is done
         // ControllerRef::mint_verify(&self._controller(), contract_addr, minter, actual_mint_amount, mint_amount).unwrap();
 
@@ -456,6 +460,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         self._transfer_underlying(redeemer, redeem_amount).unwrap();
 
         self._emit_redeem_event(redeemer, redeem_amount, redeem_tokens);
+
         // skip post-process because nothing is done
         // ControllerRef::redeem_verify(&self._controller(), contract_addr, redeemer, redeem_tokens, redeem_amount).unwrap();
 
@@ -495,6 +500,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             account_borrows_new,
             total_borrows_new,
         );
+
         // skip post-process because nothing is done
         // ControllerRef::borrow_verify(&self._controller(), contract_addr, borrower, borrow_amount).unwrap();
 
@@ -552,6 +558,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             account_borrows_new,
             total_borrows_new,
         );
+
         // skip post-process because nothing is done
         // ControllerRef::repay_borrow_verify(&self._controller(), contract_addr, payer, borrower, repay_amount_final, 0).unwrap(); // temp: index is zero (type difference)
 
@@ -615,6 +622,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             collateral,
             seize_tokens,
         );
+
         // skip post-process because nothing is done
         // ControllerRef::liquidate_borrow_verify(&self._controller(), contract_addr, collateral, liquidator, borrower, actual_repay_amount, seize_tokens).unwrap();
 
