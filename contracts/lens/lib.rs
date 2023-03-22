@@ -79,6 +79,11 @@ pub mod contract {
         }
 
         #[ink(message)]
+        pub fn pools(&self, controller: AccountId) -> Vec<AccountId> {
+            self._pools(controller)
+        }
+
+        #[ink(message)]
         pub fn pool_metadata(&self, pool: AccountId) -> PoolMetadata {
             self._pool_metadata(pool)
         }
@@ -119,6 +124,10 @@ pub mod contract {
                 .iter()
                 .map(|pool| self._pool_underlying_price(*pool))
                 .collect()
+        }
+
+        fn _pools(&self, controller: AccountId) -> Vec<AccountId> {
+            ControllerRef::markets(&controller)
         }
 
         fn _pool_metadata(&self, pool: AccountId) -> PoolMetadata {

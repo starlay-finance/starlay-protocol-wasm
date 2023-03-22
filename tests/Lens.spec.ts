@@ -1,4 +1,5 @@
 import type { KeyringPair } from '@polkadot/keyring/types'
+import Controller from '../types/contracts/controller'
 import Lens from '../types/contracts/lens'
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
@@ -14,7 +15,7 @@ import {
 const setup = async () => {
   const { api, alice: deployer, bob, charlie } = globalThis.setup
 
-  const token = await deployPSP22Token({
+  const token1 = await deployPSP22Token({
     api,
     signer: deployer,
     args: [
@@ -22,6 +23,16 @@ const setup = async () => {
       'Dai Stablecoin' as unknown as string[],
       'DAI' as unknown as string[],
       8,
+    ],
+  })
+  const token2 = await deployPSP22Token({
+    api,
+    signer: deployer,
+    args: [
+      0,
+      'USDCoin' as unknown as string[],
+      'USDC' as unknown as string[],
+      18,
     ],
   })
 
@@ -36,10 +47,16 @@ const setup = async () => {
     signer: deployer,
   })
 
-  const pool = await deployPoolFromAsset({
+  const pool1 = await deployPoolFromAsset({
     api,
     signer: deployer,
-    args: [token.address, controller.address, interestRateModel.address],
+    args: [token1.address, controller.address, interestRateModel.address],
+  })
+
+  const pool2 = await deployPoolFromAsset({
+    api,
+    signer: deployer,
+    args: [token1.address, controller.address, interestRateModel.address],
   })
 
   const priceOracle = await deployPriceOracle({
@@ -50,31 +67,63 @@ const setup = async () => {
   const users = [bob, charlie]
 
   // initialize
-  await controller.tx.supportMarket(pool.address)
+  await controller.tx.supportMarket(pool1.address)
+  await controller.tx.supportMarket(pool2.address)
   await controller.tx.setPriceOracle(priceOracle.address)
+  await priceOracle.tx.setFixedPrice(token1.address, 0)
+  await priceOracle.tx.setFixedPrice(token2.address, 0)
 
   const lens = await deployLens({ api, signer: deployer })
 
-  return { api, deployer, token, pool, controller, lens, users }
+  console.log({
+    lens: lens.address,
+    controller: controller.address,
+    pools: [pool1.address, pool2.address],
+    interestRateModel: interestRateModel.address,
+    tokens: [token1.address, token2.address],
+  })
+  return {
+    api,
+    deployer,
+    tokens: [token1, token2],
+    pools: [pool1, pool2],
+    controller,
+    lens,
+    users,
+  }
 }
 
 describe('Lens', () => {
   let lens: Lens
-  let token: PSP22Token
-  let pool: Pool
+  let tokens: PSP22Token[]
+  let pools: Pool[]
+  let controller: Controller
   let signer: KeyringPair
 
   beforeAll(async () => {
     ;({
       lens,
-      token,
-      pool,
+      tokens,
+      pools,
+      controller,
       users: [signer],
     } = await setup())
   })
 
   describe('returns value', () => {
+    it('Pools', async () => {
+      const {
+        value: { ok: res },
+      } = await lens.query.pools(controller.address)
+
+      expect(res).toHaveLength(pools.length)
+      pools.forEach((pool, idx) => {
+        expect(res[idx]).toBe(pool.address)
+      })
+    })
     it('Pool Metadata', async () => {
+      const token = tokens[0]
+      const pool = pools[0]
       const tokenDecimals = (await token.query.tokenDecimals()).value.ok
       const {
         value: { ok: res },
@@ -99,6 +148,7 @@ describe('Lens', () => {
     })
 
     it('Pool Balances', async () => {
+      const pool = pools[0]
       const {
         value: { ok: res },
       } = await lens
@@ -114,6 +164,7 @@ describe('Lens', () => {
     })
 
     it('Pool UnderlyingPrice', async () => {
+      const pool = pools[0]
       const {
         value: { ok: res },
       } = await lens.query.poolUnderlyingPrice(pool.address)
