@@ -11,12 +11,9 @@ use core::ops::{
     Div,
     Mul,
 };
-use openbrush::{
-    storage::Mapping,
-    traits::{
-        AccountId,
-        Balance,
-    },
+use openbrush::traits::{
+    AccountId,
+    Balance,
 };
 use primitive_types::U256;
 use std::collections::HashMap;
