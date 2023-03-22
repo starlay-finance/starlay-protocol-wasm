@@ -186,6 +186,8 @@ pub trait Internal {
     ) -> Result<()>;
     fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
     fn _set_borrow_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()>;
+    fn _set_seize_guardian_paused(&mut self, paused: bool) -> Result<()>;
+    fn _set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()>;
     fn _set_close_factor_mantissa(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()>;
     fn _set_liquidation_incentive_mantissa(
         &mut self,
@@ -199,6 +201,8 @@ pub trait Internal {
     fn _is_listed(&self, pool: AccountId) -> bool;
     fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
+    fn _seize_guardian_paused(&self) -> bool;
+    fn _transfer_guardian_paused(&self) -> bool;
     fn _oracle(&self) -> AccountId;
     fn _close_factor_mantissa(&self) -> WrappedU256;
     fn _liquidation_incentive_mantissa(&self) -> WrappedU256;
@@ -432,6 +436,14 @@ impl<T: Storage<Data>> Controller for T {
         self._set_borrow_guardian_paused(&pool, paused)
     }
 
+    default fn set_seize_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        self._set_seize_guardian_paused(paused)
+    }
+
+    default fn set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        self._set_transfer_guardian_paused(paused)
+    }
+
     default fn set_close_factor_mantissa(
         &mut self,
         new_close_factor_mantissa: WrappedU256,
@@ -464,6 +476,12 @@ impl<T: Storage<Data>> Controller for T {
     }
     default fn borrow_guardian_paused(&self, pool: AccountId) -> Option<bool> {
         self._borrow_guardian_paused(pool)
+    }
+    default fn seize_guardian_paused(&self) -> bool {
+        self._seize_guardian_paused()
+    }
+    default fn transfer_guardian_paused(&self) -> bool {
+        self._transfer_guardian_paused()
     }
     default fn oracle(&self) -> AccountId {
         self._oracle()
@@ -749,6 +767,14 @@ impl<T: Storage<Data>> Internal for T {
         self.data().borrow_guardian_paused.insert(pool, &paused);
         Ok(())
     }
+    default fn _set_seize_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        self.data().seize_guardian_paused = paused;
+        Ok(())
+    }
+    default fn _set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        self.data().transfer_guardian_paused = paused;
+        Ok(())
+    }
     default fn _set_close_factor_mantissa(
         &mut self,
         new_close_factor_mantissa: WrappedU256,
@@ -788,6 +814,12 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool> {
         self.data().borrow_guardian_paused.get(&pool)
+    }
+    default fn _seize_guardian_paused(&self) -> bool {
+        self.data().seize_guardian_paused
+    }
+    default fn _transfer_guardian_paused(&self) -> bool {
+        self.data().transfer_guardian_paused
     }
     default fn _oracle(&self) -> AccountId {
         self.data().oracle

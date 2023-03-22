@@ -93,6 +93,8 @@ pub mod contract {
 
             let contract = ControllerContract::new(accounts.bob);
             assert_eq!(contract.markets(), []);
+            assert_eq!(contract.seize_guardian_paused(), false);
+            assert_eq!(contract.transfer_guardian_paused(), false);
             assert_eq!(contract.oracle(), ZERO_ADDRESS.into());
             assert_eq!(contract.manager(), accounts.bob);
             assert_eq!(contract.close_factor_mantissa(), WrappedU256::from(0));

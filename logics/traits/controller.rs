@@ -165,6 +165,12 @@ pub trait Controller {
     fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()>;
 
     #[ink(message)]
+    fn set_seize_guardian_paused(&mut self, paused: bool) -> Result<()>;
+
+    #[ink(message)]
+    fn set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()>;
+
+    #[ink(message)]
     fn set_close_factor_mantissa(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()>;
 
     #[ink(message)]
@@ -185,6 +191,10 @@ pub trait Controller {
     fn mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     #[ink(message)]
     fn borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
+    #[ink(message)]
+    fn seize_guardian_paused(&self) -> bool;
+    #[ink(message)]
+    fn transfer_guardian_paused(&self) -> bool;
     #[ink(message)]
     fn oracle(&self) -> AccountId;
     #[ink(message)]
