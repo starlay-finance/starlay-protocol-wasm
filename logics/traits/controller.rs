@@ -224,6 +224,8 @@ pub trait Controller {
 pub enum Error {
     MintIsPaused,
     BorrowIsPaused,
+    SeizeIsPaused,
+    TransferIsPaused,
     MarketNotListed,
     ControllerMismatch,
     PriceError,

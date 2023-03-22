@@ -661,7 +661,9 @@ impl<T: Storage<Data>> Internal for T {
         _borrower: AccountId,
         _seize_tokens: Balance,
     ) -> Result<()> {
-        // TODO: assertion check - check paused status
+        if self._seize_guardian_paused() {
+            return Err(Error::SeizeIsPaused)
+        }
 
         if !self._is_listed(pool_collateral) || !self._is_listed(pool_borrowed) {
             return Err(Error::MarketNotListed)
@@ -693,6 +695,10 @@ impl<T: Storage<Data>> Internal for T {
         _dst: AccountId,
         _transfer_tokens: Balance,
     ) -> Result<()> {
+        if self._transfer_guardian_paused() {
+            return Err(Error::TransferIsPaused)
+        }
+
         todo!()
     }
     default fn _transfer_verify(
