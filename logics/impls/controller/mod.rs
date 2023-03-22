@@ -437,10 +437,12 @@ impl<T: Storage<Data>> Controller for T {
     }
 
     default fn set_seize_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        self._assert_manager()?;
         self._set_seize_guardian_paused(paused)
     }
 
     default fn set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        self._assert_manager()?;
         self._set_transfer_guardian_paused(paused)
     }
 
