@@ -350,7 +350,7 @@ pub mod contract {
 
             set_caller(accounts.charlie);
             let dummy_id = AccountId::from([0xff; 32]);
-            let admin_funcs = vec![
+            let admin_funcs: Vec<Result<()>> = vec![
                 contract.set_price_oracle(dummy_id),
                 contract.support_market(dummy_id),
                 contract.set_collateral_factor_mantissa(dummy_id, WrappedU256::from(0)),
