@@ -532,7 +532,7 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::MintIsPaused)
         }
 
-        // TODO: keep the flywheel moving
+        // FEATURE: update governance token supply index & distribute
 
         Ok(())
     }
@@ -556,6 +556,8 @@ impl<T: Storage<Data>> Internal for T {
         if !shortfall.is_zero() {
             return Err(Error::InsufficientLiquidity)
         }
+
+        // FEATURE: update governance token supply index & distribute
 
         Ok(())
     }
@@ -595,7 +597,7 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::InsufficientLiquidity)
         }
 
-        // TODO: keep the flywheel moving
+        // FEATURE: update governance token borrow index & distribute
 
         Ok(())
     }
@@ -614,7 +616,7 @@ impl<T: Storage<Data>> Internal for T {
         _borrower: AccountId,
         _repay_amount: Balance,
     ) -> Result<()> {
-        // TODO: keep the flywheel moving
+        // FEATURE: update governance token borrow index & distribute
 
         Ok(())
     }
@@ -690,7 +692,7 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::ControllerMismatch)
         }
 
-        // TODO: keep the flywheel moving
+        // FEATURE: update governance token supply index & distribute to borrower,liquidator
 
         Ok(())
     }
