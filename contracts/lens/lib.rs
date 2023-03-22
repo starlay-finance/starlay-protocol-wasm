@@ -15,7 +15,10 @@ pub mod contract {
             extensions::metadata::PSP22MetadataRef,
             PSP22Ref,
         },
-        traits::Storage,
+        traits::{
+            Storage,
+            String,
+        },
     };
     use scale::{
         Decode,
@@ -29,15 +32,16 @@ pub mod contract {
         pool_decimals: u8,
         underlying_asset_address: AccountId,
         underlying_decimals: u8,
+        underlying_symbol: String,
         is_listed: bool,
         total_cash: Balance,
         total_supply: Balance,
         total_borrows: Balance,
         total_reserves: Balance,
         exchange_rate_current: WrappedU256,
-        supply_rate_per_sec: WrappedU256,
-        borrow_rate_per_sec: WrappedU256,
-        collateral_factor_mantissa: u128,
+        supply_rate_per_msec: WrappedU256,
+        borrow_rate_per_msec: WrappedU256,
+        collateral_factor_mantissa: WrappedU256,
         reserve_factor_mantissa: WrappedU256,
         borrow_cap: Option<u128>,
     }
@@ -79,6 +83,11 @@ pub mod contract {
         }
 
         #[ink(message)]
+        pub fn pools(&self, controller: AccountId) -> Vec<AccountId> {
+            self._pools(controller)
+        }
+
+        #[ink(message)]
         pub fn pool_metadata(&self, pool: AccountId) -> PoolMetadata {
             self._pool_metadata(pool)
         }
@@ -109,6 +118,23 @@ pub mod contract {
         }
 
         #[ink(message)]
+        pub fn underlying_balance(&self, pool: AccountId, account: AccountId) -> Balance {
+            self._underlying_balance(&pool, account)
+        }
+
+        #[ink(message)]
+        pub fn underlying_balance_all(
+            &self,
+            pools: Vec<AccountId>,
+            account: AccountId,
+        ) -> Vec<Balance> {
+            pools
+                .iter()
+                .map(|pool| self._underlying_balance(pool, account))
+                .collect()
+        }
+
+        #[ink(message)]
         pub fn pool_underlying_price(&self, pool: AccountId) -> PoolUnderlyingPrice {
             self._pool_underlying_price(pool)
         }
@@ -121,6 +147,10 @@ pub mod contract {
                 .collect()
         }
 
+        fn _pools(&self, controller: AccountId) -> Vec<AccountId> {
+            ControllerRef::markets(&controller)
+        }
+
         fn _pool_metadata(&self, pool: AccountId) -> PoolMetadata {
             let controller = PoolRef::controller(&pool);
             let underlying_asset_address = PoolRef::underlying(&pool);
@@ -129,16 +159,21 @@ pub mod contract {
                 pool_decimals: PSP22MetadataRef::token_decimals(&pool),
                 underlying_asset_address,
                 underlying_decimals: PSP22MetadataRef::token_decimals(&underlying_asset_address),
+                underlying_symbol: PSP22MetadataRef::token_symbol(&underlying_asset_address)
+                    .unwrap_or_default(),
                 is_listed: ControllerRef::is_listed(&controller, pool),
                 total_cash: PoolRef::get_cash_prior(&pool),
                 total_supply: PSP22Ref::total_supply(&pool),
                 total_borrows: PoolRef::total_borrows(&pool),
                 total_reserves: PoolRef::total_reserves(&pool),
                 exchange_rate_current: PoolRef::exchange_rate_current(&pool).unwrap_or_default(),
-                supply_rate_per_sec: PoolRef::supply_rate_per_msec(&pool),
-                borrow_rate_per_sec: PoolRef::borrow_rate_per_msec(&pool),
-                collateral_factor_mantissa: 0,
-                // TODO ControllerRef::collateral_factor(&controller, pool),
+                supply_rate_per_msec: PoolRef::supply_rate_per_msec(&pool),
+                borrow_rate_per_msec: PoolRef::borrow_rate_per_msec(&pool),
+                collateral_factor_mantissa: ControllerRef::collateral_factor_mantissa(
+                    &controller,
+                    pool,
+                )
+                .unwrap_or_default(),
                 reserve_factor_mantissa: PoolRef::reserve_factor_mantissa(&pool),
                 borrow_cap: ControllerRef::borrow_cap(&controller, pool),
             }
@@ -166,6 +201,11 @@ pub mod contract {
                 pool,
                 underlying_price: PriceOracleRef::get_price(&oracle, underlying).unwrap(),
             }
+        }
+
+        fn _underlying_balance(&self, pool: &AccountId, account: AccountId) -> Balance {
+            let underlying = PoolRef::underlying(pool);
+            PSP22Ref::balance_of(&underlying, account)
         }
     }
 
