@@ -27,7 +27,7 @@
     "test": "yarn compile && yarn test:typechain",
     "lint": "prettier --check . && eslint . && cargo check",
     "lint:fix": "prettier --write . && eslint . --fix && cargo fmt --all",
-    "deploy:shibuya": "ts-node scripts/deploy/deploy_contracts.ts"
+    "deploy:shibuya": "yarn compile:release && ts-node scripts/deploy/deploy_contracts.ts"
   },
   "resolutions": {
     "@polkadot/api": "^9.10.3",
