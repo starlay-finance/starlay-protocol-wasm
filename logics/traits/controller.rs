@@ -233,6 +233,8 @@ pub enum Error {
     PriceError,
     TooMuchRepay,
     BorrowCapReached,
+    InsufficientLiquidity,
+    InsufficientShortfall,
     CallerIsNotManager,
     InvalidCollateralFactor,
 }
