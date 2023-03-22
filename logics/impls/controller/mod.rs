@@ -10,7 +10,10 @@ use crate::traits::{
     price_oracle::PriceOracleRef,
     types::WrappedU256,
 };
-use core::ops::Mul;
+use core::ops::{
+    Add,
+    Mul,
+};
 use ink::prelude::vec::Vec;
 use openbrush::{
     storage::Mapping,
@@ -26,6 +29,7 @@ use primitive_types::U256;
 mod utils;
 use self::utils::{
     collateral_factor_max_mantissa,
+    get_hypothetical_account_liquidity_per_asset,
     liquidate_calculate_seize_tokens,
     LiquidateCalculateSeizeTokensInput,
 };
@@ -874,35 +878,30 @@ impl<T: Storage<Data>> Internal for T {
             let (token_balance, borrow_balance, exchange_rate_mantissa) =
                 PoolRef::get_account_snapshot(&asset, account);
 
-            let collateral_factor = Exp {
-                mantissa: WrappedU256::from(self._collateral_factor_mantissa(asset).unwrap()),
-            };
-            let exchange_rate = Exp {
-                mantissa: WrappedU256::from(exchange_rate_mantissa),
-            };
-
             // Get the normalized price of the asset
             let oracle_price = Exp {
                 mantissa: WrappedU256::from(U256::from(
                     PriceOracleRef::get_underlying_price(&self._oracle(), asset).unwrap(),
                 )),
-            }; // TODO: with mantissa?
+            };
 
-            // Pre-compute a conversion factor from tokens -> base token (normalized price value)
-            let token_to_denom = collateral_factor
-                .mul(exchange_rate)
-                .mul(oracle_price.clone());
+            let (token_to_denom, collateral, borrow_plus_effect) =
+                get_hypothetical_account_liquidity_per_asset(
+                    token_balance,
+                    borrow_balance,
+                    Exp {
+                        mantissa: WrappedU256::from(exchange_rate_mantissa),
+                    },
+                    Exp {
+                        mantissa: self._collateral_factor_mantissa(asset).unwrap(),
+                    },
+                    Exp {
+                        mantissa: WrappedU256::from(exchange_rate_mantissa),
+                    },
+                );
 
-            // sumCollateral += tokensToDenom * cTokenBalance
-            vars.sum_collateral = token_to_denom
-                .clone()
-                .mul_scalar_truncate_add_uint(U256::from(token_balance), vars.sum_collateral);
-
-            // sumBorrowPlusEffects += oraclePrice * borrowBalance
-            vars.sum_borrow_plus_effect = oracle_price.clone().mul_scalar_truncate_add_uint(
-                U256::from(borrow_balance),
-                vars.sum_borrow_plus_effect,
-            );
+            vars.sum_collateral = vars.sum_collateral.add(collateral);
+            vars.sum_borrow_plus_effect = vars.sum_borrow_plus_effect.add(borrow_plus_effect);
 
             // Calculate effects of interacting with cTokenModify
             if asset == token_modify {
