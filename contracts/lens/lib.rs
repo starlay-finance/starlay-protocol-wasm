@@ -15,7 +15,10 @@ pub mod contract {
             extensions::metadata::PSP22MetadataRef,
             PSP22Ref,
         },
-        traits::Storage,
+        traits::{
+            Storage,
+            String,
+        },
     };
     use scale::{
         Decode,
@@ -29,6 +32,7 @@ pub mod contract {
         pool_decimals: u8,
         underlying_asset_address: AccountId,
         underlying_decimals: u8,
+        underlying_symbol: String,
         is_listed: bool,
         total_cash: Balance,
         total_supply: Balance,
@@ -155,6 +159,8 @@ pub mod contract {
                 pool_decimals: PSP22MetadataRef::token_decimals(&pool),
                 underlying_asset_address,
                 underlying_decimals: PSP22MetadataRef::token_decimals(&underlying_asset_address),
+                underlying_symbol: PSP22MetadataRef::token_symbol(&underlying_asset_address)
+                    .unwrap_or_default(),
                 is_listed: ControllerRef::is_listed(&controller, pool),
                 total_cash: PoolRef::get_cash_prior(&pool),
                 total_supply: PSP22Ref::total_supply(&pool),

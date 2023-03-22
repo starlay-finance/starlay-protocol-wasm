@@ -125,6 +125,7 @@ describe('Lens', () => {
       const token = tokens[0]
       const pool = pools[0]
       const tokenDecimals = (await token.query.tokenDecimals()).value.ok
+      const tokenSymbol = (await token.query.tokenSymbol()).value.ok
       const {
         value: { ok: res },
       } = await lens.query.poolMetadata(pool.address)
@@ -133,6 +134,7 @@ describe('Lens', () => {
       expect(res.poolDecimals).toBe(tokenDecimals)
       expect(res.underlyingAssetAddress).toBe(token.address)
       expect(res.underlyingDecimals).toBe(tokenDecimals)
+      expect(res.underlyingSymbol).toBe(tokenSymbol)
       expect(res.isListed).toBeTruthy()
       expect(res.totalCash.toNumber()).toBe(0)
       expect(res.totalBorrows.toNumber()).toBe(0)
