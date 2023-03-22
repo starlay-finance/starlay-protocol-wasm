@@ -210,6 +210,8 @@ pub trait Controller {
     #[ink(message)]
     fn account_assets(&self, account: AccountId) -> Vec<AccountId>;
     #[ink(message)]
+    fn get_account_liquidity(&self, account: AccountId) -> (U256, U256);
+    #[ink(message)]
     fn get_hypothetical_account_liquidity(
         &self,
         account: AccountId,

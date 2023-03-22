@@ -210,6 +210,7 @@ pub trait Internal {
     fn _manager(&self) -> AccountId;
 
     fn _account_assets(&self, account: AccountId) -> Vec<AccountId>;
+    fn _get_account_liquidity(&self, account: AccountId) -> (U256, U256);
     fn _get_hypothetical_account_liquidity(
         &self,
         account: AccountId,
@@ -505,6 +506,9 @@ impl<T: Storage<Data>> Controller for T {
     }
     default fn account_assets(&self, account: AccountId) -> Vec<AccountId> {
         self._account_assets(account)
+    }
+    default fn get_account_liquidity(&self, account: AccountId) -> (U256, U256) {
+        self._get_account_liquidity(account)
     }
     default fn get_hypothetical_account_liquidity(
         &self,
@@ -856,6 +860,10 @@ impl<T: Storage<Data>> Internal for T {
             }
         }
         return account_assets
+    }
+
+    default fn _get_account_liquidity(&self, account: AccountId) -> (U256, U256) {
+        self._get_hypothetical_account_liquidity(account, ZERO_ADDRESS.into(), 0, 0)
     }
 
     default fn _get_hypothetical_account_liquidity(
