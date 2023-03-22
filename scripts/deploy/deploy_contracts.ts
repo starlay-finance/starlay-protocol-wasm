@@ -3,7 +3,7 @@ import type { KeyringPair } from '@polkadot/keyring/types'
 import { deployController } from '../../tests/testContractsHelper'
 import PSP22Token from '../../types/contracts/psp22_token'
 import { deployer, provider } from '../helper/wallet_helper'
-import { dummyTokens, Token } from '../tokens'
+import { DUMMY_TOKENS, Token } from '../tokens'
 import { Env } from './../env'
 import {
   defaultArgs,
@@ -49,7 +49,7 @@ const resolvePoolName = (token: string) => {
 }
 const deployDummyTokens = async (api: ApiPromise, signer: KeyringPair) => {
   const res: { contract: PSP22Token; token: Token }[] = []
-  for (const token of dummyTokens) {
+  for (const token of DUMMY_TOKENS) {
     const deployed = await deployPSP22Token({
       api,
       signer,

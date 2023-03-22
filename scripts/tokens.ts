@@ -10,7 +10,7 @@ interface DummyTokenProp {
   totalSupply: BN
 }
 
-export const supportedTokens: Token[] = [
+export const SUPPORTED_TOKENS: Token[] = [
   {
     decimal: 18,
     symbol: 'WETH',
@@ -18,7 +18,7 @@ export const supportedTokens: Token[] = [
   },
 ]
 
-export const dummyTokens: DummyToken[] = supportedTokens.map((t) => {
+export const DUMMY_TOKENS: DummyToken[] = SUPPORTED_TOKENS.map((t) => {
   return {
     ...t,
     totalSupply: new BN(10).pow(new BN(18)).mul(new BN(100_000_000_000)),

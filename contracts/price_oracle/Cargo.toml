@@ -25,3 +25,6 @@ crate-type = ["cdylib", "rlib"]
 default = ["std"]
 std = ["ink/std", "scale/std", "scale-info/std", "openbrush/std", "logics/std"]
 ink-as-dependency = []
+
+[profile.release]
+overflow-checks = false
