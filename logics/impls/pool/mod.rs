@@ -677,6 +677,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         self._mint_to(liquidator, liquidator_seize_tokens).unwrap();
 
         self._emit_reserves_added_event(contract_addr, protocol_seize_amount, total_reserves_new);
+
         // skip post-process because nothing is done
         // ControllerRef::seize_verify(&self._controller(), contract_addr, seizer_token, liquidator, borrower, seize_tokens).unwrap();
 
