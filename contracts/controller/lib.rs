@@ -240,10 +240,7 @@ pub mod contract {
             let p1 = AccountId::from([0x01; 32]);
             assert!(contract.support_market(p1).is_ok());
             assert_eq!(contract.markets(), [p1]);
-            assert_eq!(
-                contract.collateral_factor_mantissa(p1),
-                Some(WrappedU256::from(0))
-            );
+            assert_eq!(contract.collateral_factor_mantissa(p1), None);
             assert_eq!(contract.mint_guardian_paused(p1), Some(false));
             assert_eq!(contract.borrow_guardian_paused(p1), Some(false));
             assert_eq!(contract.borrow_cap(p1), Some(0));
@@ -270,6 +267,9 @@ pub mod contract {
         }
 
         #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
         fn set_collateral_factor_mantissa_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
@@ -278,14 +278,27 @@ pub mod contract {
             assert_eq!(contract.collateral_factor_mantissa(pool_addr), None);
 
             let max = exp_scale().mul(U256::from(90)).div(U256::from(100));
-            assert!(contract
+            contract
                 .set_collateral_factor_mantissa(pool_addr, WrappedU256::from(max))
-                .is_ok());
-            assert_eq!(
-                contract.collateral_factor_mantissa(pool_addr),
-                Some(WrappedU256::from(max))
-            );
+                .unwrap();
+        }
 
+        #[ink::test]
+        fn set_collateral_factor_mantissa_fail_when_invalid_value() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new(accounts.bob);
+            let pool_addr = AccountId::from([0x01; 32]);
+            assert_eq!(contract.collateral_factor_mantissa(pool_addr), None);
+
+            let max = exp_scale().mul(U256::from(90)).div(U256::from(100));
+
+            assert_eq!(
+                contract
+                    .set_collateral_factor_mantissa(pool_addr, WrappedU256::from(0))
+                    .unwrap_err(),
+                Error::InvalidCollateralFactor
+            );
             assert_eq!(
                 contract
                     .set_collateral_factor_mantissa(pool_addr, WrappedU256::from(max.add(1)))
