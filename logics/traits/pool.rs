@@ -63,6 +63,9 @@ pub trait Pool: PSP22 {
     fn reduce_reserves(&mut self, amount: Balance) -> Result<()>;
 
     #[ink(message)]
+    fn sweep_token(&mut self, asset: AccountId) -> Result<()>;
+
+    #[ink(message)]
     fn underlying(&self) -> AccountId;
     #[ink(message)]
     fn controller(&self) -> AccountId;
@@ -112,6 +115,7 @@ pub enum Error {
     ReduceReservesCashValidation,
     BorrowRateIsAbsurdlyHigh,
     SetReserveFactorBoundsCheck,
+    CannotSweepUnderlyingToken,
     CallerIsNotManager,
     PSP22(PSP22Error),
     Lang(LangError),

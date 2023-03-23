@@ -126,6 +126,7 @@ pub trait Internal {
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()>;
     fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()>;
+    fn _sweep_token(&mut self, asset: AccountId) -> Result<()>;
 
     fn _transfer_underlying_from(
         &self,
@@ -313,6 +314,11 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
 
     default fn reduce_reserves(&mut self, amount: Balance) -> Result<()> {
         self._reduce_reserves(Self::env().caller(), amount)
+    }
+
+    default fn sweep_token(&mut self, asset: AccountId) -> Result<()> {
+        self._assert_manager()?;
+        self._sweep_token(asset)
     }
 
     default fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256) {
@@ -909,6 +915,17 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         data.total_reserves = total_reserves_new;
         self._transfer_underlying(admin, amount).unwrap();
         self._emit_reserves_reduced_event(amount, total_reserves_new);
+        Ok(())
+    }
+
+    default fn _sweep_token(&mut self, asset: AccountId) -> Result<()> {
+        if asset == self._underlying() {
+            return Err(Error::CannotSweepUnderlyingToken)
+        }
+
+        let balance = PSP22Ref::balance_of(&asset, Self::env().account_id());
+        PSP22Ref::transfer(&asset, Self::env().caller(), balance, Vec::<u8>::new())
+            .map_err(to_psp22_error)?;
         Ok(())
     }
 
