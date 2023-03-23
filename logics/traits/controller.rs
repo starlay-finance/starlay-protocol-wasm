@@ -210,7 +210,7 @@ pub trait Controller {
     #[ink(message)]
     fn account_assets(&self, account: AccountId) -> Vec<AccountId>;
     #[ink(message)]
-    fn get_account_liquidity(&self, account: AccountId) -> (U256, U256);
+    fn get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)>;
     #[ink(message)]
     fn get_hypothetical_account_liquidity(
         &self,
@@ -218,7 +218,7 @@ pub trait Controller {
         token: AccountId,
         redeem_tokens: Balance,
         borrow_amount: Balance,
-    ) -> (U256, U256);
+    ) -> Result<(U256, U256)>;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]

@@ -210,14 +210,14 @@ pub trait Internal {
     fn _manager(&self) -> AccountId;
 
     fn _account_assets(&self, account: AccountId) -> Vec<AccountId>;
-    fn _get_account_liquidity(&self, account: AccountId) -> (U256, U256);
+    fn _get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)>;
     fn _get_hypothetical_account_liquidity(
         &self,
         account: AccountId,
         token: AccountId,
         redeem_tokens: Balance,
         borrow_amount: Balance,
-    ) -> (U256, U256);
+    ) -> Result<(U256, U256)>;
 
     // event emission
     fn _emit_market_listed_event(&self, pool: AccountId);
@@ -507,7 +507,7 @@ impl<T: Storage<Data>> Controller for T {
     default fn account_assets(&self, account: AccountId) -> Vec<AccountId> {
         self._account_assets(account)
     }
-    default fn get_account_liquidity(&self, account: AccountId) -> (U256, U256) {
+    default fn get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)> {
         self._get_account_liquidity(account)
     }
     default fn get_hypothetical_account_liquidity(
@@ -516,7 +516,7 @@ impl<T: Storage<Data>> Controller for T {
         token: AccountId,
         redeem_tokens: Balance,
         borrow_amount: Balance,
-    ) -> (U256, U256) {
+    ) -> Result<(U256, U256)> {
         self._get_hypothetical_account_liquidity(account, token, redeem_tokens, borrow_amount)
     }
 }
@@ -551,8 +551,9 @@ impl<T: Storage<Data>> Internal for T {
         redeemer: AccountId,
         redeem_amount: Balance,
     ) -> Result<()> {
-        let (_, shortfall) =
-            self._get_hypothetical_account_liquidity(redeemer, pool, redeem_amount, 0);
+        let (_, shortfall) = self
+            ._get_hypothetical_account_liquidity(redeemer, pool, redeem_amount, 0)
+            .unwrap();
         if !shortfall.is_zero() {
             return Err(Error::InsufficientLiquidity)
         }
@@ -580,7 +581,9 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::BorrowIsPaused)
         }
 
-        // TODO: assertion check - check oracle price for underlying asset
+        if let None | Some(0) = PriceOracleRef::get_underlying_price(&self._oracle(), pool) {
+            return Err(Error::PriceError)
+        }
 
         let borrow_cap = self._borrow_cap(pool).unwrap();
         // borrow cap of 0 corresponds to unlimited borrowing
@@ -591,8 +594,9 @@ impl<T: Storage<Data>> Internal for T {
             }
         }
 
-        let (_, shortfall) =
-            self._get_hypothetical_account_liquidity(borrower, pool, 0, borrow_amount);
+        let (_, shortfall) = self
+            ._get_hypothetical_account_liquidity(borrower, pool, 0, borrow_amount)
+            .unwrap();
         if !shortfall.is_zero() {
             return Err(Error::InsufficientLiquidity)
         }
@@ -643,7 +647,7 @@ impl<T: Storage<Data>> Internal for T {
         }
 
         // The borrower must have shortfall in order to be liquidatable
-        let (_, shortfall) = self._get_account_liquidity(borrower);
+        let (_, shortfall) = self._get_account_liquidity(borrower).unwrap();
         if shortfall.is_zero() {
             return Err(Error::InsufficientShortfall)
         }
@@ -876,7 +880,7 @@ impl<T: Storage<Data>> Internal for T {
         return account_assets
     }
 
-    default fn _get_account_liquidity(&self, account: AccountId) -> (U256, U256) {
+    default fn _get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)> {
         self._get_hypothetical_account_liquidity(account, ZERO_ADDRESS.into(), 0, 0)
     }
 
@@ -886,7 +890,7 @@ impl<T: Storage<Data>> Internal for T {
         token_modify: AccountId,
         redeem_tokens: Balance,
         borrow_amount: Balance,
-    ) -> (U256, U256) {
+    ) -> Result<(U256, U256)> {
         // For each asset the account is in
         let account_assets = self._account_assets(account);
         let mut asset_params = Vec::<HypotheticalAccountLiquidityCalculationParam>::new();
@@ -898,10 +902,12 @@ impl<T: Storage<Data>> Internal for T {
                 PoolRef::get_account_snapshot(asset, account);
 
             // Get the normalized price of the asset
-            let oracle_price = Exp {
-                mantissa: WrappedU256::from(U256::from(
-                    PriceOracleRef::get_underlying_price(&self._oracle(), *asset).unwrap(),
-                )),
+            let oracle_price = PriceOracleRef::get_underlying_price(&self._oracle(), *asset);
+            if let None | Some(0) = oracle_price {
+                return Err(Error::PriceError)
+            }
+            let oracle_price_mantissa = Exp {
+                mantissa: WrappedU256::from(U256::from(oracle_price.clone().unwrap())),
             };
 
             asset_params.push(HypotheticalAccountLiquidityCalculationParam {
@@ -914,7 +920,7 @@ impl<T: Storage<Data>> Internal for T {
                 collateral_factor_mantissa: Exp {
                     mantissa: self._collateral_factor_mantissa(*asset).unwrap(),
                 },
-                oracle_price_mantissa: oracle_price.clone(),
+                oracle_price_mantissa: oracle_price_mantissa.clone(),
             });
         }
 
@@ -927,11 +933,12 @@ impl<T: Storage<Data>> Internal for T {
             });
 
         // These are safe, as the underflow condition is checked first
-        if sum_collateral > sum_borrow_plus_effect {
-            return (sum_collateral.sub(sum_borrow_plus_effect), U256::from(0))
+        let value = if sum_collateral > sum_borrow_plus_effect {
+            (sum_collateral.sub(sum_borrow_plus_effect), U256::from(0))
         } else {
-            return (U256::from(0), sum_borrow_plus_effect.sub(sum_collateral))
-        }
+            (U256::from(0), sum_borrow_plus_effect.sub(sum_collateral))
+        };
+        Ok(value)
     }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}
