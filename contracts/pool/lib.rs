@@ -272,7 +272,15 @@ pub mod contract {
             },
             DefaultEnvironment,
         };
+        use logics::{
+            impls::exp_no_err::exp_scale,
+            traits::types::WrappedU256,
+        };
         use openbrush::traits::ZERO_ADDRESS;
+        use std::ops::{
+            Add,
+            Div,
+        };
 
         fn default_accounts() -> DefaultAccounts<DefaultEnvironment> {
             test::default_accounts::<DefaultEnvironment>()
@@ -382,6 +390,37 @@ pub mod contract {
         }
 
         #[ink::test]
+        fn set_reserve_factor_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let dummy_id = AccountId::from([0x01; 32]);
+            let mut contract = PoolContract::new(
+                dummy_id,
+                dummy_id,
+                dummy_id,
+                String::from("Token Name"),
+                String::from("symbol"),
+                8,
+            );
+            assert_eq!(contract.reserve_factor_mantissa(), WrappedU256::from(0));
+            let half_exp_scale = exp_scale().div(2);
+            assert!(contract
+                .set_reserve_factor_mantissa(WrappedU256::from(half_exp_scale))
+                .is_ok());
+            assert_eq!(
+                contract.reserve_factor_mantissa(),
+                WrappedU256::from(half_exp_scale)
+            );
+            let over_exp_scale = exp_scale().add(1);
+            assert_eq!(
+                contract
+                    .set_reserve_factor_mantissa(WrappedU256::from(over_exp_scale))
+                    .unwrap_err(),
+                Error::SetReserveFactorBoundsCheck
+            );
+        }
+
+        #[ink::test]
         fn assert_manager_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
@@ -400,7 +439,13 @@ pub mod contract {
             assert_eq!(
                 contract.reduce_reserves(100).unwrap_err(),
                 Error::CallerIsNotManager
-            )
+            );
+            assert_eq!(
+                contract
+                    .set_reserve_factor_mantissa(WrappedU256::from(0))
+                    .unwrap_err(),
+                Error::CallerIsNotManager
+            );
         }
     }
 }

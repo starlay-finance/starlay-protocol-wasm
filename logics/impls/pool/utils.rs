@@ -22,6 +22,11 @@ pub fn borrow_rate_max_mantissa() -> U256 {
     exp_scale().mul(U256::from(5)).div(U256::from(1000 * 100))
 }
 
+pub fn reserve_factor_max_mantissa() -> U256 {
+    // 100% / time
+    exp_scale()
+}
+
 pub fn protocol_seize_share_mantissa() -> U256 {
     exp_scale().mul(U256::from(28)).div(U256::from(10 * 100)) // 2.8%
 }
