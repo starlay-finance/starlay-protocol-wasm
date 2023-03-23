@@ -90,6 +90,15 @@ pub mod contract {
         }
         #[ink(message)]
         #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
+        fn support_market_with_collateral_factor_mantissa(
+            &mut self,
+            pool: AccountId,
+            collateral_factor_mantissa: WrappedU256,
+        ) -> Result<()> {
+            self._support_market_with_collateral_factor_mantissa(pool, collateral_factor_mantissa)
+        }
+        #[ink(message)]
+        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
         fn set_collateral_factor_mantissa(
             &mut self,
             pool: AccountId,
@@ -308,6 +317,44 @@ pub mod contract {
                 .is_ok());
             assert_eq!(
                 contract.support_market(ZERO_ADDRESS.into()).unwrap_err(),
+                Error::AccessControl(AccessControlError::MissingRole)
+            );
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn support_market_with_collateral_factor_mantissa_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
+            assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
+            contract
+                .support_market_with_collateral_factor_mantissa(
+                    ZERO_ADDRESS.into(),
+                    WrappedU256::from(0),
+                )
+                .unwrap();
+        }
+        #[ink::test]
+        fn support_market_with_collateral_factor_mantissa_fails_by_no_authority() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
+            assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
+            assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
+            assert!(contract
+                .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
+                .is_ok());
+            assert_eq!(
+                contract
+                    .support_market_with_collateral_factor_mantissa(
+                        ZERO_ADDRESS.into(),
+                        WrappedU256::from(0)
+                    )
+                    .unwrap_err(),
                 Error::AccessControl(AccessControlError::MissingRole)
             );
         }

@@ -23,6 +23,11 @@ pub trait Internal {
     fn _set_controller(&mut self, id: AccountId) -> Result<()>;
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
     fn _support_market(&mut self, pool: AccountId) -> Result<()>;
+    fn _support_market_with_collateral_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()>;
     fn _set_collateral_factor_mantissa(
         &mut self,
         pool: AccountId,
@@ -56,6 +61,13 @@ impl<T: Storage<Data>> Manager for T {
     }
     default fn support_market(&mut self, pool: AccountId) -> Result<()> {
         self._support_market(pool)
+    }
+    default fn support_market_with_collateral_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        self._support_market_with_collateral_factor_mantissa(pool, collateral_factor_mantissa)
     }
     default fn set_collateral_factor_mantissa(
         &mut self,
@@ -111,6 +123,19 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _support_market(&mut self, pool: AccountId) -> Result<()> {
         ControllerRef::support_market(&self._controller(), pool).unwrap();
+        Ok(())
+    }
+    default fn _support_market_with_collateral_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        ControllerRef::support_market_with_collateral_factor_mantissa(
+            &self._controller(),
+            pool,
+            collateral_factor_mantissa,
+        )
+        .unwrap();
         Ok(())
     }
     default fn _set_collateral_factor_mantissa(

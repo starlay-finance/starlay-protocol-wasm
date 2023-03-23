@@ -22,6 +22,12 @@ pub trait Manager {
     #[ink(message)]
     fn support_market(&mut self, pool: AccountId) -> Result<()>;
     #[ink(message)]
+    fn support_market_with_collateral_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()>;
+    #[ink(message)]
     fn set_collateral_factor_mantissa(
         &mut self,
         pool: AccountId,
