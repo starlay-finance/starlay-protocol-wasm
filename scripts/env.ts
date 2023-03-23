@@ -10,7 +10,7 @@ const testParam: EnvironmentParameter = {
   rpc: 'ws://127.0.0.1:9944',
 }
 
-const ENV = {
+export const ENV = {
   testnet: 0,
   test: 1,
 } as const

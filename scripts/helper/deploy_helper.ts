@@ -58,6 +58,15 @@ export const defaultArgs = (
     gasLimit: getGasLimit(api),
   }
 }
+
+export const ROLE = {
+  DEFAULT_ADMIN_ROLE: 0,
+  CONTROLLER_ADMIN: 2873677832,
+  TOKEN_ADMIN: 937842313,
+  BORROW_CAP_GUARDIAN: 181502825,
+  PAUSE_GUARDIAN: 1332676982,
+} as const
+
 export const deployController = async ({
   api,
   signer,
@@ -88,9 +97,12 @@ export const deployManager = async ({
 export const deployPriceOracle = async ({
   api,
   signer,
-}: FactoryArgs): Promise<PriceOracle> => {
+  args,
+}: FactoryArgs & {
+  args: Parameters<PriceOracle_factory['new']>
+}): Promise<PriceOracle> => {
   const factory = new PriceOracle_factory(api, signer)
-  const contract = await factory.new()
+  const contract = await factory.new(...args)
   const result = new PriceOracle(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
@@ -124,9 +136,12 @@ const isTestEnv = (result: SignAndSendSuccessResponse) => {
 export const deployFaucet = async ({
   api,
   signer,
-}: FactoryArgs): Promise<Faucet> => {
+  args,
+}: FactoryArgs & {
+  args: Parameters<Lens_factory['new']>
+}): Promise<Faucet> => {
   const factory = new Faucet_factory(api, signer)
-  const contract = await factory.new()
+  const contract = await factory.new(...args)
   const result = new Faucet(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result

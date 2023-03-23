@@ -60,6 +60,9 @@ pub trait Pool: PSP22 {
     ) -> Result<()>;
 
     #[ink(message)]
+    fn add_reserves(&mut self, amount: Balance) -> Result<()>;
+
+    #[ink(message)]
     fn reduce_reserves(&mut self, amount: Balance) -> Result<()>;
 
     #[ink(message)]

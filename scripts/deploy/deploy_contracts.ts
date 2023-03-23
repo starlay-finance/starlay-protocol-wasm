@@ -3,22 +3,25 @@ import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
 import PSP22Token from '../../types/contracts/psp22_token'
 import { deployer, provider } from '../helper/wallet_helper'
-import { DUMMY_TOKENS, Token } from '../tokens'
-import { Env } from './../env'
+import { DUMMY_TOKENS, ONE_ETHER, Token } from '../tokens'
+import { ENV, Env } from './../env'
 import {
+  ROLE,
+  ZERO_ADDRESS,
   defaultArgs,
   deployController,
   deployDefaultInterestRateModel,
+  deployFaucet,
   deployLens,
   deployManager,
-  deployPool,
   deployPSP22Token,
+  deployPool,
+  deployPriceOracle,
   waitForTx,
-  ZERO_ADDRESS,
 } from './../helper/deploy_helper'
 
 const main = async () => {
-  await deployContracts(0)
+  await deployContracts(ENV.testnet)
 }
 const deployContracts = async (env: Env) => {
   const api = await provider(env)
@@ -34,7 +37,21 @@ const deployContracts = async (env: Env) => {
     signer,
     args: [manager.address, args],
   })
+  const priceOracle = await deployPriceOracle({
+    api,
+    signer,
+    args: [args],
+  })
+
   await waitForTx(await manager.tx.setController(controller.address, args))
+  for (const key of Object.keys(ROLE)) {
+    const role = ROLE[key]
+    if (role === ROLE.DEFAULT_ADMIN_ROLE) continue
+    await waitForTx(await manager.tx.grantRole(role, signer.address, args))
+    console.log(`Role ${key} has been granted to ${signer.address}`)
+  }
+
+  await waitForTx(await manager.tx.setPriceOracle(priceOracle.address, args))
   for (const token of await deployDummyTokens(api, signer)) {
     const {
       baseRatePerYear,
@@ -55,7 +72,7 @@ const deployContracts = async (env: Env) => {
         args,
       ],
     })
-    await deployPool({
+    const pool = await deployPool({
       api,
       signer,
       args: [
@@ -68,8 +85,17 @@ const deployContracts = async (env: Env) => {
         args,
       ],
     })
+    await waitForTx(
+      await priceOracle.tx.setFixedPrice(
+        token.contract.address,
+        ONE_ETHER,
+        args,
+      ),
+    )
+    await waitForTx(await manager.tx.supportMarket(pool.address, args))
   }
   await deployLens({ api, signer, args: [args] })
+  await deployFaucet({ api, signer, args: [args] })
 }
 
 const resolvePoolName = (token: string) => {

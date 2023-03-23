@@ -88,6 +88,11 @@ pub mod contract {
         ) -> Result<()> {
             Err(Error::NotImplemented)
         }
+
+        #[ink(message)]
+        fn add_reserves(&mut self, _amount: Balance) -> Result<()> {
+            Err(Error::NotImplemented)
+        }
     }
     impl Internal for PoolContract {
         fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance) {
@@ -382,6 +387,24 @@ pub mod contract {
                     .unwrap_err(),
                 Error::NotImplemented
             )
+        }
+
+        #[ink::test]
+        fn add_reserves_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let dummy_id = AccountId::from([0x01; 32]);
+            let mut contract = PoolContract::new(
+                dummy_id,
+                dummy_id,
+                dummy_id,
+                String::from("Token Name"),
+                String::from("symbol"),
+                8,
+            );
+
+            assert_eq!(contract.add_reserves(0).unwrap_err(), Error::NotImplemented)
         }
 
         #[ink::test]
