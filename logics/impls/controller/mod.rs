@@ -778,6 +778,7 @@ impl<T: Storage<Data>> Internal for T {
         pool: &AccountId,
         new_collateral_factor_mantissa: WrappedU256,
     ) -> Result<()> {
+        // TODO: validations? (new_collateral_factor_mantissa is zero / pool underlying token price is zero?)
         if U256::from(new_collateral_factor_mantissa).gt(&collateral_factor_max_mantissa()) {
             return Err(Error::InvalidCollateralFactor)
         }
