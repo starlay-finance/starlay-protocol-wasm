@@ -128,7 +128,7 @@ export const deployFaucet = async ({
   const factory = new Faucet_factory(api, signer)
   const contract = await factory.new()
   const result = new Faucet(contract.address, signer, api)
-  await afterDeployment(contract.name, result)
+  await afterDeployment(result.name, contract)
   return result
 }
 export const deployLens = async ({
