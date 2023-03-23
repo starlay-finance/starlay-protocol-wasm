@@ -730,8 +730,8 @@ impl<T: Storage<Data>> Internal for T {
         &self,
         pool_borrowed: AccountId,
         pool_collateral: AccountId,
-        _exchange_rate_mantissa: WrappedU256,
-        _repay_amount: Balance,
+        exchange_rate_mantissa: WrappedU256,
+        repay_amount: Balance,
     ) -> Result<Balance> {
         let price_borrowed_mantissa =
             PriceOracleRef::get_underlying_price(&self._oracle(), pool_borrowed);
@@ -746,9 +746,9 @@ impl<T: Storage<Data>> Internal for T {
         let result = liquidate_calculate_seize_tokens(&LiquidateCalculateSeizeTokensInput {
             price_borrowed_mantissa: U256::from(price_borrowed_mantissa.unwrap()),
             price_collateral_mantissa: U256::from(price_collateral_mantissa.unwrap()),
-            actual_repay_amount: _repay_amount,
-            exchange_rate_mantissa: _exchange_rate_mantissa.into(),
+            exchange_rate_mantissa: exchange_rate_mantissa.into(),
             liquidation_incentive_mantissa: self._liquidation_incentive_mantissa().into(),
+            actual_repay_amount: repay_amount,
         });
         Ok(result)
     }
