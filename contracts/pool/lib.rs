@@ -457,7 +457,9 @@ pub mod contract {
             let admin_funcs: Vec<Result<()>> = vec![
                 contract.reduce_reserves(100),
                 contract.sweep_token(dummy_id),
+                contract.set_controller(dummy_id),
                 contract.set_reserve_factor_mantissa(WrappedU256::from(0)),
+                contract.set_interest_rate_model(dummy_id),
             ];
             for func in admin_funcs {
                 assert_eq!(func.unwrap_err(), Error::CallerIsNotManager);
