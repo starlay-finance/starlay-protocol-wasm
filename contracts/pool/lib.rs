@@ -94,7 +94,17 @@ pub mod contract {
         }
 
         #[ink(message)]
+        fn set_controller(&mut self, _new_controller: AccountId) -> Result<()> {
+            Err(Error::NotImplemented)
+        }
+
+        #[ink(message)]
         fn add_reserves(&mut self, _amount: Balance) -> Result<()> {
+            Err(Error::NotImplemented)
+        }
+
+        #[ink(message)]
+        fn set_interest_rate_model(&mut self, _new_interest_rate_model: AccountId) -> Result<()> {
             Err(Error::NotImplemented)
         }
     }
@@ -469,6 +479,27 @@ pub mod contract {
         }
 
         #[ink::test]
+        fn set_controller_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let dummy_id = AccountId::from([0x01; 32]);
+            let mut contract = PoolContract::new(
+                dummy_id,
+                dummy_id,
+                dummy_id,
+                String::from("Token Name"),
+                String::from("symbol"),
+                8,
+            );
+
+            assert_eq!(
+                contract.set_controller(dummy_id).unwrap_err(),
+                Error::NotImplemented
+            )
+        }
+
+        #[ink::test]
         fn add_reserves_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
@@ -484,6 +515,27 @@ pub mod contract {
             );
 
             assert_eq!(contract.add_reserves(0).unwrap_err(), Error::NotImplemented)
+        }
+
+        #[ink::test]
+        fn set_interest_rate_model_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let dummy_id = AccountId::from([0x01; 32]);
+            let mut contract = PoolContract::new(
+                dummy_id,
+                dummy_id,
+                dummy_id,
+                String::from("Token Name"),
+                String::from("symbol"),
+                8,
+            );
+
+            assert_eq!(
+                contract.set_interest_rate_model(dummy_id).unwrap_err(),
+                Error::NotImplemented
+            )
         }
 
         #[ink::test]

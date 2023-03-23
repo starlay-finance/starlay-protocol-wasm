@@ -138,10 +138,12 @@ pub trait Internal {
         borrower: AccountId,
         seize_tokens: Balance,
     ) -> Result<()>;
+    fn _set_controller(&mut self, new_controller: AccountId) -> Result<()>;
     fn _set_reserve_factor_mantissa(
         &mut self,
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()>;
+    fn _set_interest_rate_model(&mut self, new_interest_rate_model: AccountId) -> Result<()>;
     fn _add_reserves(&mut self, amount: Balance) -> Result<()>;
     fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()>;
     fn _sweep_token(&mut self, asset: AccountId) -> Result<()>;
@@ -323,11 +325,24 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         self._total_reserves()
     }
 
+    default fn set_controller(&mut self, new_controller: AccountId) -> Result<()> {
+        self._assert_manager()?;
+        self._set_controller(new_controller)
+    }
+
     default fn set_reserve_factor_mantissa(
         &mut self,
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()> {
         self._set_reserve_factor_mantissa(new_reserve_factor_mantissa)
+    }
+
+    default fn set_interest_rate_model(
+        &mut self,
+        new_interest_rate_model: AccountId,
+    ) -> Result<()> {
+        self._assert_manager()?;
+        self._set_interest_rate_model(new_interest_rate_model)
     }
 
     default fn add_reserves(&mut self, amount: Balance) -> Result<()> {
@@ -933,6 +948,11 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     ) {
     }
 
+    default fn _set_controller(&mut self, new_controller: AccountId) -> Result<()> {
+        self.data::<Data>().controller = new_controller;
+        Ok(())
+    }
+
     default fn _set_reserve_factor_mantissa(
         &mut self,
         new_reserve_factor_mantissa: WrappedU256,
@@ -951,6 +971,19 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         }
 
         self.data::<Data>().reserve_factor_mantissa = new_reserve_factor_mantissa;
+        Ok(())
+    }
+
+    default fn _set_interest_rate_model(
+        &mut self,
+        new_interest_rate_model: AccountId,
+    ) -> Result<()> {
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        }
+
+        self.data::<Data>().rate_model = new_interest_rate_model;
         Ok(())
     }
 

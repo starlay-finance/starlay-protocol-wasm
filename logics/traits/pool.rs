@@ -54,10 +54,16 @@ pub trait Pool: PSP22 {
     ) -> Result<()>;
 
     #[ink(message)]
+    fn set_controller(&mut self, new_controller: AccountId) -> Result<()>;
+
+    #[ink(message)]
     fn set_reserve_factor_mantissa(
         &mut self,
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()>;
+
+    #[ink(message)]
+    fn set_interest_rate_model(&mut self, new_interest_rate_model: AccountId) -> Result<()>;
 
     #[ink(message)]
     fn add_reserves(&mut self, amount: Balance) -> Result<()>;
