@@ -8,7 +8,10 @@ pub mod token {
         Env,
     };
     use openbrush::{
-        contracts::psp22::extensions::metadata::*,
+        contracts::psp22::extensions::{
+            metadata::*,
+            mintable::*,
+        },
         traits::{
             Storage,
             String,
@@ -69,6 +72,8 @@ pub mod token {
 
     impl PSP22Metadata for MyPSP22 {}
 
+    impl PSP22Mintable for MyPSP22 {}
+
     impl MyPSP22 {
         #[ink(constructor)]
         pub fn new(
@@ -85,12 +90,6 @@ pub mod token {
                 ._mint_to(instance.env().caller(), total_supply)
                 .expect("Should mint");
             instance
-        }
-        #[ink(message)]
-        /// Permissionless mint, test purpose only. DO NOT use for production.
-        /// Users can test our uniswap v2 demo on Shibuya by minting it by themselves.
-        pub fn mint(&mut self, account: AccountId, amount: Balance) -> Result<(), PSP22Error> {
-            self._mint_to(account, amount)
         }
     }
 }
