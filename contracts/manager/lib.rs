@@ -151,6 +151,11 @@ pub mod contract {
         fn reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
             self._reduce_reserves(pool, amount)
         }
+        #[ink(message)]
+        #[modifiers(access_control::only_role(TOKEN_ADMIN))]
+        fn sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()> {
+            self._sweep_token(pool, asset)
+        }
     }
 
     impl access_control::AccessControl for ManagerContract {}
@@ -604,6 +609,38 @@ pub mod contract {
             assert_eq!(
                 contract
                     .reduce_reserves(ZERO_ADDRESS.into(), 100)
+                    .unwrap_err(),
+                Error::AccessControl(AccessControlError::MissingRole)
+            );
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn sweep_token_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
+            assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
+            contract
+                .sweep_token(ZERO_ADDRESS.into(), ZERO_ADDRESS.into())
+                .unwrap();
+        }
+        #[ink::test]
+        fn sweep_token_fails_by_no_authority() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
+            assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
+            assert!(contract
+                .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
+                .is_ok());
+            assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
+            assert_eq!(
+                contract
+                    .sweep_token(ZERO_ADDRESS.into(), ZERO_ADDRESS.into())
                     .unwrap_err(),
                 Error::AccessControl(AccessControlError::MissingRole)
             );
