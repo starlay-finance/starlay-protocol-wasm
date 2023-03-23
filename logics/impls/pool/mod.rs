@@ -2,7 +2,10 @@ use super::exp_no_err::{
     exp_scale,
     Exp,
 };
-use crate::traits::types::WrappedU256;
+use crate::traits::{
+    controller,
+    types::WrappedU256,
+};
 pub use crate::traits::{
     controller::ControllerRef,
     interest_rate_model::InterestRateModelRef,
@@ -23,6 +26,7 @@ use openbrush::{
         self,
         Data as PSP22Data,
         Internal as PSP22Internal,
+        PSP22Error,
         PSP22Ref,
         PSP22,
     },
@@ -31,6 +35,7 @@ use openbrush::{
         AccountId,
         Balance,
         Storage,
+        String,
         Timestamp,
         ZERO_ADDRESS,
     },
@@ -94,6 +99,17 @@ impl Default for Data {
 pub trait Internal {
     fn _accrue_interest(&mut self) -> Result<()>;
     fn _accure_interest_at(&mut self, at: Timestamp) -> Result<()>;
+
+    // use in PSP22#transfer,transfer_from interface
+    // return PSP22Error as Error for this
+    fn _transfer_tokens(
+        &mut self,
+        spender: AccountId,
+        src: AccountId,
+        dst: AccountId,
+        value: Balance,
+        data: Vec<u8>,
+    ) -> core::result::Result<(), PSP22Error>;
     fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()>;
     fn _redeem(
         &mut self,
@@ -407,6 +423,41 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             WrappedU256::from(out.borrow_index.mantissa),
             out.total_borrows,
         );
+        Ok(())
+    }
+    default fn _transfer_tokens(
+        &mut self,
+        spender: AccountId,
+        src: AccountId,
+        dst: AccountId,
+        value: Balance,
+        data: Vec<u8>,
+    ) -> core::result::Result<(), PSP22Error> {
+        let contract_addr = Self::env().account_id();
+        ControllerRef::transfer_allowed(&self._controller(), contract_addr, src, dst, value)
+            .map_err(to_psp22_err_from_controller_err)?;
+
+        if src == dst {
+            return Err(PSP22Error::Custom(String::from("TransferNotAllowed")))
+        }
+
+        if spender == src {
+            // copied from PSP22#transfer
+            // ref: https://github.com/727-Ventures/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L75-L79
+            self._transfer_from_to(src, dst, value, data)?;
+        } else {
+            // copied from PSP22#transfer_from
+            // ref: https://github.com/727-Ventures/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L81-L98
+            let allowance = self._allowance(&src, &spender);
+
+            if allowance < value {
+                return Err(PSP22Error::InsufficientAllowance)
+            }
+
+            self._approve_from_to(src, spender, allowance - value)?;
+            self._transfer_from_to(src, dst, value, data)?;
+        }
+
         Ok(())
     }
     default fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()> {
@@ -960,10 +1011,30 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
 }
 
-pub fn to_psp22_error(e: psp22::PSP22Error) -> Error {
+pub fn to_psp22_error(e: PSP22Error) -> Error {
     Error::PSP22(e)
 }
 
 pub fn to_lang_error(e: LangError) -> Error {
     Error::Lang(e)
+}
+
+pub fn to_psp22_err_from_controller_err(e: controller::Error) -> PSP22Error {
+    let convert = { |str: &str| PSP22Error::Custom(String::from(str)) };
+    return match e {
+        controller::Error::MintIsPaused => convert("MintIsPaused"),
+        controller::Error::BorrowIsPaused => convert("BorrowIsPaused"),
+        controller::Error::SeizeIsPaused => convert("SeizeIsPaused"),
+        controller::Error::TransferIsPaused => convert("TransferIsPaused"),
+        controller::Error::MarketNotListed => convert("MarketNotListed"),
+        controller::Error::MarketAlreadyListed => convert("MarketAlreadyListed"),
+        controller::Error::ControllerMismatch => convert("ControllerMismatch"),
+        controller::Error::PriceError => convert("PriceError"),
+        controller::Error::TooMuchRepay => convert("TooMuchRepay"),
+        controller::Error::BorrowCapReached => convert("BorrowCapReached"),
+        controller::Error::InsufficientLiquidity => convert("InsufficientLiquidity"),
+        controller::Error::InsufficientShortfall => convert("InsufficientShortfall"),
+        controller::Error::CallerIsNotManager => convert("CallerIsNotManager"),
+        controller::Error::InvalidCollateralFactor => convert("InvalidCollateralFactor"),
+    }
 }
