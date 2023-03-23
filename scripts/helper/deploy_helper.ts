@@ -2,9 +2,11 @@ import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { WeightV2 } from '@polkadot/types/interfaces'
 import { BN, BN_ONE } from '@polkadot/util'
+import Faucet_factory from '../../types/constructors/faucet'
 import Lens_factory from '../../types/constructors/lens'
 import Manager_factory from '../../types/constructors/manager'
 import PriceOracle_factory from '../../types/constructors/price_oracle'
+import Faucet from '../../types/contracts/faucet'
 import Lens from '../../types/contracts/lens'
 import Manager from '../../types/contracts/manager'
 import PriceOracle from '../../types/contracts/price_oracle'
@@ -119,6 +121,16 @@ const isTestEnv = (result: SignAndSendSuccessResponse) => {
   return result.result.blockNumber.toNumber() < 1000
 }
 
+export const deployFaucet = async ({
+  api,
+  signer,
+}: FactoryArgs): Promise<Faucet> => {
+  const factory = new Faucet_factory(api, signer)
+  const contract = await factory.new()
+  const result = new Faucet(contract.address, signer, api)
+  await afterDeployment(contract.name, result)
+  return result
+}
 export const deployLens = async ({
   api,
   signer,

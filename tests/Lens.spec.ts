@@ -1,15 +1,15 @@
 import type { KeyringPair } from '@polkadot/keyring/types'
-import { BN } from '@polkadot/util'
 import {
   deployController,
   deployDefaultInterestRateModel,
+  deployFaucet,
   deployLens,
   deployPoolFromAsset,
   deployPriceOracle,
   deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
-import { ONE_ETHER } from '../scripts/tokens'
 import Controller from '../types/contracts/controller'
+import Faucet from '../types/contracts/faucet'
 import Lens from '../types/contracts/lens'
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
@@ -47,12 +47,7 @@ const setup = async () => {
   const interestRateModel = await deployDefaultInterestRateModel({
     api,
     signer: deployer,
-    args: [
-      [new BN(100).mul(ONE_ETHER).toString()],
-      [new BN(100).mul(ONE_ETHER).toString()],
-      [new BN(100).mul(ONE_ETHER).toString()],
-      [new BN(100).mul(ONE_ETHER).toString()],
-    ],
+    args: [[0], [0], [0], [0]],
   })
 
   const pool1 = await deployPoolFromAsset({
@@ -74,6 +69,8 @@ const setup = async () => {
 
   const users = [bob, charlie]
 
+  const faucet = await deployFaucet({ api, signer: deployer })
+
   // initialize
   await controller.tx.supportMarket(pool1.address)
   await controller.tx.supportMarket(pool2.address)
@@ -89,6 +86,7 @@ const setup = async () => {
     pools: [pool1.address, pool2.address],
     interestRateModel: interestRateModel.address,
     tokens: [token1.address, token2.address],
+    faucet: faucet.address,
   })
   return {
     api,
@@ -97,6 +95,7 @@ const setup = async () => {
     pools: [pool1, pool2],
     controller,
     lens,
+    faucet,
     users,
   }
 }
@@ -106,19 +105,20 @@ describe('Lens', () => {
   let tokens: PSP22Token[]
   let pools: Pool[]
   let controller: Controller
+  let faucet: Faucet
   let signer: KeyringPair
 
-  beforeAll(async () => {
-    ;({
-      lens,
-      tokens,
-      pools,
-      controller,
-      users: [signer],
-    } = await setup())
-  })
-
   describe('returns value', () => {
+    beforeAll(async () => {
+      ;({
+        lens,
+        tokens,
+        pools,
+        controller,
+        users: [signer],
+      } = await setup())
+    })
+
     it('Pools', async () => {
       const {
         value: { ok: res },
@@ -182,14 +182,46 @@ describe('Lens', () => {
       expect(res.pool).toBe(pool.address)
       expect(res.underlyingPrice.toNumber()).toBe(0)
     })
+
+    it('UnderlyingBalance', async () => {
+      const pool = pools[0]
+      const {
+        value: { ok: res },
+      } = await lens.query.underlyingBalance(pool.address, signer.address)
+
+      expect(res.toNumber()).toBe(0)
+    })
   })
 
-  it('UnderlyingBalance', async () => {
-    const pool = pools[0]
-    const {
-      value: { ok: res },
-    } = await lens.query.underlyingBalance(pool.address, signer.address)
+  describe('underlying Balance', () => {
+    const amount = 100
+    beforeAll(async () => {
+      ;({
+        lens,
+        tokens,
+        pools,
+        controller,
+        faucet,
+        users: [signer],
+      } = await setup())
+      await faucet.tx.mintUnderlyingAll(
+        controller.address,
+        amount,
+        signer.address,
+      )
+    })
 
-    expect(res.toNumber()).toBe(0)
+    it('underlying_balance_all', async () => {
+      const {
+        value: { ok: res },
+      } = await lens.query.underlyingBalanceAll(
+        pools.map(({ address }) => address),
+        signer.address,
+      )
+      expect(res).toHaveLength(pools.length)
+      res.forEach((balance) => {
+        expect(balance.toNumber()).toBe(amount)
+      })
+    })
   })
 })
