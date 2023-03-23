@@ -429,7 +429,13 @@ pub mod contract {
             assert_eq!(
                 contract.reduce_reserves(100).unwrap_err(),
                 Error::CallerIsNotManager
-            )
+            );
+            assert_eq!(
+                contract
+                    .set_reserve_factor_mantissa(WrappedU256::from(0))
+                    .unwrap_err(),
+                Error::CallerIsNotManager
+            );
         }
     }
 }

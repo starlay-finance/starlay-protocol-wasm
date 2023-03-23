@@ -869,6 +869,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         &mut self,
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()> {
+        self._assert_manager()?;
+
         self.data::<Data>().reserve_factor_mantissa = new_reserve_factor_mantissa;
         Ok(())
     }
