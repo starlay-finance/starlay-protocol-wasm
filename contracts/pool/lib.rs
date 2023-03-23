@@ -459,6 +459,10 @@ pub mod contract {
                 Error::CallerIsNotManager
             );
             assert_eq!(
+                contract.sweep_token(dummy_id).unwrap_err(),
+                Error::CallerIsNotManager
+            );
+            assert_eq!(
                 contract
                     .set_reserve_factor_mantissa(WrappedU256::from(0))
                     .unwrap_err(),
