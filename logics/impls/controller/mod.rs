@@ -721,16 +721,20 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _transfer_allowed(
         &self,
-        _pool: AccountId,
-        _src: AccountId,
+        pool: AccountId,
+        src: AccountId,
         _dst: AccountId,
-        _transfer_tokens: Balance,
+        transfer_tokens: Balance,
     ) -> Result<()> {
         if self._transfer_guardian_paused() {
             return Err(Error::TransferIsPaused)
         }
 
-        todo!()
+        self._redeem_allowed(pool, src, transfer_tokens)?;
+
+        // FEATURE: update governance token supply index & distribute
+
+        Ok(())
     }
     default fn _transfer_verify(
         &self,
