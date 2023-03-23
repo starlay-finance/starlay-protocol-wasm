@@ -256,6 +256,20 @@ pub mod contract {
         }
 
         #[ink::test]
+        fn support_market_fails_when_duplicate() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new(accounts.bob);
+
+            let p1 = AccountId::from([0x01; 32]);
+            assert!(contract.support_market(p1).is_ok());
+            assert_eq!(
+                contract.support_market(p1).unwrap_err(),
+                Error::MarketAlreadyListed
+            );
+        }
+
+        #[ink::test]
         fn set_collateral_factor_mantissa_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
