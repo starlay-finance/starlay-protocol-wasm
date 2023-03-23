@@ -1,5 +1,8 @@
 import { encodeAddress } from '@polkadot/keyring'
-import { deployController, deployManager } from './testContractsHelper'
+import {
+  deployController,
+  deployManager,
+} from '../scripts/helper/deploy_helper'
 import { zeroAddress } from './testHelpers'
 
 const Roles = {
