@@ -109,8 +109,8 @@ const deployDummyTokens = async (api: ApiPromise, signer: KeyringPair) => {
       signer,
       args: [
         token.totalSupply,
-        [token.name],
-        [token.symbol],
+        token.name as unknown as string[],
+        token.symbol as unknown as string[],
         token.decimal,
         defaultArgs(api),
       ],
