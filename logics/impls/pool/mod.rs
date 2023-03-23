@@ -9,6 +9,7 @@ pub use crate::traits::{
     pool::*,
 };
 use core::ops::{
+    Add,
     Div,
     Mul,
     Sub,
@@ -125,6 +126,7 @@ pub trait Internal {
         &mut self,
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()>;
+    fn _add_reserves(&mut self, amount: Balance) -> Result<()>;
     fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()>;
 
     fn _transfer_underlying_from(
@@ -195,17 +197,17 @@ pub trait Internal {
         token_collateral: AccountId,
         seize_tokens: Balance,
     );
-    fn _emit_reserves_added_event(
-        &self,
-        benefactor: AccountId,
-        add_amount: Balance,
-        new_total_reserves: Balance,
-    );
     fn _emit_accrue_interest_event(
         &self,
         interest_accumulated: Balance,
         new_index: WrappedU256,
         new_total_borrows: Balance,
+    );
+    fn _emit_reserves_added_event(
+        &self,
+        benefactor: AccountId,
+        add_amount: Balance,
+        new_total_reserves: Balance,
     );
     fn _emit_reserves_reduced_event(&self, _reduce_amount: Balance, _total_reserves_new: Balance);
 }
@@ -309,6 +311,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()> {
         self._set_reserve_factor_mantissa(new_reserve_factor_mantissa)
+    }
+
+    default fn add_reserves(&mut self, amount: Balance) -> Result<()> {
+        self._add_reserves(amount)
     }
 
     default fn reduce_reserves(&mut self, amount: Balance) -> Result<()> {
@@ -885,6 +891,24 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         }
 
         self.data::<Data>().reserve_factor_mantissa = new_reserve_factor_mantissa;
+        Ok(())
+    }
+
+    default fn _add_reserves(&mut self, amount: Balance) -> Result<()> {
+        self._accrue_interest()?;
+
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        }
+
+        let total_reserves_new = self._total_reserves().add(amount);
+        self.data::<Data>().total_reserves = total_reserves_new;
+        let caller = Self::env().caller();
+        self._transfer_underlying_from(Self::env().caller(), Self::env().account_id(), amount)
+            .unwrap();
+        self._emit_reserves_added_event(caller, amount, total_reserves_new);
+
         Ok(())
     }
 
