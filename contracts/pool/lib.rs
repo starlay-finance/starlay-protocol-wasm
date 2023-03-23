@@ -3,9 +3,12 @@
 
 #[openbrush::contract]
 pub mod contract {
-    use ink::codegen::{
-        EmitEvent,
-        Env,
+    use ink::{
+        codegen::{
+            EmitEvent,
+            Env,
+        },
+        prelude::vec::Vec,
     };
     use logics::impls::pool::{
         Internal,
@@ -18,6 +21,7 @@ pub mod contract {
                 PSP22MetadataRef,
             },
             psp22,
+            PSP22Error,
         },
         traits::{
             AccountIdExt,
@@ -169,7 +173,29 @@ pub mod contract {
         }
     }
 
-    impl psp22::PSP22 for PoolContract {}
+    impl psp22::PSP22 for PoolContract {
+        #[ink(message)]
+        fn transfer(
+            &mut self,
+            to: AccountId,
+            value: Balance,
+            data: Vec<u8>,
+        ) -> core::result::Result<(), PSP22Error> {
+            let caller = self.env().caller();
+            self._transfer_tokens(caller, caller, to, value, data)
+        }
+
+        #[ink(message)]
+        fn transfer_from(
+            &mut self,
+            from: AccountId,
+            to: AccountId,
+            value: Balance,
+            data: Vec<u8>,
+        ) -> core::result::Result<(), PSP22Error> {
+            self._transfer_tokens(self.env().caller(), from, to, value, data)
+        }
+    }
 
     impl metadata::PSP22Metadata for PoolContract {}
 
@@ -260,18 +286,27 @@ pub mod contract {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use ink::env::{
-            test::{
-                self,
-                DefaultAccounts,
+        use ink::{
+            env::{
+                test::{
+                    self,
+                    DefaultAccounts,
+                },
+                DefaultEnvironment,
             },
-            DefaultEnvironment,
+            prelude::vec::Vec,
         };
         use logics::{
-            impls::exp_no_err::exp_scale,
+            impls::{
+                exp_no_err::exp_scale,
+                pool::Pool,
+            },
             traits::types::WrappedU256,
         };
-        use openbrush::traits::ZERO_ADDRESS;
+        use openbrush::{
+            contracts::psp22::PSP22,
+            traits::ZERO_ADDRESS,
+        };
         use std::ops::{
             Add,
             Div,
@@ -338,6 +373,50 @@ pub mod contract {
                 String::from("symbol"),
                 8,
             );
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn transfer_works_overrided() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let dummy_id = AccountId::from([0x01; 32]);
+            let mut contract = PoolContract::new(
+                dummy_id,
+                dummy_id,
+                dummy_id,
+                String::from("Token Name"),
+                String::from("symbol"),
+                8,
+            );
+
+            contract.transfer(accounts.charlie, 0, Vec::new()).unwrap();
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn transfer_from_works_overrided() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let dummy_id = AccountId::from([0x01; 32]);
+            let mut contract = PoolContract::new(
+                dummy_id,
+                dummy_id,
+                dummy_id,
+                String::from("Token Name"),
+                String::from("symbol"),
+                8,
+            );
+
+            contract
+                .transfer_from(accounts.bob, accounts.charlie, 0, Vec::new())
+                .unwrap();
         }
 
         #[ink::test]
