@@ -229,6 +229,7 @@ pub enum Error {
     SeizeIsPaused,
     TransferIsPaused,
     MarketNotListed,
+    MarketAlreadyListed,
     ControllerMismatch,
     PriceError,
     TooMuchRepay,

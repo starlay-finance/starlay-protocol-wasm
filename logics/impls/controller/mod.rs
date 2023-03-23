@@ -763,6 +763,12 @@ impl<T: Storage<Data>> Internal for T {
         Ok(())
     }
     default fn _support_market(&mut self, pool: &AccountId) -> Result<()> {
+        for market in self._markets() {
+            if pool == &market {
+                return Err(Error::MarketAlreadyListed)
+            }
+        }
+
         self.data().markets.push(*pool);
 
         // set default states
