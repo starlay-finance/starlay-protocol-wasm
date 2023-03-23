@@ -42,6 +42,7 @@ use self::utils::{
     exchange_rate,
     protocol_seize_amount,
     protocol_seize_share_mantissa,
+    reserve_factor_max_mantissa,
     CalculateInterestInput,
 };
 
@@ -871,9 +872,15 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     ) -> Result<()> {
         self._assert_manager()?;
 
+        self._accrue_interest()?;
+
         let current_timestamp = Self::env().block_timestamp();
         if self._accural_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
+        }
+
+        if U256::from(new_reserve_factor_mantissa).gt(&reserve_factor_max_mantissa()) {
+            return Err(Error::SetReserveFactorBoundsCheck)
         }
 
         self.data::<Data>().reserve_factor_mantissa = new_reserve_factor_mantissa;

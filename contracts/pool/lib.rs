@@ -277,7 +277,10 @@ pub mod contract {
             traits::types::WrappedU256,
         };
         use openbrush::traits::ZERO_ADDRESS;
-        use std::ops::Div;
+        use std::ops::{
+            Add,
+            Div,
+        };
 
         fn default_accounts() -> DefaultAccounts<DefaultEnvironment> {
             test::default_accounts::<DefaultEnvironment>()
@@ -407,6 +410,13 @@ pub mod contract {
             assert_eq!(
                 contract.reserve_factor_mantissa(),
                 WrappedU256::from(half_exp_scale)
+            );
+            let over_exp_scale = exp_scale().add(1);
+            assert_eq!(
+                contract
+                    .set_reserve_factor_mantissa(WrappedU256::from(over_exp_scale))
+                    .unwrap_err(),
+                Error::SetReserveFactorBoundsCheck
             );
         }
 

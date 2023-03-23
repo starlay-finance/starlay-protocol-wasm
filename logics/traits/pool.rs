@@ -111,6 +111,7 @@ pub enum Error {
     ReduceReservesCashNotAvailable,
     ReduceReservesCashValidation,
     BorrowRateIsAbsurdlyHigh,
+    SetReserveFactorBoundsCheck,
     CallerIsNotManager,
     PSP22(PSP22Error),
     Lang(LangError),
