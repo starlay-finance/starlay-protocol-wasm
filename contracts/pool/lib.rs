@@ -90,7 +90,17 @@ pub mod contract {
         }
 
         #[ink(message)]
+        fn set_controller(&mut self, _new_controller: AccountId) -> Result<()> {
+            Err(Error::NotImplemented)
+        }
+
+        #[ink(message)]
         fn add_reserves(&mut self, _amount: Balance) -> Result<()> {
+            Err(Error::NotImplemented)
+        }
+
+        #[ink(message)]
+        fn set_interest_rate_model(&mut self, _new_interest_rate_model: AccountId) -> Result<()> {
             Err(Error::NotImplemented)
         }
     }
@@ -390,6 +400,27 @@ pub mod contract {
         }
 
         #[ink::test]
+        fn set_controller_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let dummy_id = AccountId::from([0x01; 32]);
+            let mut contract = PoolContract::new(
+                dummy_id,
+                dummy_id,
+                dummy_id,
+                String::from("Token Name"),
+                String::from("symbol"),
+                8,
+            );
+
+            assert_eq!(
+                contract.set_controller(dummy_id).unwrap_err(),
+                Error::NotImplemented
+            )
+        }
+
+        #[ink::test]
         fn add_reserves_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
@@ -405,6 +436,27 @@ pub mod contract {
             );
 
             assert_eq!(contract.add_reserves(0).unwrap_err(), Error::NotImplemented)
+        }
+
+        #[ink::test]
+        fn set_interest_rate_model_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let dummy_id = AccountId::from([0x01; 32]);
+            let mut contract = PoolContract::new(
+                dummy_id,
+                dummy_id,
+                dummy_id,
+                String::from("Token Name"),
+                String::from("symbol"),
+                8,
+            );
+
+            assert_eq!(
+                contract.set_interest_rate_model(dummy_id).unwrap_err(),
+                Error::NotImplemented
+            )
         }
 
         #[ink::test]
@@ -457,9 +509,7 @@ pub mod contract {
             let admin_funcs: Vec<Result<()>> = vec![
                 contract.reduce_reserves(100),
                 contract.sweep_token(dummy_id),
-                contract.set_controller(dummy_id),
                 contract.set_reserve_factor_mantissa(WrappedU256::from(0)),
-                contract.set_interest_rate_model(dummy_id),
             ];
             for func in admin_funcs {
                 assert_eq!(func.unwrap_err(), Error::CallerIsNotManager);
