@@ -172,7 +172,11 @@ pub trait Internal {
     ) -> Result<Balance>;
     fn _assert_manager(&self) -> Result<()>;
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
-    fn _support_market(&mut self, pool: &AccountId) -> Result<()>;
+    fn _support_market(
+        &mut self,
+        pool: &AccountId,
+        collateral_factor_mantissa: Option<WrappedU256>,
+    ) -> Result<()>;
     fn _set_collateral_factor_mantissa(
         &mut self,
         pool: &AccountId,
@@ -407,7 +411,18 @@ impl<T: Storage<Data>> Controller for T {
 
     default fn support_market(&mut self, pool: AccountId) -> Result<()> {
         self._assert_manager()?;
-        self._support_market(&pool)?;
+        self._support_market(&pool, None)?;
+        self._emit_market_listed_event(pool);
+        Ok(())
+    }
+
+    default fn support_market_with_collateral_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        collateral_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        self._assert_manager()?;
+        self._support_market(&pool, Some(collateral_factor_mantissa))?;
         self._emit_market_listed_event(pool);
         Ok(())
     }
@@ -762,7 +777,11 @@ impl<T: Storage<Data>> Internal for T {
         self.data().oracle = new_oracle;
         Ok(())
     }
-    default fn _support_market(&mut self, pool: &AccountId) -> Result<()> {
+    default fn _support_market(
+        &mut self,
+        pool: &AccountId,
+        collateral_factor_mantissa: Option<WrappedU256>,
+    ) -> Result<()> {
         for market in self._markets() {
             if pool == &market {
                 return Err(Error::MarketAlreadyListed)
@@ -772,9 +791,14 @@ impl<T: Storage<Data>> Internal for T {
         self.data().markets.push(*pool);
 
         // set default states
-        self._set_mint_guardian_paused(pool, false)?;
-        self._set_borrow_guardian_paused(pool, false)?;
-        // self._set_collateral_factor_mantissa(pool, WrappedU256::from(0))?; // TODO: enable to set in process of _support_market
+        if let Some(value) = collateral_factor_mantissa {
+            self._set_collateral_factor_mantissa(pool, value)?;
+            self._set_mint_guardian_paused(pool, false)?;
+            self._set_borrow_guardian_paused(pool, false)?;
+        } else {
+            self._set_mint_guardian_paused(pool, true)?;
+            self._set_borrow_guardian_paused(pool, true)?;
+        }
         self._set_borrow_cap(pool, 0)?;
 
         Ok(())
