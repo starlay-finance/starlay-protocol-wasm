@@ -791,13 +791,10 @@ impl<T: Storage<Data>> Internal for T {
         self.data().markets.push(*pool);
 
         // set default states
+        self._set_mint_guardian_paused(pool, false)?;
+        self._set_borrow_guardian_paused(pool, false)?;
         if let Some(value) = collateral_factor_mantissa {
             self._set_collateral_factor_mantissa(pool, value)?;
-            self._set_mint_guardian_paused(pool, false)?;
-            self._set_borrow_guardian_paused(pool, false)?;
-        } else {
-            self._set_mint_guardian_paused(pool, true)?;
-            self._set_borrow_guardian_paused(pool, true)?;
         }
         self._set_borrow_cap(pool, 0)?;
 
