@@ -1,10 +1,13 @@
 import type { KeyringPair } from '@polkadot/keyring/types'
-import { deployController, deployPSP22Token } from './testContractsHelper'
 import { hexToUtf8, zeroAddress } from './testHelpers'
 
 import Pool_factory from '../types/constructors/pool'
 import Pool from '../types/contracts/pool'
 
+import {
+  deployController,
+  deployPSP22Token,
+} from '../scripts/helper/deploy_helper'
 import PSP22Token from '../types/contracts/psp22_token'
 
 describe('Pool spec', () => {

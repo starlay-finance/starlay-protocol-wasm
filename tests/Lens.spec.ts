@@ -1,9 +1,4 @@
 import type { KeyringPair } from '@polkadot/keyring/types'
-import Controller from '../types/contracts/controller'
-import Faucet from '../types/contracts/faucet'
-import Lens from '../types/contracts/lens'
-import Pool from '../types/contracts/pool'
-import PSP22Token from '../types/contracts/psp22_token'
 import {
   deployController,
   deployDefaultInterestRateModel,
@@ -12,7 +7,12 @@ import {
   deployPoolFromAsset,
   deployPriceOracle,
   deployPSP22Token,
-} from './testContractsHelper'
+} from '../scripts/helper/deploy_helper'
+import Controller from '../types/contracts/controller'
+import Faucet from '../types/contracts/faucet'
+import Lens from '../types/contracts/lens'
+import Pool from '../types/contracts/pool'
+import PSP22Token from '../types/contracts/psp22_token'
 
 const setup = async () => {
   const { api, alice: deployer, bob, charlie } = globalThis.setup
@@ -78,7 +78,7 @@ const setup = async () => {
   await priceOracle.tx.setFixedPrice(token1.address, 0)
   await priceOracle.tx.setFixedPrice(token2.address, 0)
 
-  const lens = await deployLens({ api, signer: deployer })
+  const lens = await deployLens({ api, signer: deployer, args: [] })
 
   console.log({
     lens: lens.address,

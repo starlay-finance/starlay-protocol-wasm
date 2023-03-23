@@ -2,10 +2,14 @@ import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { WeightV2 } from '@polkadot/types/interfaces'
 import { BN, BN_ONE } from '@polkadot/util'
+import Faucet_factory from '../../types/constructors/faucet'
 import Lens_factory from '../../types/constructors/lens'
 import Manager_factory from '../../types/constructors/manager'
+import PriceOracle_factory from '../../types/constructors/price_oracle'
+import Faucet from '../../types/contracts/faucet'
 import Lens from '../../types/contracts/lens'
 import Manager from '../../types/contracts/manager'
+import PriceOracle from '../../types/contracts/price_oracle'
 
 import Controller_factory from '../../types/constructors/controller'
 import DefaultInterestRateModel_factory from '../../types/constructors/default_interest_rate_model'
@@ -81,6 +85,16 @@ export const deployManager = async ({
   return result
 }
 
+export const deployPriceOracle = async ({
+  api,
+  signer,
+}: FactoryArgs): Promise<PriceOracle> => {
+  const factory = new PriceOracle_factory(api, signer)
+  const contract = await factory.new()
+  const result = new PriceOracle(contract.address, signer, api)
+  await afterDeployment(result.name, contract)
+  return result
+}
 const afterDeployment = async (
   name: string,
   contract: {
@@ -95,11 +109,28 @@ const afterDeployment = async (
 export const waitForTx = async (
   result: SignAndSendSuccessResponse,
 ): Promise<void> => {
+  if (isTestEnv(result)) return
+
   while (!result.result.isFinalized) {
     await new Promise((resolve) => setTimeout(resolve, WAIT_FINALIZED_SECONDS))
   }
 }
 
+const isTestEnv = (result: SignAndSendSuccessResponse) => {
+  // TODO
+  return result.result.blockNumber.toNumber() < 1000
+}
+
+export const deployFaucet = async ({
+  api,
+  signer,
+}: FactoryArgs): Promise<Faucet> => {
+  const factory = new Faucet_factory(api, signer)
+  const contract = await factory.new()
+  const result = new Faucet(contract.address, signer, api)
+  await afterDeployment(result.name, contract)
+  return result
+}
 export const deployLens = async ({
   api,
   signer,
@@ -110,6 +141,20 @@ export const deployLens = async ({
   const factory = new Lens_factory(api, signer)
   const contract = await factory.new(...args)
   const result = new Lens(contract.address, signer, api)
+  await afterDeployment(result.name, contract)
+  return result
+}
+
+export const deployPoolFromAsset = async ({
+  api,
+  signer,
+  args,
+}: FactoryArgs & {
+  args: Parameters<Pool_factory['newFromAsset']>
+}): Promise<Pool> => {
+  const factory = new Pool_factory(api, signer)
+  const contract = await factory.newFromAsset(...args)
+  const result = new Pool(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
 }

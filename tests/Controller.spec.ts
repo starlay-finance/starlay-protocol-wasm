@@ -1,6 +1,6 @@
 import { encodeAddress } from '@polkadot/keyring'
 import BN from 'bn.js'
-import { deployController } from './testContractsHelper'
+import { deployController } from '../scripts/helper/deploy_helper'
 import { zeroAddress } from './testHelpers'
 
 describe('Controller spec', () => {
