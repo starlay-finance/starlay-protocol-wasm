@@ -54,6 +54,8 @@ pub trait Manager {
     ) -> Result<()>;
     #[ink(message)]
     fn reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
+    #[ink(message)]
+    fn sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()>;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]

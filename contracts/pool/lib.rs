@@ -454,20 +454,14 @@ pub mod contract {
             );
 
             set_caller(accounts.charlie);
-            assert_eq!(
-                contract.reduce_reserves(100).unwrap_err(),
-                Error::CallerIsNotManager
-            );
-            assert_eq!(
-                contract.sweep_token(dummy_id).unwrap_err(),
-                Error::CallerIsNotManager
-            );
-            assert_eq!(
-                contract
-                    .set_reserve_factor_mantissa(WrappedU256::from(0))
-                    .unwrap_err(),
-                Error::CallerIsNotManager
-            );
+            let admin_funcs: Vec<Result<()>> = vec![
+                contract.reduce_reserves(100),
+                contract.sweep_token(dummy_id),
+                contract.set_reserve_factor_mantissa(WrappedU256::from(0)),
+            ];
+            for func in admin_funcs {
+                assert_eq!(func.unwrap_err(), Error::CallerIsNotManager);
+            }
         }
     }
 }

@@ -47,6 +47,7 @@ pub trait Internal {
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()>;
     fn _reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
+    fn _sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()>;
 }
 
 impl<T: Storage<Data>> Manager for T {
@@ -106,6 +107,9 @@ impl<T: Storage<Data>> Manager for T {
     }
     default fn reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
         self._reduce_reserves(pool, amount)
+    }
+    default fn sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()> {
+        self._sweep_token(pool, asset)
     }
 }
 
@@ -192,6 +196,10 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
         PoolRef::reduce_reserves(&pool, amount).unwrap();
+        Ok(())
+    }
+    default fn _sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()> {
+        PoolRef::sweep_token(&pool, asset).unwrap();
         Ok(())
     }
 }
