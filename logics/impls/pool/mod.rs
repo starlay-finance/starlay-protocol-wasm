@@ -315,10 +315,13 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
     }
 
     default fn add_reserves(&mut self, amount: Balance) -> Result<()> {
+        self._accrue_interest()?;
         self._add_reserves(amount)
     }
 
     default fn reduce_reserves(&mut self, amount: Balance) -> Result<()> {
+        self._assert_manager()?;
+        self._accrue_interest()?;
         self._reduce_reserves(Self::env().caller(), amount)
     }
 
@@ -901,8 +904,6 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
 
     default fn _add_reserves(&mut self, amount: Balance) -> Result<()> {
-        self._accrue_interest()?;
-
         let current_timestamp = Self::env().block_timestamp();
         if self._accural_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
@@ -911,7 +912,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let total_reserves_new = self._total_reserves().add(amount);
         self.data::<Data>().total_reserves = total_reserves_new;
         let caller = Self::env().caller();
-        self._transfer_underlying_from(Self::env().caller(), Self::env().account_id(), amount)
+        self._transfer_underlying_from(caller, Self::env().account_id(), amount)
             .unwrap();
         self._emit_reserves_added_event(caller, amount, total_reserves_new);
 
@@ -919,15 +920,11 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
 
     default fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()> {
-        self._assert_manager()?;
-
-        self._accrue_interest()?;
-
         let current_timestamp = Self::env().block_timestamp();
-
         if self._accural_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
+
         if self._get_cash_prior().lt(&amount) {
             return Err(Error::ReduceReservesCashNotAvailable)
         }
