@@ -871,6 +871,11 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     ) -> Result<()> {
         self._assert_manager()?;
 
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        }
+
         self.data::<Data>().reserve_factor_mantissa = new_reserve_factor_mantissa;
         Ok(())
     }
