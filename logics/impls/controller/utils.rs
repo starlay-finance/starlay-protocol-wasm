@@ -26,12 +26,7 @@ pub struct LiquidateCalculateSeizeTokensInput {
     pub actual_repay_amount: Balance,
 }
 
-pub fn liquidate_calculate_seize_tokens(
-    input: &LiquidateCalculateSeizeTokensInput,
-) -> Result<Balance> {
-    if input.price_borrowed_mantissa.is_zero() || input.price_collateral_mantissa.is_zero() {
-        return Err(Error::PriceError)
-    }
+pub fn liquidate_calculate_seize_tokens(input: &LiquidateCalculateSeizeTokensInput) -> Balance {
     let numerator = Exp {
         mantissa: WrappedU256::from(input.liquidation_incentive_mantissa),
     }
@@ -46,7 +41,7 @@ pub fn liquidate_calculate_seize_tokens(
     });
     let ratio = numerator.div(denominator);
     let seize_tokens = ratio.mul_scalar_truncate(U256::from(input.actual_repay_amount));
-    Ok(seize_tokens.as_u128())
+    seize_tokens.as_u128()
 }
 
 pub fn collateral_factor_max_mantissa() -> U256 {
@@ -153,39 +148,40 @@ mod tests {
     fn mts(val: u128) -> U256 {
         U256::from(val).mul(exp_scale())
     }
-    #[test]
-    fn test_liquidate_calculate_seize_tokens_price_is_zero() {
-        struct Case<'a> {
-            input: &'a LiquidateCalculateSeizeTokensInput,
-            want_err: Error,
-        }
-        let cases: &[Case] = &[
-            Case {
-                input: &LiquidateCalculateSeizeTokensInput {
-                    price_borrowed_mantissa: U256::one(),
-                    price_collateral_mantissa: U256::zero(),
-                    exchange_rate_mantissa: U256::one(),
-                    liquidation_incentive_mantissa: U256::one(),
-                    actual_repay_amount: 1,
-                },
-                want_err: Error::PriceError,
-            },
-            Case {
-                input: &LiquidateCalculateSeizeTokensInput {
-                    price_borrowed_mantissa: U256::zero(),
-                    price_collateral_mantissa: U256::one(),
-                    exchange_rate_mantissa: U256::one(),
-                    liquidation_incentive_mantissa: U256::one(),
-                    actual_repay_amount: 1,
-                },
-                want_err: Error::PriceError,
-            },
-        ];
-        for case in cases {
-            let result = liquidate_calculate_seize_tokens(case.input.into());
-            assert_eq!(result.err().unwrap(), case.want_err);
-        }
-    }
+    // TODO: in controller contract
+    // #[test]
+    // fn test_liquidate_calculate_seize_tokens_price_is_zero() {
+    //     struct Case<'a> {
+    //         input: &'a LiquidateCalculateSeizeTokensInput,
+    //         want_err: Error,
+    //     }
+    //     let cases: &[Case] = &[
+    //         Case {
+    //             input: &LiquidateCalculateSeizeTokensInput {
+    //                 price_borrowed_mantissa: U256::one(),
+    //                 price_collateral_mantissa: U256::zero(),
+    //                 exchange_rate_mantissa: U256::one(),
+    //                 liquidation_incentive_mantissa: U256::one(),
+    //                 actual_repay_amount: 1,
+    //             },
+    //             want_err: Error::PriceError,
+    //         },
+    //         Case {
+    //             input: &LiquidateCalculateSeizeTokensInput {
+    //                 price_borrowed_mantissa: U256::zero(),
+    //                 price_collateral_mantissa: U256::one(),
+    //                 exchange_rate_mantissa: U256::one(),
+    //                 liquidation_incentive_mantissa: U256::one(),
+    //                 actual_repay_amount: 1,
+    //             },
+    //             want_err: Error::PriceError,
+    //         },
+    //     ];
+    //     for case in cases {
+    //         let result = liquidate_calculate_seize_tokens(case.input.into());
+    //         assert_eq!(result.err().unwrap(), case.want_err);
+    //     }
+    // }
     #[test]
     fn test_liquidate_calculate_seize_tokens() {
         struct Case<'a> {
@@ -232,7 +228,7 @@ mod tests {
                 .mul(input.price_borrowed_mantissa)
                 .div(input.price_collateral_mantissa)
                 .div(input.exchange_rate_mantissa);
-            assert_eq!(got.unwrap(), want.as_u128());
+            assert_eq!(got, want.as_u128());
         }
     }
 

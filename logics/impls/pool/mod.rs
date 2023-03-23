@@ -20,6 +20,7 @@ use ink::{
 use openbrush::{
     contracts::psp22::{
         self,
+        Data as PSP22Data,
         Internal as PSP22Internal,
         PSP22Ref,
         PSP22,
@@ -653,13 +654,13 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let exchange_rate = Exp {
             mantissa: WrappedU256::from(self._exchange_rate_stored()),
         };
-        let (liquidator_seize_tokens, protocol_seize_amount) =
+        let (liquidator_seize_tokens, protocol_seize_amount, protocol_seize_tokens) =
             protocol_seize_amount(exchange_rate, seize_tokens, protocol_seize_share_mantissa());
         let total_reserves_new = self._total_reserves() + protocol_seize_amount;
 
         // EFFECTS & INTERACTIONS
         self.data::<Data>().total_reserves = total_reserves_new;
-        // total_supply = total_supply - protocol_seize_token; // TODO: check
+        self.data::<PSP22Data>().supply -= protocol_seize_tokens;
         self._burn_from(borrower, seize_tokens).unwrap();
         self._mint_to(liquidator, liquidator_seize_tokens).unwrap();
 
