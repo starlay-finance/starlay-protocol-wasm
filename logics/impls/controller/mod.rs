@@ -1,7 +1,4 @@
-use super::exp_no_err::{
-    exp_scale,
-    Exp,
-};
+use super::exp_no_err::Exp;
 pub use crate::traits::{
     controller::*,
     pool::PoolRef,
@@ -10,10 +7,7 @@ use crate::traits::{
     price_oracle::PriceOracleRef,
     types::WrappedU256,
 };
-use core::ops::{
-    Mul,
-    Sub,
-};
+use core::ops::Sub;
 use ink::prelude::vec::Vec;
 use openbrush::{
     storage::Mapping,
@@ -734,20 +728,29 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _liquidate_calculate_seize_tokens(
         &self,
-        _pool_borrowed: AccountId,
-        _pool_collateral: AccountId,
+        pool_borrowed: AccountId,
+        pool_collateral: AccountId,
         _exchange_rate_mantissa: WrappedU256,
         _repay_amount: Balance,
     ) -> Result<Balance> {
-        let (price_borrowed_mantissa, price_collateral_mantissa) =
-            (U256::one().mul(exp_scale()), U256::one().mul(exp_scale())); // TODO
-        liquidate_calculate_seize_tokens(&LiquidateCalculateSeizeTokensInput {
+        let price_borrowed_mantissa =
+            PriceOracleRef::get_underlying_price(&self._oracle(), pool_borrowed);
+        if let None | Some(0) = price_borrowed_mantissa {
+            return Err(Error::PriceError)
+        }
+        let price_collateral_mantissa =
+            PriceOracleRef::get_underlying_price(&self._oracle(), pool_collateral);
+        if let None | Some(0) = price_collateral_mantissa {
+            return Err(Error::PriceError)
+        }
+        let result = liquidate_calculate_seize_tokens(&LiquidateCalculateSeizeTokensInput {
+            price_borrowed_mantissa: U256::from(price_borrowed_mantissa.unwrap()),
+            price_collateral_mantissa: U256::from(price_collateral_mantissa.unwrap()),
             actual_repay_amount: _repay_amount,
             exchange_rate_mantissa: _exchange_rate_mantissa.into(),
             liquidation_incentive_mantissa: self._liquidation_incentive_mantissa().into(),
-            price_borrowed_mantissa,
-            price_collateral_mantissa,
-        })
+        });
+        Ok(result)
     }
     default fn _assert_manager(&self) -> Result<()> {
         if Self::env().caller() != self._manager() {
