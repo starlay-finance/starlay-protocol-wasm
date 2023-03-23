@@ -408,10 +408,8 @@ pub mod contract {
             let admin_funcs: Vec<Result<()>> = vec![
                 contract.set_price_oracle(dummy_id),
                 contract.support_market(dummy_id),
-                contract._support_market_with_collateral_factor_mantissa(
-                    dummy_id,
-                    WrappedU256::from(0),
-                ),
+                contract
+                    .support_market_with_collateral_factor_mantissa(dummy_id, WrappedU256::from(0)),
                 contract.set_collateral_factor_mantissa(dummy_id, WrappedU256::from(0)),
                 contract.set_mint_guardian_paused(dummy_id, true),
                 contract.set_borrow_guardian_paused(dummy_id, true),
