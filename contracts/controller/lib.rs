@@ -270,6 +270,37 @@ pub mod contract {
         #[should_panic(
             expected = "not implemented: off-chain environment does not support contract invocation"
         )]
+        fn support_market_with_collateral_factor_mantissa_fails_by_call_price_oracle_in_set_collateral_factor_mantissa(
+        ) {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new(accounts.bob);
+
+            let p1 = AccountId::from([0x01; 32]);
+            contract
+                .support_market_with_collateral_factor_mantissa(p1, WrappedU256::from(1))
+                .unwrap();
+        }
+
+        #[ink::test]
+        fn support_market_with_collateral_factor_mantissa_fails_when_collateral_factor_is_zero() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ControllerContract::new(accounts.bob);
+
+            let p1 = AccountId::from([0x01; 32]);
+            assert_eq!(
+                contract
+                    .support_market_with_collateral_factor_mantissa(p1, WrappedU256::from(0))
+                    .unwrap_err(),
+                Error::InvalidCollateralFactor
+            );
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
         fn set_collateral_factor_mantissa_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
@@ -377,6 +408,8 @@ pub mod contract {
             let admin_funcs: Vec<Result<()>> = vec![
                 contract.set_price_oracle(dummy_id),
                 contract.support_market(dummy_id),
+                contract
+                    .support_market_with_collateral_factor_mantissa(dummy_id, WrappedU256::from(0)),
                 contract.set_collateral_factor_mantissa(dummy_id, WrappedU256::from(0)),
                 contract.set_mint_guardian_paused(dummy_id, true),
                 contract.set_borrow_guardian_paused(dummy_id, true),
