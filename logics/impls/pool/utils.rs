@@ -77,12 +77,12 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
     })
 }
 
-// returns liquidator_seize_tokens and protocolSeizeAmount
+// returns liquidator_seize_tokens, protocol_seize_amount and protocol_seize_tokens
 pub fn protocol_seize_amount(
     exchange_rate: Exp,
     seize_tokens: Balance,
     protocol_seize_share_mantissa: U256,
-) -> (Balance, Balance) {
+) -> (Balance, Balance, Balance) {
     let protocol_seize_tokens = Exp {
         mantissa: WrappedU256::from(U256::from(seize_tokens).mul(protocol_seize_share_mantissa)),
     }
@@ -93,6 +93,7 @@ pub fn protocol_seize_amount(
         exchange_rate
             .mul_scalar_truncate(protocol_seize_tokens)
             .as_u128(),
+        protocol_seize_tokens.as_u128(),
     )
 }
 
@@ -225,10 +226,11 @@ mod tests {
         let protocol_seize_share_mantissa = U256::from(10_u128.pow(18).div(10)); // 10%
         let liquidator_seize_tokens_want = seize_tokens.mul(9).div(10);
         let protocol_seize_amount_want = protocol_seize_tokens.mul(1).div(100); // 1%
-        let (liquidator_seize_tokens_got, protocol_seize_amount_got) =
+        let (liquidator_seize_tokens_got, protocol_seize_amount_got, protocol_seize_tokens_got) =
             protocol_seize_amount(exchange_rate, seize_tokens, protocol_seize_share_mantissa);
         assert_eq!(liquidator_seize_tokens_got, liquidator_seize_tokens_want);
         assert_eq!(protocol_seize_amount_got, protocol_seize_amount_want);
+        assert_eq!(protocol_seize_tokens_got, protocol_seize_tokens);
     }
     #[test]
     fn test_exchange_rate_in_case_total_supply_is_zero() {
