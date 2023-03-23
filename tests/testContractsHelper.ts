@@ -3,6 +3,7 @@ import type { KeyringPair } from '@polkadot/keyring/types'
 
 import Controller_factory from '../types/constructors/controller'
 import DefaultInterestRateModel_factory from '../types/constructors/default_interest_rate_model'
+import Faucet_factory from '../types/constructors/faucet'
 import Lens_factory from '../types/constructors/lens'
 import Manager_factory from '../types/constructors/manager'
 import Pool_factory from '../types/constructors/pool'
@@ -11,6 +12,7 @@ import PSP22Token_factory from '../types/constructors/psp22_token'
 
 import Controller from '../types/contracts/controller'
 import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
+import Faucet from '../types/contracts/faucet'
 import Lens from '../types/contracts/lens'
 import Manager from '../types/contracts/manager'
 import Pool from '../types/contracts/pool'
@@ -112,4 +114,13 @@ export const deployPSP22Token = async ({
   const factory = new PSP22Token_factory(api, signer)
   const contract = await factory.new(...args)
   return new PSP22Token(contract.address, signer, api)
+}
+
+export const deployFaucet = async ({
+  api,
+  signer,
+}: FactoryArgs): Promise<Faucet> => {
+  const factory = new Faucet_factory(api, signer)
+  const contract = await factory.new()
+  return new Faucet(contract.address, signer, api)
 }
