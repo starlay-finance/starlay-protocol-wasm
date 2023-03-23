@@ -89,6 +89,15 @@ pub mod contract {
             self._support_market(pool)
         }
         #[ink(message)]
+        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
+        fn set_collateral_factor_mantissa(
+            &mut self,
+            pool: AccountId,
+            new_collateral_factor_mantissa: WrappedU256,
+        ) -> Result<()> {
+            self._set_collateral_factor_mantissa(pool, new_collateral_factor_mantissa)
+        }
+        #[ink(message)]
         #[modifiers(access_control::only_role(PAUSE_GUARDIAN))]
         fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
             self._set_mint_guardian_paused(pool, paused)
@@ -118,6 +127,15 @@ pub mod contract {
         #[modifiers(access_control::only_role(BORROW_CAP_GUARDIAN))]
         fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()> {
             self._set_borrow_cap(pool, new_cap)
+        }
+        #[ink(message)]
+        #[modifiers(access_control::only_role(TOKEN_ADMIN))]
+        fn set_reserve_factor_mantissa(
+            &mut self,
+            pool: AccountId,
+            new_reserve_factor_mantissa: WrappedU256,
+        ) -> Result<()> {
+            self._set_reserve_factor_mantissa(pool, new_reserve_factor_mantissa)
         }
         #[ink(message)]
         #[modifiers(access_control::only_role(TOKEN_ADMIN))]
@@ -188,7 +206,10 @@ pub mod contract {
         };
         use logics::{
             impls::manager::Manager,
-            traits::manager::Error,
+            traits::{
+                manager::Error,
+                types::WrappedU256,
+            },
         };
         use openbrush::{
             contracts::access_control::{
@@ -287,6 +308,38 @@ pub mod contract {
                 .is_ok());
             assert_eq!(
                 contract.support_market(ZERO_ADDRESS.into()).unwrap_err(),
+                Error::AccessControl(AccessControlError::MissingRole)
+            );
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn set_collateral_factor_mantissa_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
+            assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
+            contract
+                .set_collateral_factor_mantissa(ZERO_ADDRESS.into(), WrappedU256::from(0))
+                .unwrap();
+        }
+        #[ink::test]
+        fn set_collateral_factor_mantissa_fails_by_no_authority() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
+            assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
+            assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
+            assert!(contract
+                .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
+                .is_ok());
+            assert_eq!(
+                contract
+                    .set_collateral_factor_mantissa(ZERO_ADDRESS.into(), WrappedU256::from(0))
+                    .unwrap_err(),
                 Error::AccessControl(AccessControlError::MissingRole)
             );
         }
@@ -443,6 +496,38 @@ pub mod contract {
             assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
             assert_eq!(
                 contract.set_borrow_cap(ZERO_ADDRESS.into(), 0).unwrap_err(),
+                Error::AccessControl(AccessControlError::MissingRole)
+            );
+        }
+
+        #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
+        fn set_reserve_factor_mantissa_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
+            assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
+            contract
+                .set_reserve_factor_mantissa(ZERO_ADDRESS.into(), WrappedU256::from(0))
+                .unwrap();
+        }
+        #[ink::test]
+        fn set_reserve_factor_mantissa_fails_by_no_authority() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
+            assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
+            assert!(contract
+                .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
+                .is_ok());
+            assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
+            assert_eq!(
+                contract
+                    .set_reserve_factor_mantissa(ZERO_ADDRESS.into(), WrappedU256::from(0))
+                    .unwrap_err(),
                 Error::AccessControl(AccessControlError::MissingRole)
             );
         }
