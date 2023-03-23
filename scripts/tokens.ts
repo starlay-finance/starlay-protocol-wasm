@@ -21,18 +21,23 @@ interface InterestRateModel {
   kink: BN
 }
 
-export const SUPPORTED_TOKENS: Token[] = [
-  {
-    decimal: 18,
-    symbol: 'WETH',
-    name: 'Wrapped Ether',
-    rateModel: {
-      baseRatePerYear: new BN(100).mul(ONE_ETHER),
-      multiplierPerYearSlope1: new BN(100).mul(ONE_ETHER),
-      multiplierPerYearSlope2: new BN(100).mul(ONE_ETHER),
-      kink: new BN(100).mul(ONE_ETHER),
-    },
+const TOKEN_BASE: Omit<Token, 'symbol' | 'name'> = {
+  decimal: 18,
+  rateModel: {
+    baseRatePerYear: new BN(100).mul(ONE_ETHER),
+    multiplierPerYearSlope1: new BN(100).mul(ONE_ETHER),
+    multiplierPerYearSlope2: new BN(100).mul(ONE_ETHER),
+    kink: new BN(100).mul(ONE_ETHER),
   },
+}
+
+export const SUPPORTED_TOKENS: Token[] = [
+  { symbol: 'WETH', name: 'Wrapped Ether', ...TOKEN_BASE },
+  // { symbol: 'WBTC', name: 'Wrapped Bitcoin', ...TOKEN_BASE },
+  // { symbol: 'DAI', name: 'Dai Stablecoin', ...TOKEN_BASE },
+  // { symbol: 'USDC', name: 'USD Coin', ...TOKEN_BASE, decimal: 6 },
+  // { symbol: 'ceUSDT', name: 'Tether USD', ...TOKEN_BASE, decimal: 6 },
+  // { symbol: 'USDT', name: 'Native Tether USD', ...TOKEN_BASE, decimal: 6 },
 ]
 
 export const DUMMY_TOKENS: DummyToken[] = SUPPORTED_TOKENS.map((t) => {

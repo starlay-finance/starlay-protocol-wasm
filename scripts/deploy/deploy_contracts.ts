@@ -4,21 +4,21 @@ import { BN } from '@polkadot/util'
 import PSP22Token from '../../types/contracts/psp22_token'
 import { deployer, provider } from '../helper/wallet_helper'
 import { DUMMY_TOKENS, Token } from '../tokens'
-import { Env } from './../env'
+import { ENV, Env } from './../env'
 import {
+  ZERO_ADDRESS,
   defaultArgs,
   deployController,
   deployDefaultInterestRateModel,
   deployLens,
   deployManager,
-  deployPool,
   deployPSP22Token,
+  deployPool,
   waitForTx,
-  ZERO_ADDRESS,
 } from './../helper/deploy_helper'
 
 const main = async () => {
-  await deployContracts(0)
+  await deployContracts(ENV.testnet)
 }
 const deployContracts = async (env: Env) => {
   const api = await provider(env)
