@@ -33,7 +33,7 @@ describe('Manager spec', () => {
     expect(
       (await manager.query.hasRole(ROLE.DEFAULT_ADMIN_ROLE, deployer.address))
         .value.ok,
-    ).toBeTruthy
+    ).toBeTruthy()
 
     // connections
     expect((await controller.query.manager()).value.ok).toBe(manager.address)
@@ -69,7 +69,7 @@ describe('Manager spec', () => {
       const { value: value2 } = await controller.query.borrowCap(poolAddr)
       expect(value2.ok).toEqual(10)
     })
-    it('.set_price_oracle', async () => {
+    it('.set_mint_guardian_paused', async () => {
       const { deployer, manager, controller } = await setup()
       const poolAddr = encodeAddress(
         '0x0000000000000000000000000000000000000000000000000000000000000000',
