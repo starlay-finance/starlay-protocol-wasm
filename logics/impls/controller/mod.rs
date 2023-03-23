@@ -773,8 +773,8 @@ impl<T: Storage<Data>> Internal for T {
 
         // set default states
         self._set_mint_guardian_paused(pool, false)?;
-        self._set_collateral_factor_mantissa(pool, WrappedU256::from(0))?;
         self._set_borrow_guardian_paused(pool, false)?;
+        // self._set_collateral_factor_mantissa(pool, WrappedU256::from(0))?; // TODO: enable to set in process of _support_market
         self._set_borrow_cap(pool, 0)?;
 
         Ok(())
@@ -784,9 +784,15 @@ impl<T: Storage<Data>> Internal for T {
         pool: &AccountId,
         new_collateral_factor_mantissa: WrappedU256,
     ) -> Result<()> {
-        // TODO: validations? (new_collateral_factor_mantissa is zero / pool underlying token price is zero?)
-        if U256::from(new_collateral_factor_mantissa).gt(&collateral_factor_max_mantissa()) {
+        let new_collateral_factor_mantissa_u256 = U256::from(new_collateral_factor_mantissa);
+        if new_collateral_factor_mantissa_u256.is_zero()
+            || new_collateral_factor_mantissa_u256.gt(&collateral_factor_max_mantissa())
+        {
             return Err(Error::InvalidCollateralFactor)
+        }
+
+        if let None | Some(0) = PriceOracleRef::get_underlying_price(&self._oracle(), *pool) {
+            return Err(Error::PriceError)
         }
 
         self.data()
