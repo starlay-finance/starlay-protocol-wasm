@@ -10,6 +10,7 @@ import {
   defaultArgs,
   deployController,
   deployDefaultInterestRateModel,
+  deployFaucet,
   deployLens,
   deployManager,
   deployPSP22Token,
@@ -70,6 +71,7 @@ const deployContracts = async (env: Env) => {
     })
   }
   await deployLens({ api, signer, args: [args] })
+  await deployFaucet({ api, signer, args: [args] })
 }
 
 const resolvePoolName = (token: string) => {

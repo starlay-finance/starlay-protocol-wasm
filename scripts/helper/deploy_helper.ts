@@ -124,9 +124,12 @@ const isTestEnv = (result: SignAndSendSuccessResponse) => {
 export const deployFaucet = async ({
   api,
   signer,
-}: FactoryArgs): Promise<Faucet> => {
+  args,
+}: FactoryArgs & {
+  args: Parameters<Lens_factory['new']>
+}): Promise<Faucet> => {
   const factory = new Faucet_factory(api, signer)
-  const contract = await factory.new()
+  const contract = await factory.new(...args)
   const result = new Faucet(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
