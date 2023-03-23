@@ -35,6 +35,12 @@ pub trait Manager {
     #[ink(message)]
     fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()>;
     #[ink(message)]
+    fn set_reserve_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        new_reserve_factor_mantissa: WrappedU256,
+    ) -> Result<()>;
+    #[ink(message)]
     fn reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
 }
 

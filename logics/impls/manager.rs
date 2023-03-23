@@ -31,6 +31,11 @@ pub trait Internal {
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()>;
     fn _set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()>;
+    fn _set_reserve_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        new_reserve_factor_mantissa: WrappedU256,
+    ) -> Result<()>;
     fn _reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
 }
 
@@ -67,6 +72,13 @@ impl<T: Storage<Data>> Manager for T {
     }
     default fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()> {
         self._set_borrow_cap(pool, new_cap)
+    }
+    default fn set_reserve_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        new_reserve_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        self._set_reserve_factor_mantissa(pool, new_reserve_factor_mantissa)
     }
     default fn reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
         self._reduce_reserves(pool, amount)
@@ -118,6 +130,14 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()> {
         ControllerRef::set_borrow_cap(&self._controller(), pool, new_cap).unwrap();
+        Ok(())
+    }
+    default fn _set_reserve_factor_mantissa(
+        &mut self,
+        pool: AccountId,
+        new_reserve_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        PoolRef::set_reserve_factor_mantissa(&pool, new_reserve_factor_mantissa).unwrap();
         Ok(())
     }
     default fn _reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
