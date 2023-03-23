@@ -120,6 +120,10 @@ pub trait Internal {
         borrower: AccountId,
         seize_tokens: Balance,
     ) -> Result<()>;
+    fn _set_reserve_factor_mantissa(
+        &mut self,
+        new_reserve_factor_mantissa: WrappedU256,
+    ) -> Result<()>;
     fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()>;
 
     fn _transfer_underlying_from(
@@ -297,6 +301,13 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
 
     default fn total_reserves(&self) -> Balance {
         self._total_reserves()
+    }
+
+    default fn set_reserve_factor_mantissa(
+        &mut self,
+        new_reserve_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        self._set_reserve_factor_mantissa(new_reserve_factor_mantissa)
     }
 
     default fn reduce_reserves(&mut self, amount: Balance) -> Result<()> {
@@ -852,6 +863,14 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         _reduce_amount: Balance,
         _total_reserves_new: Balance,
     ) {
+    }
+
+    default fn _set_reserve_factor_mantissa(
+        &mut self,
+        new_reserve_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        self.data::<Data>().reserve_factor_mantissa = new_reserve_factor_mantissa;
+        Ok(())
     }
 
     default fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()> {

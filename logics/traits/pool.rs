@@ -52,6 +52,13 @@ pub trait Pool: PSP22 {
         borrower: AccountId,
         seize_tokens: Balance,
     ) -> Result<()>;
+
+    #[ink(message)]
+    fn set_reserve_factor_mantissa(
+        &mut self,
+        new_reserve_factor_mantissa: WrappedU256,
+    ) -> Result<()>;
+
     #[ink(message)]
     fn reduce_reserves(&mut self, amount: Balance) -> Result<()>;
 
