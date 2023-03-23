@@ -81,11 +81,6 @@ pub mod contract {
 
     impl Pool for PoolContract {
         #[ink(message)]
-        fn redeem_underlying(&mut self, _redeem_tokens: Balance) -> Result<()> {
-            Err(Error::NotImplemented)
-        }
-
-        #[ink(message)]
         fn repay_borrow_behalf(
             &mut self,
             _borrower: AccountId,
@@ -346,6 +341,9 @@ pub mod contract {
         }
 
         #[ink::test]
+        #[should_panic(
+            expected = "not implemented: off-chain environment does not support contract invocation"
+        )]
         fn redeem_underlying_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
@@ -360,10 +358,7 @@ pub mod contract {
                 8,
             );
 
-            assert_eq!(
-                contract.redeem_underlying(0).unwrap_err(),
-                Error::NotImplemented
-            )
+            contract.redeem_underlying(0).unwrap();
         }
 
         #[ink::test]
