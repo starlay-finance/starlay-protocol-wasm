@@ -1,6 +1,4 @@
 import type { KeyringPair } from '@polkadot/keyring/types'
-import { BN } from '@polkadot/util'
-import { ONE_ETHER } from '../scripts/tokens'
 import Controller from '../types/contracts/controller'
 import Lens from '../types/contracts/lens'
 import Pool from '../types/contracts/pool'
@@ -47,12 +45,7 @@ const setup = async () => {
   const interestRateModel = await deployDefaultInterestRateModel({
     api,
     signer: deployer,
-    args: [
-      [new BN(100).mul(ONE_ETHER).toString()],
-      [new BN(100).mul(ONE_ETHER).toString()],
-      [new BN(100).mul(ONE_ETHER).toString()],
-      [new BN(100).mul(ONE_ETHER).toString()],
-    ],
+    args: [[0], [0], [0], [0]],
   })
 
   const pool1 = await deployPoolFromAsset({
