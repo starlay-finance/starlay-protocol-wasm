@@ -447,27 +447,38 @@ impl<T: Storage<Data>> Controller for T {
         new_collateral_factor_mantissa: WrappedU256,
     ) -> Result<()> {
         self._assert_manager()?;
-        self._set_collateral_factor_mantissa(&pool, new_collateral_factor_mantissa)
+        let old = self._collateral_factor_mantissa(pool).unwrap_or_default();
+        self._set_collateral_factor_mantissa(&pool, new_collateral_factor_mantissa)?;
+        self._emit_new_collateral_factor_event(pool, old, new_collateral_factor_mantissa);
+        Ok(())
     }
 
     default fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
         self._assert_manager()?;
-        self._set_mint_guardian_paused(&pool, paused)
+        self._set_mint_guardian_paused(&pool, paused)?;
+        self._emit_pool_action_paused_event(pool, String::from("Mint"), paused);
+        Ok(())
     }
 
     default fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
         self._assert_manager()?;
-        self._set_borrow_guardian_paused(&pool, paused)
+        self._set_borrow_guardian_paused(&pool, paused)?;
+        self._emit_pool_action_paused_event(pool, String::from("Borrow"), paused);
+        Ok(())
     }
 
     default fn set_seize_guardian_paused(&mut self, paused: bool) -> Result<()> {
         self._assert_manager()?;
-        self._set_seize_guardian_paused(paused)
+        self._set_seize_guardian_paused(paused)?;
+        self._emit_action_paused_event(String::from("Seize"), paused);
+        Ok(())
     }
 
     default fn set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()> {
         self._assert_manager()?;
-        self._set_transfer_guardian_paused(paused)
+        self._set_transfer_guardian_paused(paused)?;
+        self._emit_action_paused_event(String::from("Transfer"), paused);
+        Ok(())
     }
 
     default fn set_close_factor_mantissa(
@@ -475,7 +486,10 @@ impl<T: Storage<Data>> Controller for T {
         new_close_factor_mantissa: WrappedU256,
     ) -> Result<()> {
         self._assert_manager()?;
-        self._set_close_factor_mantissa(new_close_factor_mantissa)
+        let old = self._close_factor_mantissa();
+        self._set_close_factor_mantissa(new_close_factor_mantissa)?;
+        self._emit_new_close_factor_event(old, new_close_factor_mantissa);
+        Ok(())
     }
 
     default fn set_liquidation_incentive_mantissa(
@@ -483,12 +497,17 @@ impl<T: Storage<Data>> Controller for T {
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()> {
         self._assert_manager()?;
-        self._set_liquidation_incentive_mantissa(new_liquidation_incentive_mantissa)
+        let old = self._liquidation_incentive_mantissa();
+        self._set_liquidation_incentive_mantissa(new_liquidation_incentive_mantissa)?;
+        self._emit_new_liquidation_incentive_event(old, new_liquidation_incentive_mantissa);
+        Ok(())
     }
 
     default fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()> {
         self._assert_manager()?;
-        self._set_borrow_cap(&pool, new_cap)
+        self._set_borrow_cap(&pool, new_cap)?;
+        self._emit_new_borrow_cap_event(pool, new_cap);
+        Ok(())
     }
 
     default fn markets(&self) -> Vec<AccountId> {
