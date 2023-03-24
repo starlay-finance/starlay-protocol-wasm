@@ -171,6 +171,8 @@ pub trait Internal {
         repay_amount: Balance,
     ) -> Result<Balance>;
     fn _assert_manager(&self) -> Result<()>;
+
+    // admin functions
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
     fn _support_market(
         &mut self,
@@ -219,6 +221,18 @@ pub trait Internal {
 
     // event emission
     fn _emit_market_listed_event(&self, pool: AccountId);
+    fn _emit_new_collateral_factor_event(
+        &self,
+        pool: AccountId,
+        old: WrappedU256,
+        new: WrappedU256,
+    );
+    fn _emit_pool_action_paused_event(&self, pool: AccountId, action: String, paused: bool);
+    fn _emit_action_paused_event(&self, action: String, paused: bool);
+    fn _emit_new_price_oracle_event(&self, old: WrappedU256, new: WrappedU256);
+    fn _emit_new_close_factor_event(&self, old: WrappedU256, new: WrappedU256);
+    fn _emit_new_liquidation_incentive_event(&self, old: WrappedU256, new: WrappedU256);
+    fn _emit_new_borrow_cap_event(&self, pool: AccountId, new: Balance);
 }
 
 impl<T: Storage<Data>> Controller for T {
@@ -983,4 +997,23 @@ impl<T: Storage<Data>> Internal for T {
     }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}
+    default fn _emit_new_collateral_factor_event(
+        &self,
+        _pool: AccountId,
+        _old: WrappedU256,
+        _new: WrappedU256,
+    ) {
+    }
+    default fn _emit_pool_action_paused_event(
+        &self,
+        _pool: AccountId,
+        _action: String,
+        _paused: bool,
+    ) {
+    }
+    default fn _emit_action_paused_event(&self, _action: String, _paused: bool) {}
+    default fn _emit_new_price_oracle_event(&self, _old: WrappedU256, _new: WrappedU256) {}
+    default fn _emit_new_close_factor_event(&self, _old: WrappedU256, _new: WrappedU256) {}
+    default fn _emit_new_liquidation_incentive_event(&self, _old: WrappedU256, _new: WrappedU256) {}
+    default fn _emit_new_borrow_cap_event(&self, _pool: AccountId, _new: Balance) {}
 }
