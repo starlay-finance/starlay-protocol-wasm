@@ -82,6 +82,22 @@ pub mod contract {
         add_amount: Balance,
         new_total_reserves: Balance,
     }
+    #[ink(event)]
+    pub struct Transfer {
+        #[ink(topic)]
+        from: Option<AccountId>,
+        #[ink(topic)]
+        to: Option<AccountId>,
+        value: Balance,
+    }
+    #[ink(event)]
+    pub struct Approval {
+        #[ink(topic)]
+        owner: AccountId,
+        #[ink(topic)]
+        spender: AccountId,
+        value: Balance,
+    }
 
     impl Pool for PoolContract {
         #[ink(message)]
@@ -209,6 +225,24 @@ pub mod contract {
             data: Vec<u8>,
         ) -> core::result::Result<(), PSP22Error> {
             self._transfer_tokens(self.env().caller(), from, to, value, data)
+        }
+    }
+    impl psp22::Internal for PoolContract {
+        fn _emit_transfer_event(
+            &self,
+            from: Option<AccountId>,
+            to: Option<AccountId>,
+            value: Balance,
+        ) {
+            self.env().emit_event(Transfer { from, to, value });
+        }
+
+        fn _emit_approval_event(&self, owner: AccountId, spender: AccountId, value: Balance) {
+            self.env().emit_event(Approval {
+                owner,
+                spender,
+                value,
+            });
         }
     }
 
