@@ -230,7 +230,7 @@ pub trait Internal {
     );
     fn _emit_pool_action_paused_event(&self, pool: AccountId, action: String, paused: bool);
     fn _emit_action_paused_event(&self, action: String, paused: bool);
-    fn _emit_new_price_oracle_event(&self, old: WrappedU256, new: WrappedU256);
+    fn _emit_new_price_oracle_event(&self, old: AccountId, new: AccountId);
     fn _emit_new_close_factor_event(&self, old: WrappedU256, new: WrappedU256);
     fn _emit_new_liquidation_incentive_event(&self, old: WrappedU256, new: WrappedU256);
     fn _emit_new_borrow_cap_event(&self, pool: AccountId, new: Balance);
@@ -421,7 +421,10 @@ impl<T: Storage<Data>> Controller for T {
 
     default fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
         self._assert_manager()?;
-        self._set_price_oracle(new_oracle)
+        let old = self._oracle();
+        self._set_price_oracle(new_oracle)?;
+        self._emit_new_price_oracle_event(old, new_oracle);
+        Ok(())
     }
 
     default fn support_market(&mut self, pool: AccountId) -> Result<()> {
@@ -1032,7 +1035,7 @@ impl<T: Storage<Data>> Internal for T {
     ) {
     }
     default fn _emit_action_paused_event(&self, _action: String, _paused: bool) {}
-    default fn _emit_new_price_oracle_event(&self, _old: WrappedU256, _new: WrappedU256) {}
+    default fn _emit_new_price_oracle_event(&self, _old: AccountId, _new: AccountId) {}
     default fn _emit_new_close_factor_event(&self, _old: WrappedU256, _new: WrappedU256) {}
     default fn _emit_new_liquidation_incentive_event(&self, _old: WrappedU256, _new: WrappedU256) {}
     default fn _emit_new_borrow_cap_event(&self, _pool: AccountId, _new: Balance) {}
