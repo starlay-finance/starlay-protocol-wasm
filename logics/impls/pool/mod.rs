@@ -334,6 +334,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         &mut self,
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()> {
+        self._assert_manager()?;
         self._set_reserve_factor_mantissa(new_reserve_factor_mantissa)
     }
 
@@ -957,8 +958,6 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         &mut self,
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()> {
-        self._assert_manager()?;
-
         self._accrue_interest()?;
 
         let current_timestamp = Self::env().block_timestamp();
