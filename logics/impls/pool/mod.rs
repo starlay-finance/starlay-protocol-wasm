@@ -138,6 +138,8 @@ pub trait Internal {
         borrower: AccountId,
         seize_tokens: Balance,
     ) -> Result<()>;
+
+    // admin functions
     fn _set_controller(&mut self, new_controller: AccountId) -> Result<()>;
     fn _set_reserve_factor_mantissa(
         &mut self,
@@ -148,6 +150,7 @@ pub trait Internal {
     fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()>;
     fn _sweep_token(&mut self, asset: AccountId) -> Result<()>;
 
+    // utilities
     fn _transfer_underlying_from(
         &self,
         from: AccountId,
@@ -155,9 +158,9 @@ pub trait Internal {
         value: Balance,
     ) -> Result<()>;
     fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()>;
-
     fn _assert_manager(&self) -> Result<()>;
 
+    // view functions
     fn _underlying(&self) -> AccountId;
     fn _controller(&self) -> AccountId;
     fn _manager(&self) -> AccountId;
@@ -295,39 +298,6 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         self._seize(Self::env().caller(), liquidator, borrower, seize_tokens)
     }
 
-    default fn underlying(&self) -> AccountId {
-        self._underlying()
-    }
-
-    default fn controller(&self) -> AccountId {
-        self._controller()
-    }
-
-    default fn manager(&self) -> AccountId {
-        self._manager()
-    }
-
-    default fn exchage_rate_stored(&self) -> WrappedU256 {
-        WrappedU256::from(self._exchange_rate_stored())
-    }
-
-    default fn exchange_rate_current(&mut self) -> Result<WrappedU256> {
-        self._accrue_interest()?;
-        Ok(self.exchage_rate_stored())
-    }
-
-    default fn get_cash_prior(&self) -> Balance {
-        self._get_cash_prior()
-    }
-
-    default fn total_borrows(&self) -> Balance {
-        self._total_borrows()
-    }
-
-    default fn total_reserves(&self) -> Balance {
-        self._total_reserves()
-    }
-
     default fn set_controller(&mut self, new_controller: AccountId) -> Result<()> {
         self._assert_manager()?;
         let old = self._controller();
@@ -372,6 +342,39 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
     default fn sweep_token(&mut self, asset: AccountId) -> Result<()> {
         self._assert_manager()?;
         self._sweep_token(asset)
+    }
+
+    default fn underlying(&self) -> AccountId {
+        self._underlying()
+    }
+
+    default fn controller(&self) -> AccountId {
+        self._controller()
+    }
+
+    default fn manager(&self) -> AccountId {
+        self._manager()
+    }
+
+    default fn exchage_rate_stored(&self) -> WrappedU256 {
+        WrappedU256::from(self._exchange_rate_stored())
+    }
+
+    default fn exchange_rate_current(&mut self) -> Result<WrappedU256> {
+        self._accrue_interest()?;
+        Ok(self.exchage_rate_stored())
+    }
+
+    default fn get_cash_prior(&self) -> Balance {
+        self._get_cash_prior()
+    }
+
+    default fn total_borrows(&self) -> Balance {
+        self._total_borrows()
+    }
+
+    default fn total_reserves(&self) -> Balance {
+        self._total_reserves()
     }
 
     default fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256) {
@@ -778,7 +781,97 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         Ok(())
     }
 
-    fn _transfer_underlying_from(
+    // admin functions
+    default fn _set_controller(&mut self, new_controller: AccountId) -> Result<()> {
+        self.data::<Data>().controller = new_controller;
+        Ok(())
+    }
+
+    default fn _set_reserve_factor_mantissa(
+        &mut self,
+        new_reserve_factor_mantissa: WrappedU256,
+    ) -> Result<()> {
+        self._accrue_interest()?;
+
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        }
+
+        if U256::from(new_reserve_factor_mantissa).gt(&reserve_factor_max_mantissa()) {
+            return Err(Error::SetReserveFactorBoundsCheck)
+        }
+
+        self.data::<Data>().reserve_factor_mantissa = new_reserve_factor_mantissa;
+        Ok(())
+    }
+
+    default fn _set_interest_rate_model(
+        &mut self,
+        new_interest_rate_model: AccountId,
+    ) -> Result<()> {
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        }
+
+        self.data::<Data>().rate_model = new_interest_rate_model;
+        Ok(())
+    }
+
+    default fn _add_reserves(&mut self, amount: Balance) -> Result<()> {
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        }
+
+        let total_reserves_new = self._total_reserves().add(amount);
+        self.data::<Data>().total_reserves = total_reserves_new;
+        let caller = Self::env().caller();
+        self._transfer_underlying_from(caller, Self::env().account_id(), amount)
+            .unwrap();
+
+        // event
+        self._emit_reserves_added_event(caller, amount, total_reserves_new);
+
+        Ok(())
+    }
+
+    default fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()> {
+        let current_timestamp = Self::env().block_timestamp();
+        if self._accural_block_timestamp() != current_timestamp {
+            return Err(Error::AccrualBlockNumberIsNotFresh)
+        }
+
+        if self._get_cash_prior().lt(&amount) {
+            return Err(Error::ReduceReservesCashNotAvailable)
+        }
+        if self._total_reserves().lt(&amount) {
+            return Err(Error::ReduceReservesCashValidation)
+        }
+        let total_reserves_new = self._total_reserves().sub(amount);
+        let mut data = self.data::<Data>();
+        data.total_reserves = total_reserves_new;
+        self._transfer_underlying(admin, amount).unwrap();
+
+        // event
+        self._emit_reserves_reduced_event(amount, total_reserves_new);
+        Ok(())
+    }
+
+    default fn _sweep_token(&mut self, asset: AccountId) -> Result<()> {
+        if asset == self._underlying() {
+            return Err(Error::CannotSweepUnderlyingToken)
+        }
+
+        let balance = PSP22Ref::balance_of(&asset, Self::env().account_id());
+        PSP22Ref::transfer(&asset, Self::env().caller(), balance, Vec::<u8>::new())
+            .map_err(to_psp22_error)?;
+        Ok(())
+    }
+
+    // utilities
+    default fn _transfer_underlying_from(
         &self,
         from: AccountId,
         to: AccountId,
@@ -791,7 +884,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             .unwrap()
             .map_err(to_psp22_error)
     }
-    fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()> {
+
+    default fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()> {
         PSP22Ref::transfer(&self._underlying(), to, value, Vec::<u8>::new()).map_err(to_psp22_error)
     }
 
@@ -802,6 +896,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         Ok(())
     }
 
+    // view functions
     default fn _underlying(&self) -> AccountId {
         self.data::<Data>().underlying
     }
@@ -896,6 +991,15 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         self.data::<Data>().reserve_factor_mantissa
     }
 
+    default fn _exchange_rate_stored(&self) -> U256 {
+        exchange_rate(
+            self.total_supply(),
+            self._get_cash_prior(),
+            self._total_borrows(),
+            self._total_reserves(),
+        )
+    }
+
     // event emission
     default fn _emit_mint_event(
         &self,
@@ -964,103 +1068,6 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     default fn _emit_new_controller_event(&self, _old: AccountId, _new: AccountId) {}
     default fn _emit_new_interest_rate_model_event(&self, _old: AccountId, _new: AccountId) {}
     default fn _emit_new_reserve_factor_event(&self, _old: WrappedU256, _new: WrappedU256) {}
-
-    default fn _set_controller(&mut self, new_controller: AccountId) -> Result<()> {
-        self.data::<Data>().controller = new_controller;
-        Ok(())
-    }
-
-    default fn _set_reserve_factor_mantissa(
-        &mut self,
-        new_reserve_factor_mantissa: WrappedU256,
-    ) -> Result<()> {
-        self._accrue_interest()?;
-
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accural_block_timestamp() != current_timestamp {
-            return Err(Error::AccrualBlockNumberIsNotFresh)
-        }
-
-        if U256::from(new_reserve_factor_mantissa).gt(&reserve_factor_max_mantissa()) {
-            return Err(Error::SetReserveFactorBoundsCheck)
-        }
-
-        self.data::<Data>().reserve_factor_mantissa = new_reserve_factor_mantissa;
-        Ok(())
-    }
-
-    default fn _set_interest_rate_model(
-        &mut self,
-        new_interest_rate_model: AccountId,
-    ) -> Result<()> {
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accural_block_timestamp() != current_timestamp {
-            return Err(Error::AccrualBlockNumberIsNotFresh)
-        }
-
-        self.data::<Data>().rate_model = new_interest_rate_model;
-        Ok(())
-    }
-
-    default fn _add_reserves(&mut self, amount: Balance) -> Result<()> {
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accural_block_timestamp() != current_timestamp {
-            return Err(Error::AccrualBlockNumberIsNotFresh)
-        }
-
-        let total_reserves_new = self._total_reserves().add(amount);
-        self.data::<Data>().total_reserves = total_reserves_new;
-        let caller = Self::env().caller();
-        self._transfer_underlying_from(caller, Self::env().account_id(), amount)
-            .unwrap();
-
-        // event
-        self._emit_reserves_added_event(caller, amount, total_reserves_new);
-
-        Ok(())
-    }
-
-    default fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()> {
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accural_block_timestamp() != current_timestamp {
-            return Err(Error::AccrualBlockNumberIsNotFresh)
-        }
-
-        if self._get_cash_prior().lt(&amount) {
-            return Err(Error::ReduceReservesCashNotAvailable)
-        }
-        if self._total_reserves().lt(&amount) {
-            return Err(Error::ReduceReservesCashValidation)
-        }
-        let total_reserves_new = self._total_reserves().sub(amount);
-        let mut data = self.data::<Data>();
-        data.total_reserves = total_reserves_new;
-        self._transfer_underlying(admin, amount).unwrap();
-
-        // event
-        self._emit_reserves_reduced_event(amount, total_reserves_new);
-        Ok(())
-    }
-
-    default fn _sweep_token(&mut self, asset: AccountId) -> Result<()> {
-        if asset == self._underlying() {
-            return Err(Error::CannotSweepUnderlyingToken)
-        }
-
-        let balance = PSP22Ref::balance_of(&asset, Self::env().account_id());
-        PSP22Ref::transfer(&asset, Self::env().caller(), balance, Vec::<u8>::new())
-            .map_err(to_psp22_error)?;
-        Ok(())
-    }
-
-    default fn _exchange_rate_stored(&self) -> U256 {
-        exchange_rate(
-            self.total_supply(),
-            self._get_cash_prior(),
-            self._total_borrows(),
-            self._total_reserves(),
-        )
-    }
 }
 
 pub fn to_psp22_error(e: PSP22Error) -> Error {
