@@ -228,7 +228,10 @@ pub trait Internal {
         add_amount: Balance,
         new_total_reserves: Balance,
     );
-    fn _emit_reserves_reduced_event(&self, _reduce_amount: Balance, _total_reserves_new: Balance);
+    fn _emit_reserves_reduced_event(&self, reduce_amount: Balance, total_reserves_new: Balance);
+    fn _emit_new_controller_event(&self, old: AccountId, new: AccountId);
+    fn _emit_new_interest_rate_model_event(&self, old: AccountId, new: AccountId);
+    fn _emit_new_reserve_factor_event(&self, old: AccountId, new: AccountId);
 }
 
 impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
@@ -947,6 +950,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         _total_reserves_new: Balance,
     ) {
     }
+
+    default fn _emit_new_controller_event(&self, _old: AccountId, _new: AccountId) {}
+    default fn _emit_new_interest_rate_model_event(&self, _old: AccountId, _new: AccountId) {}
+    default fn _emit_new_reserve_factor_event(&self, _old: AccountId, _new: AccountId) {}
 
     default fn _set_controller(&mut self, new_controller: AccountId) -> Result<()> {
         self.data::<Data>().controller = new_controller;
