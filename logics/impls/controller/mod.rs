@@ -15,6 +15,7 @@ use openbrush::{
         AccountId,
         Balance,
         Storage,
+        String,
         ZERO_ADDRESS,
     },
 };
