@@ -252,6 +252,13 @@ pub mod contract {
                 _ => panic!("unexpected event kind: expected RoleGranted event"),
             }
         }
+        fn decode_role_revoked_event(event: test::EmittedEvent) -> RoleRevoked {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..]);
+            match decoded_event {
+                Ok(Event::RoleRevoked(x)) => return x,
+                _ => panic!("unexpected event kind: expected RoleRevoked event"),
+            }
+        }
 
         #[ink::test]
         fn new_works() {
@@ -268,6 +275,38 @@ pub mod contract {
             assert_eq!(event.role, DEFAULT_ADMIN_ROLE);
             assert_eq!(event.grantee, accounts.bob);
             assert_eq!(event.grantor, None);
+        }
+
+        #[ink::test]
+        fn events_in_access_control_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
+            assert!(contract.has_role(DEFAULT_ADMIN_ROLE, accounts.bob));
+
+            {
+                assert!(contract
+                    .grant_role(CONTROLLER_ADMIN, accounts.alice)
+                    .is_ok());
+                let events = get_emitted_events();
+                assert_eq!(events.len(), 2);
+                let event = decode_role_granted_event(events[1].clone());
+                assert_eq!(event.role, CONTROLLER_ADMIN);
+                assert_eq!(event.grantee, accounts.alice);
+                assert_eq!(event.grantor, Some(accounts.bob));
+            }
+            {
+                assert!(contract
+                    .revoke_role(CONTROLLER_ADMIN, accounts.alice)
+                    .is_ok());
+                let events = get_emitted_events();
+                assert_eq!(events.len(), 3);
+                let event = decode_role_revoked_event(events[2].clone());
+                assert_eq!(event.role, CONTROLLER_ADMIN);
+                assert_eq!(event.account, accounts.alice);
+                assert_eq!(event.admin, accounts.bob);
+            }
         }
 
         #[ink::test]
