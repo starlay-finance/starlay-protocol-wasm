@@ -65,11 +65,12 @@ const setup = async () => {
   const priceOracle = await deployPriceOracle({
     api,
     signer: deployer,
+    args: [],
   })
 
   const users = [bob, charlie]
 
-  const faucet = await deployFaucet({ api, signer: deployer })
+  const faucet = await deployFaucet({ api, signer: deployer, args: [] })
 
   // initialize
   await controller.tx.supportMarket(pool1.address)
