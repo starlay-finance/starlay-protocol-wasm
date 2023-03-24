@@ -1014,6 +1014,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let caller = Self::env().caller();
         self._transfer_underlying_from(caller, Self::env().account_id(), amount)
             .unwrap();
+
+        // event
         self._emit_reserves_added_event(caller, amount, total_reserves_new);
 
         Ok(())
@@ -1035,6 +1037,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let mut data = self.data::<Data>();
         data.total_reserves = total_reserves_new;
         self._transfer_underlying(admin, amount).unwrap();
+
+        // event
         self._emit_reserves_reduced_event(amount, total_reserves_new);
         Ok(())
     }
