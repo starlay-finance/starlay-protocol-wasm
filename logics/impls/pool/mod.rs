@@ -231,7 +231,7 @@ pub trait Internal {
     fn _emit_reserves_reduced_event(&self, reduce_amount: Balance, total_reserves_new: Balance);
     fn _emit_new_controller_event(&self, old: AccountId, new: AccountId);
     fn _emit_new_interest_rate_model_event(&self, old: AccountId, new: AccountId);
-    fn _emit_new_reserve_factor_event(&self, old: AccountId, new: AccountId);
+    fn _emit_new_reserve_factor_event(&self, old: WrappedU256, new: WrappedU256);
 }
 
 impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
@@ -330,14 +330,20 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
 
     default fn set_controller(&mut self, new_controller: AccountId) -> Result<()> {
         self._assert_manager()?;
-        self._set_controller(new_controller)
+        let old = self._controller();
+        self._set_controller(new_controller)?;
+        self._emit_new_controller_event(old, new_controller);
+        Ok(())
     }
 
     default fn set_reserve_factor_mantissa(
         &mut self,
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()> {
-        self._set_reserve_factor_mantissa(new_reserve_factor_mantissa)
+        let old = self._reserve_factor_mantissa();
+        self._set_reserve_factor_mantissa(new_reserve_factor_mantissa)?;
+        self._emit_new_reserve_factor_event(old, new_reserve_factor_mantissa);
+        Ok(())
     }
 
     default fn set_interest_rate_model(
@@ -345,7 +351,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         new_interest_rate_model: AccountId,
     ) -> Result<()> {
         self._assert_manager()?;
-        self._set_interest_rate_model(new_interest_rate_model)
+        let old = self._rate_model();
+        self._set_interest_rate_model(new_interest_rate_model)?;
+        self._emit_new_interest_rate_model_event(old, new_interest_rate_model);
+        Ok(())
     }
 
     default fn add_reserves(&mut self, amount: Balance) -> Result<()> {
@@ -953,7 +962,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
     default fn _emit_new_controller_event(&self, _old: AccountId, _new: AccountId) {}
     default fn _emit_new_interest_rate_model_event(&self, _old: AccountId, _new: AccountId) {}
-    default fn _emit_new_reserve_factor_event(&self, _old: AccountId, _new: AccountId) {}
+    default fn _emit_new_reserve_factor_event(&self, _old: WrappedU256, _new: WrappedU256) {}
 
     default fn _set_controller(&mut self, new_controller: AccountId) -> Result<()> {
         self.data::<Data>().controller = new_controller;
