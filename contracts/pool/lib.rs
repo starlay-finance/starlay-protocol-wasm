@@ -229,12 +229,12 @@ pub mod contract {
 
         #[ink(message)]
         fn balance_of(&self, owner: AccountId) -> Balance {
-            self._balance_of(&owner)
+            Internal::_balance_of(self, &owner)
         }
 
         #[ink(message)]
         fn total_supply(&self) -> Balance {
-            self._total_supply()
+            Internal::_total_supply(self)
         }
     }
     impl psp22::Internal for PoolContract {
