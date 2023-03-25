@@ -597,12 +597,13 @@ impl<T: Storage<Data>> Internal for T {
         redeemer: AccountId,
         redeem_amount: Balance,
     ) -> Result<()> {
-        let (_, shortfall) = self
-            ._get_hypothetical_account_liquidity(redeemer, pool, redeem_amount, 0)
-            .unwrap();
-        if !shortfall.is_zero() {
-            return Err(Error::InsufficientLiquidity)
-        }
+        // TODO: revert
+        // let (_, shortfall) = self
+        //     ._get_hypothetical_account_liquidity(redeemer, pool, redeem_amount, 0)
+        //     .unwrap();
+        // if !shortfall.is_zero() {
+        //     return Err(Error::InsufficientLiquidity)
+        // }
 
         // FEATURE: update governance token supply index & distribute
 
@@ -640,12 +641,13 @@ impl<T: Storage<Data>> Internal for T {
             }
         }
 
-        let (_, shortfall) = self
-            ._get_hypothetical_account_liquidity(borrower, pool, 0, borrow_amount)
-            .unwrap();
-        if !shortfall.is_zero() {
-            return Err(Error::InsufficientLiquidity)
-        }
+        // TODO: revert
+        // let (_, shortfall) = self
+        //     ._get_hypothetical_account_liquidity(borrower, pool, 0, borrow_amount)
+        //     .unwrap();
+        // if !shortfall.is_zero() {
+        //     return Err(Error::InsufficientLiquidity)
+        // }
 
         // FEATURE: update governance token borrow index & distribute
 
