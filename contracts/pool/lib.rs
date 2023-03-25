@@ -226,6 +226,16 @@ pub mod contract {
         ) -> core::result::Result<(), PSP22Error> {
             self._transfer_tokens(self.env().caller(), from, to, value, data)
         }
+
+        #[ink(message)]
+        fn balance_of(&self, owner: AccountId) -> Balance {
+            Internal::_balance_of(self, &owner)
+        }
+
+        #[ink(message)]
+        fn total_supply(&self) -> Balance {
+            Internal::_total_supply(self)
+        }
     }
     impl psp22::Internal for PoolContract {
         fn _emit_transfer_event(
@@ -428,7 +438,7 @@ pub mod contract {
         #[should_panic(
             expected = "not implemented: off-chain environment does not support contract invocation"
         )]
-        fn transfer_works_overrided() {
+        fn transfer_works_overridden() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
@@ -449,7 +459,7 @@ pub mod contract {
         #[should_panic(
             expected = "not implemented: off-chain environment does not support contract invocation"
         )]
-        fn transfer_from_works_overrided() {
+        fn transfer_from_works_overridden() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 

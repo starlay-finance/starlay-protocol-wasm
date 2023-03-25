@@ -95,8 +95,6 @@ pub trait Pool: PSP22 {
     #[ink(message)]
     fn borrow_balance_current(&mut self, account: AccountId) -> Result<Balance>;
     #[ink(message)]
-    fn balance_of_underlying_current(&mut self, account: AccountId) -> Result<Balance>;
-    #[ink(message)]
     fn get_accrual_block_timestamp(&self) -> Timestamp;
     #[ink(message)]
     fn borrow_rate_per_msec(&self) -> WrappedU256;
