@@ -162,7 +162,7 @@ pub mod contract {
                     .unwrap_or_default(),
                 is_listed: ControllerRef::is_listed(&controller, pool),
                 total_cash: PoolRef::get_cash_prior(&pool),
-                total_supply: PoolRef::total_supply(&pool),
+                total_supply: PSP22Ref::total_supply(&pool),
                 total_borrows: PoolRef::total_borrows(&pool),
                 total_reserves: PoolRef::total_reserves(&pool),
                 exchange_rate_current: PoolRef::exchange_rate_current(&pool).unwrap_or_default(),
