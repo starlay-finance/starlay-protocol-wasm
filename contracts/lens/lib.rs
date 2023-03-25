@@ -182,7 +182,7 @@ pub mod contract {
             let underlying = PoolRef::underlying(&pool);
             PoolBalances {
                 pool,
-                balance_of: PoolRef::balance_of(&pool, account),
+                balance_of: PSP22Ref::balance_of(&pool, account),
 
                 borrow_balance_current: PoolRef::borrow_balance_current(&pool, account)
                     .unwrap_or_default(),
