@@ -1,13 +1,16 @@
 import type { KeyringPair } from '@polkadot/keyring/types'
+import { BN } from '@polkadot/util'
 import { hexToUtf8, shouldNotRevert, zeroAddress } from './testHelpers'
 
 import Pool from '../types/contracts/pool'
 
 import {
   deployController,
-  deployPSP22Token,
+  deployDefaultInterestRateModel,
   deployPoolFromAsset,
+  deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
+import { ONE_ETHER } from '../scripts/tokens'
 import PSP22Token from '../types/contracts/psp22_token'
 
 describe('Pool spec', () => {
@@ -31,10 +34,24 @@ describe('Pool spec', () => {
       args: [deployer.address],
     })
 
+    // temp: declare params for rate_model
+    const toParam = (m: BN) => [m.toString()]
+    const rateModelArg = new BN(100).mul(ONE_ETHER)
+    const rateModel = await deployDefaultInterestRateModel({
+      api,
+      signer: deployer,
+      args: [
+        toParam(rateModelArg),
+        toParam(rateModelArg),
+        toParam(rateModelArg),
+        toParam(rateModelArg),
+      ],
+    })
+
     const pool = await deployPoolFromAsset({
       api,
       signer: deployer,
-      args: [token.address, controller.address, zeroAddress],
+      args: [token.address, controller.address, rateModel.address],
       token,
     })
     const users = [bob, charlie]
