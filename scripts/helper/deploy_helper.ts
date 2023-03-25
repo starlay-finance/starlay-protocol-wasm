@@ -177,7 +177,7 @@ export const deployPoolFromAsset = async ({
   const name = `Starlay ${hexToUtf8(
     (await token.query.tokenName()).value.ok,
   )}` as unknown as string[]
-  const symbol = `s${(await token.query.tokenSymbol()).value.ok}
+  const symbol = `s${hexToUtf8((await token.query.tokenSymbol()).value.ok)}
   ` as unknown as string[]
   const decimals = (await token.query.tokenDecimals()).value.ok
   const contract = await factory.new(...args, name, symbol, decimals, option)
