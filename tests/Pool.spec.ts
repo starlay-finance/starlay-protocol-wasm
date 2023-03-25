@@ -8,6 +8,7 @@ import {
   deployController,
   deployDefaultInterestRateModel,
   deployPoolFromAsset,
+  deployPriceOracle,
   deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
 import { ONE_ETHER } from '../scripts/tokens'
@@ -33,6 +34,11 @@ describe('Pool spec', () => {
       signer: deployer,
       args: [deployer.address],
     })
+    const priceOracle = await deployPriceOracle({
+      api,
+      signer: deployer,
+      args: [],
+    })
 
     // temp: declare params for rate_model
     const toParam = (m: BN) => [m.toString()]
@@ -57,7 +63,14 @@ describe('Pool spec', () => {
     const users = [bob, charlie]
 
     // initialize
+    await controller.tx.setPriceOracle(priceOracle.address)
+    //// for pool
     await controller.tx.supportMarket(pool.address)
+    await priceOracle.tx.setFixedPrice(token.address, ONE_ETHER)
+    await controller.tx.setCollateralFactorMantissa(
+      pool.address,
+      toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+    )
 
     return { api, deployer, token, pool, rateModel, controller, users }
   }
