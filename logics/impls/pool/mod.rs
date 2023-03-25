@@ -498,9 +498,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         };
 
+        let exchange_rate = self._exchange_rate_stored(); // NOTE: need exchange_rate calculation before transfer underlying
         self._mint_to(minter, mint_amount).unwrap();
         let actual_mint_amount = U256::from(mint_amount)
-            .mul(self._exchange_rate_stored())
+            .mul(exchange_rate)
             .div(exp_scale())
             .as_u128();
         self._transfer_underlying_from(minter, contract_addr, actual_mint_amount)

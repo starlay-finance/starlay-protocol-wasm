@@ -109,7 +109,7 @@ pub fn exchange_rate(
     total_reserves: Balance,
 ) -> U256 {
     if total_supply == 0 {
-        return U256::zero()
+        return U256::one().mul(exp_scale()) // (temp) TODO: set initial exchange_rate
     };
     let cash_plus_borrows_minus_reserves = total_cash.add(total_borrows).sub(total_reserves);
     U256::from(cash_plus_borrows_minus_reserves)
@@ -239,7 +239,7 @@ mod tests {
     }
     #[test]
     fn test_exchange_rate_in_case_total_supply_is_zero() {
-        assert_eq!(exchange_rate(0, 1, 1, 1), U256::zero());
+        assert_eq!(exchange_rate(0, 1, 1, 1), U256::one().mul(exp_scale()));
     }
 
     #[test]
