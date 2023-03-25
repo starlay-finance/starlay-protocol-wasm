@@ -381,14 +381,6 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         self._total_reserves()
     }
 
-    default fn balance_of(&self, owner: AccountId) -> Balance {
-        Internal::_balance_of(self, &owner)
-    }
-
-    default fn total_supply(&self) -> Balance {
-        Internal::_total_supply(self)
-    }
-
     default fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256) {
         (
             Internal::_balance_of(self, &account),

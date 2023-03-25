@@ -6,7 +6,10 @@ pub mod contract {
     use ink::prelude::vec::Vec;
     use logics::traits::{
         controller::ControllerRef,
-        pool::PoolRef,
+        pool::{
+            pool_external::PoolWrapper,
+            PoolRef,
+        },
         price_oracle::PriceOracleRef,
         types::WrappedU256,
     };
@@ -162,7 +165,7 @@ pub mod contract {
                     .unwrap_or_default(),
                 is_listed: ControllerRef::is_listed(&controller, pool),
                 total_cash: PoolRef::get_cash_prior(&pool),
-                total_supply: PSP22Ref::total_supply(&pool),
+                total_supply: PoolRef::total_supply(&pool),
                 total_borrows: PoolRef::total_borrows(&pool),
                 total_reserves: PoolRef::total_reserves(&pool),
                 exchange_rate_current: PoolRef::exchange_rate_current(&pool).unwrap_or_default(),
@@ -182,7 +185,7 @@ pub mod contract {
             let underlying = PoolRef::underlying(&pool);
             PoolBalances {
                 pool,
-                balance_of: PSP22Ref::balance_of(&pool, account),
+                balance_of: PoolRef::balance_of(&pool, account),
 
                 borrow_balance_current: PoolRef::borrow_balance_current(&pool, account)
                     .unwrap_or_default(),
