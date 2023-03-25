@@ -104,11 +104,16 @@ describe('Pool spec', () => {
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(3000)
 
-      const event = events[0]
-      expect(event.name).toEqual('Mint')
-      expect(event.args.minter).toEqual(deployer.address)
-      expect(event.args.mintAmount.toNumber()).toEqual(3_000)
-      expect(event.args.mintTokens.toNumber()).toEqual(3_000)
+      const transfer_event = events[0]
+      expect(transfer_event.name).toEqual('Transfer')
+      expect(transfer_event.args.from).toBeNull
+      expect(transfer_event.args.to).toEqual(deployer.address)
+      expect(transfer_event.args.value.toNumber()).toEqual(3_000)
+      const mint_event = events[1]
+      expect(mint_event.name).toEqual('Mint')
+      expect(mint_event.args.minter).toEqual(deployer.address)
+      expect(mint_event.args.mintAmount.toNumber()).toEqual(3_000)
+      expect(mint_event.args.mintTokens.toNumber()).toEqual(3_000)
     })
   })
 
