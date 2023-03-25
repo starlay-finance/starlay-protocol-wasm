@@ -51,7 +51,6 @@ pub mod contract {
     pub struct PoolBalances {
         pool: AccountId,
         balance_of: Balance,
-        balance_of_underlying: Balance,
         borrow_balance_current: Balance,
         token_balance: Balance,
         token_allowance: Balance,
@@ -184,8 +183,7 @@ pub mod contract {
             PoolBalances {
                 pool,
                 balance_of: PSP22Ref::balance_of(&pool, account),
-                balance_of_underlying: PoolRef::balance_of_underlying_current(&pool, account)
-                    .unwrap_or_default(),
+
                 borrow_balance_current: PoolRef::borrow_balance_current(&pool, account)
                     .unwrap_or_default(),
                 token_balance: PSP22Ref::balance_of(&underlying, account),

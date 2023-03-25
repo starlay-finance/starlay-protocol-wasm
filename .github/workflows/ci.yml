@@ -46,6 +46,9 @@ jobs:
           sudo apt-get install binaryen
           cargo install cargo-dylint dylint-link
           cargo install --force --locked cargo-contract
+      - name: Install substrate-contracts-node
+        if: ${{ steps.check-cargo-contract.outcome == 'failure' }}
+        run: cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git
       - name: Compile checks
         env:
           CARGO_INCREMENTAL: 1
@@ -65,3 +68,5 @@ jobs:
           key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
       - name: test
         run: cargo test
+      - name: e2e
+        run: yarn test

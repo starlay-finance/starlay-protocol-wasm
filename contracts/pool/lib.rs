@@ -226,6 +226,16 @@ pub mod contract {
         ) -> core::result::Result<(), PSP22Error> {
             self._transfer_tokens(self.env().caller(), from, to, value, data)
         }
+
+        #[ink(message)]
+        fn balance_of(&self, owner: AccountId) -> Balance {
+            self._balance_of(&owner)
+        }
+
+        #[ink(message)]
+        fn total_supply(&self) -> Balance {
+            self._total_supply()
+        }
     }
     impl psp22::Internal for PoolContract {
         fn _emit_transfer_event(
