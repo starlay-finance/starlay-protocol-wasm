@@ -21,9 +21,11 @@ import PSP22Token from '../../types/contracts/psp22_token'
 import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
 import { encodeAddress } from '@polkadot/keyring'
 import { LastArrayElement } from 'type-fest'
+import { hexToUtf8 } from '../../tests/testHelpers'
 import { ExcludeLastArrayElement } from '../../tests/utilityTypes'
 import Controller from '../../types/contracts/controller'
 import Pool from '../../types/contracts/pool'
+import Token from '../../types/contracts/psp22_token'
 
 type FactoryArgs<C extends (...args: unknown[]) => unknown> = {
   api: ApiPromise
@@ -165,9 +167,21 @@ export const deployPoolFromAsset = async ({
   signer,
   args,
   option = defaultOption(api),
-}: FactoryArgs<Pool_factory['newFromAsset']>): Promise<Pool> => {
+  token,
+}: FactoryArgs<Pool_factory['newFromAsset']> & {
+  token: Token
+}): Promise<Pool> => {
   const factory = new Pool_factory(api, signer)
-  const contract = await factory.newFromAsset(...args, option)
+
+  // FIXME: calling token_name or token_symbol on contract will fail
+  const name = `Starlay ${hexToUtf8(
+    (await token.query.tokenName()).value.ok,
+  )}` as unknown as string[]
+  const symbol = `s${(await token.query.tokenSymbol()).value.ok}
+  ` as unknown as string[]
+  const decimals = (await token.query.tokenDecimals()).value.ok
+  const contract = await factory.new(...args, name, symbol, decimals, option)
+
   const result = new Pool(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result

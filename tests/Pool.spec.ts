@@ -1,12 +1,12 @@
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { hexToUtf8, zeroAddress } from './testHelpers'
 
-import Pool_factory from '../types/constructors/pool'
 import Pool from '../types/contracts/pool'
 
 import {
   deployController,
   deployPSP22Token,
+  deployPoolFromAsset,
 } from '../scripts/helper/deploy_helper'
 import PSP22Token from '../types/contracts/psp22_token'
 
@@ -31,18 +31,12 @@ describe('Pool spec', () => {
       args: [deployer.address],
     })
 
-    const poolFactory = new Pool_factory(api, deployer)
-    const pool = new Pool(
-      (
-        await poolFactory.newFromAsset(
-          token.address,
-          controller.address,
-          zeroAddress,
-        )
-      ).address,
-      deployer,
+    const pool = await deployPoolFromAsset({
       api,
-    )
+      signer: deployer,
+      args: [token.address, controller.address, zeroAddress],
+      token,
+    })
     const users = [bob, charlie]
 
     // initialize
@@ -315,18 +309,12 @@ describe('Pool spec', () => {
         ],
       })
 
-      const poolFactory = new Pool_factory(api, deployer)
-      secondPool = new Pool(
-        (
-          await poolFactory.newFromAsset(
-            secondToken.address,
-            secondToken.address,
-            zeroAddress,
-          )
-        ).address,
-        deployer,
+      secondPool = await deployPoolFromAsset({
         api,
-      )
+        signer: deployer,
+        args: [secondToken.address, secondToken.address, zeroAddress],
+        token: secondToken,
+      })
 
       // initialize
       await controller.tx.supportMarket(secondPool.address)
@@ -401,18 +389,12 @@ describe('Pool spec', () => {
         ],
       })
 
-      const poolFactory = new Pool_factory(args.api, args.deployer)
-      const secondPool = new Pool(
-        (
-          await poolFactory.newFromAsset(
-            secondToken.address,
-            secondToken.address,
-            zeroAddress,
-          )
-        ).address,
-        args.deployer,
-        args.api,
-      )
+      const secondPool = await deployPoolFromAsset({
+        api: args.api,
+        signer: args.deployer,
+        args: [secondToken.address, secondToken.address, zeroAddress],
+        token: secondToken,
+      })
 
       // initialize
       await args.controller.tx.supportMarket(secondPool.address)
