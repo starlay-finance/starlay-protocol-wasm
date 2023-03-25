@@ -53,6 +53,7 @@ pub trait Pool: PSP22 {
         seize_tokens: Balance,
     ) -> Result<()>;
 
+    // admin functions
     #[ink(message)]
     fn set_controller(&mut self, new_controller: AccountId) -> Result<()>;
 
@@ -74,6 +75,7 @@ pub trait Pool: PSP22 {
     #[ink(message)]
     fn sweep_token(&mut self, asset: AccountId) -> Result<()>;
 
+    // view functions
     #[ink(message)]
     fn underlying(&self) -> AccountId;
     #[ink(message)]
