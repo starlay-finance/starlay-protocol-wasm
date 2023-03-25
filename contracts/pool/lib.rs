@@ -438,7 +438,7 @@ pub mod contract {
         #[should_panic(
             expected = "not implemented: off-chain environment does not support contract invocation"
         )]
-        fn transfer_works_overrided() {
+        fn transfer_works_overridden() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
@@ -459,7 +459,7 @@ pub mod contract {
         #[should_panic(
             expected = "not implemented: off-chain environment does not support contract invocation"
         )]
-        fn transfer_from_works_overrided() {
+        fn transfer_from_works_overridden() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
 
