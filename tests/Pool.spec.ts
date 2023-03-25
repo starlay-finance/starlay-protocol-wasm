@@ -59,7 +59,7 @@ describe('Pool spec', () => {
     // initialize
     await controller.tx.supportMarket(pool.address)
 
-    return { api, deployer, token, pool, controller, users }
+    return { api, deployer, token, pool, rateModel, controller, users }
   }
 
   it('instantiate', async () => {
@@ -409,7 +409,11 @@ describe('Pool spec', () => {
       const secondPool = await deployPoolFromAsset({
         api: args.api,
         signer: args.deployer,
-        args: [secondToken.address, secondToken.address, zeroAddress],
+        args: [
+          secondToken.address,
+          args.controller.address,
+          args.rateModel.address,
+        ],
         token: secondToken,
       })
 
