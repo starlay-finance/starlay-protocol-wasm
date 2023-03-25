@@ -985,12 +985,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
 
     default fn _total_supply(&self) -> Balance {
-        let supply = PSP22::total_supply(self);
+        let supply = self.data::<PSP22Data>().supply;
         let interest = self
             ._get_interest_at(Self::env().block_timestamp())
             .unwrap();
         let rate = exchange_rate(
-            PSP22::total_supply(self).into(),
+            supply.into(),
             self._get_cash_prior(),
             interest.total_borrows,
             interest.total_reserves,
@@ -1017,7 +1017,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
     default fn _exchange_rate_stored(&self) -> U256 {
         exchange_rate(
-            PSP22::total_supply(self),
+            self.data::<PSP22Data>().supply,
             self._get_cash_prior(),
             self._total_borrows(),
             self._total_reserves(),
