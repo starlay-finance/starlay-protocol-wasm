@@ -8,7 +8,7 @@ import { ENV, Env } from './../env'
 import {
   ROLE,
   ZERO_ADDRESS,
-  defaultArgs,
+  defaultOption,
   deployController,
   deployDefaultInterestRateModel,
   deployFaucet,
@@ -26,32 +26,32 @@ const main = async () => {
 const deployContracts = async (env: Env) => {
   const api = await provider(env)
   const signer = await deployer(env)
-  const args = defaultArgs(api)
+  const option = defaultOption(api)
   const manager = await deployManager({
     api,
     signer,
-    args: [ZERO_ADDRESS, args],
+    args: [ZERO_ADDRESS],
   })
   const controller = await deployController({
     api,
     signer,
-    args: [manager.address, args],
+    args: [manager.address],
   })
   const priceOracle = await deployPriceOracle({
     api,
     signer,
-    args: [args],
+    args: [],
   })
 
-  await waitForTx(await manager.tx.setController(controller.address, args))
+  await waitForTx(await manager.tx.setController(controller.address, option))
   for (const key of Object.keys(ROLE)) {
     const role = ROLE[key]
     if (role === ROLE.DEFAULT_ADMIN_ROLE) continue
-    await waitForTx(await manager.tx.grantRole(role, signer.address, args))
+    await waitForTx(await manager.tx.grantRole(role, signer.address, option))
     console.log(`Role ${key} has been granted to ${signer.address}`)
   }
 
-  await waitForTx(await manager.tx.setPriceOracle(priceOracle.address, args))
+  await waitForTx(await manager.tx.setPriceOracle(priceOracle.address, option))
   for (const token of await deployDummyTokens(api, signer)) {
     const {
       baseRatePerYear,
@@ -69,7 +69,6 @@ const deployContracts = async (env: Env) => {
         toParam(multiplierPerYearSlope1),
         toParam(multiplierPerYearSlope2),
         toParam(kink),
-        args,
       ],
     })
     const pool = await deployPool({
@@ -82,20 +81,19 @@ const deployContracts = async (env: Env) => {
         [resolvePoolName(token.token.name)],
         [token.token.symbol],
         token.token.decimal,
-        args,
       ],
     })
     await waitForTx(
       await priceOracle.tx.setFixedPrice(
         token.contract.address,
         ONE_ETHER,
-        args,
+        option,
       ),
     )
-    await waitForTx(await manager.tx.supportMarket(pool.address, args))
+    await waitForTx(await manager.tx.supportMarket(pool.address, option))
   }
-  await deployLens({ api, signer, args: [args] })
-  await deployFaucet({ api, signer, args: [args] })
+  await deployLens({ api, signer, args: [] })
+  await deployFaucet({ api, signer, args: [] })
 }
 
 const resolvePoolName = (token: string) => {
@@ -112,7 +110,6 @@ const deployDummyTokens = async (api: ApiPromise, signer: KeyringPair) => {
         token.name as unknown as string[],
         token.symbol as unknown as string[],
         token.decimal,
-        defaultArgs(api),
       ],
     })
     res.push({ contract: deployed, token: token })

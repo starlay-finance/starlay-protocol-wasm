@@ -20,12 +20,17 @@ import PSP22Token from '../../types/contracts/psp22_token'
 
 import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
 import { encodeAddress } from '@polkadot/keyring'
+import { LastArrayElement } from 'type-fest'
+import { ExcludeLastArrayElement } from '../../tests/utilityTypes'
 import Controller from '../../types/contracts/controller'
 import Pool from '../../types/contracts/pool'
 
-type FactoryArgs = {
+type FactoryArgs<C extends (...args: unknown[]) => unknown> = {
   api: ApiPromise
   signer: KeyringPair
+} & {
+  args: ExcludeLastArrayElement<Parameters<C>>
+  option?: LastArrayElement<Parameters<C>>
 }
 
 const WAIT_FINALIZED_SECONDS = 10000
@@ -47,7 +52,7 @@ export const getGasLimit = (
     proofSize: proofSize,
   })
 }
-export const defaultArgs = (
+export const defaultOption = (
   api: ApiPromise,
 ): {
   storageDepositLimit: BN
@@ -71,11 +76,10 @@ export const deployController = async ({
   api,
   signer,
   args,
-}: FactoryArgs & {
-  args: Parameters<Controller_factory['new']>
-}): Promise<Controller> => {
+  option = defaultOption(api),
+}: FactoryArgs<Controller_factory['new']>): Promise<Controller> => {
   const factory = new Controller_factory(api, signer)
-  const contract = await factory.new(...args)
+  const contract = await factory.new(...args, option)
   const result = new Controller(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
@@ -84,11 +88,10 @@ export const deployManager = async ({
   api,
   signer,
   args,
-}: FactoryArgs & {
-  args: Parameters<Manager_factory['new']>
-}): Promise<Manager> => {
+  option = defaultOption(api),
+}: FactoryArgs<Manager_factory['new']>): Promise<Manager> => {
   const factory = new Manager_factory(api, signer)
-  const contract = await factory.new(...args)
+  const contract = await factory.new(...args, option)
   const result = new Manager(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
@@ -98,11 +101,10 @@ export const deployPriceOracle = async ({
   api,
   signer,
   args,
-}: FactoryArgs & {
-  args: Parameters<PriceOracle_factory['new']>
-}): Promise<PriceOracle> => {
+  option = defaultOption(api),
+}: FactoryArgs<PriceOracle_factory['new']>): Promise<PriceOracle> => {
   const factory = new PriceOracle_factory(api, signer)
-  const contract = await factory.new(...args)
+  const contract = await factory.new(...args, option)
   const result = new PriceOracle(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
@@ -137,11 +139,10 @@ export const deployFaucet = async ({
   api,
   signer,
   args,
-}: FactoryArgs & {
-  args: Parameters<Lens_factory['new']>
-}): Promise<Faucet> => {
+  option = defaultOption(api),
+}: FactoryArgs<Lens_factory['new']>): Promise<Faucet> => {
   const factory = new Faucet_factory(api, signer)
-  const contract = await factory.new(...args)
+  const contract = await factory.new(...args, option)
   const result = new Faucet(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
@@ -150,11 +151,10 @@ export const deployLens = async ({
   api,
   signer,
   args,
-}: FactoryArgs & {
-  args: Parameters<Lens_factory['new']>
-}): Promise<Lens> => {
+  option = defaultOption(api),
+}: FactoryArgs<Lens_factory['new']>): Promise<Lens> => {
   const factory = new Lens_factory(api, signer)
-  const contract = await factory.new(...args)
+  const contract = await factory.new(...args, option)
   const result = new Lens(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
@@ -164,11 +164,10 @@ export const deployPoolFromAsset = async ({
   api,
   signer,
   args,
-}: FactoryArgs & {
-  args: Parameters<Pool_factory['newFromAsset']>
-}): Promise<Pool> => {
+  option = defaultOption(api),
+}: FactoryArgs<Pool_factory['newFromAsset']>): Promise<Pool> => {
   const factory = new Pool_factory(api, signer)
-  const contract = await factory.newFromAsset(...args)
+  const contract = await factory.newFromAsset(...args, option)
   const result = new Pool(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
@@ -178,11 +177,12 @@ export const deployDefaultInterestRateModel = async ({
   api,
   signer,
   args,
-}: FactoryArgs & {
-  args: Parameters<DefaultInterestRateModel_factory['new']>
-}): Promise<DefaultInterestRateModel> => {
+  option = defaultOption(api),
+}: FactoryArgs<
+  DefaultInterestRateModel_factory['new']
+>): Promise<DefaultInterestRateModel> => {
   const factory = new DefaultInterestRateModel_factory(api, signer)
-  const contract = await factory.new(...args)
+  const contract = await factory.new(...args, option)
   const result = new DefaultInterestRateModel(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
@@ -192,11 +192,10 @@ export const deployPool = async ({
   api,
   signer,
   args,
-}: FactoryArgs & {
-  args: Parameters<Pool_factory['new']>
-}): Promise<Pool> => {
+  option = defaultOption(api),
+}: FactoryArgs<Pool_factory['new']>): Promise<Pool> => {
   const factory = new Pool_factory(api, signer)
-  const contract = await factory.new(...args)
+  const contract = await factory.new(...args, option)
   const result = new Pool(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
@@ -207,11 +206,10 @@ export const deployPSP22Token = async ({
   api,
   signer,
   args,
-}: FactoryArgs & {
-  args: Parameters<PSP22Token_factory['new']>
-}): Promise<PSP22Token> => {
+  option = defaultOption(api),
+}: FactoryArgs<PSP22Token_factory['new']>): Promise<PSP22Token> => {
   const factory = new PSP22Token_factory(api, signer)
-  const contract = await factory.new(...args)
+  const contract = await factory.new(...args, option)
   const result = new PSP22Token(contract.address, signer, api)
   await afterDeployment(`${args[2]}${result.name}`, contract)
   return result
