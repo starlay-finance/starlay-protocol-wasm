@@ -1,5 +1,5 @@
 import type { KeyringPair } from '@polkadot/keyring/types'
-import { hexToUtf8, zeroAddress } from './testHelpers'
+import { hexToUtf8, shouldNotRevert, zeroAddress } from './testHelpers'
 
 import Pool from '../types/contracts/pool'
 
@@ -67,15 +67,15 @@ describe('Pool spec', () => {
     })
 
     it('preparations', async () => {
-      await token.tx.mint(deployer.address, 10_000)
+      await shouldNotRevert(token, 'mint', [deployer.address, 10_000])
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(10_000)
     })
 
     it('execute', async () => {
-      await token.tx.approve(pool.address, 3_000)
-      const { events } = await pool.tx.mint(3_000)
+      await shouldNotRevert(token, 'approve', [pool.address, 3_000])
+      const { events } = await shouldNotRevert(pool, 'mint', [3_000])
 
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
@@ -105,17 +105,17 @@ describe('Pool spec', () => {
     })
 
     it('preparations', async () => {
-      await token.tx.mint(deployer.address, 10_000)
+      await shouldNotRevert(token, 'mint', [deployer.address, 10_000])
 
-      await token.tx.approve(pool.address, 10_000)
-      await pool.tx.mint(10_000)
+      await shouldNotRevert(token, 'approve', [pool.address, 10_000])
+      await shouldNotRevert(pool, 'mint', [10_000])
       expect(
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(10_000)
     })
 
     it('execute', async () => {
-      const { events } = await pool.tx.redeem(3_000)
+      const { events } = await shouldNotRevert(pool, 'redeem', [3_000])
 
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
