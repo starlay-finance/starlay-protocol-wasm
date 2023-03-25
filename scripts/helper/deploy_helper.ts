@@ -118,24 +118,21 @@ const afterDeployment = async (
     address: string
   },
 ) => {
-  console.log(name + ' was deployed at: ' + contract.address)
+  if (!isTest()) console.log(name + ' was deployed at: ' + contract.address)
   await waitForTx(contract.result)
 }
 
 export const waitForTx = async (
   result: SignAndSendSuccessResponse,
 ): Promise<void> => {
-  if (isTestEnv(result)) return
+  if (isTest()) return
 
   while (!result.result.isFinalized) {
     await new Promise((resolve) => setTimeout(resolve, WAIT_FINALIZED_SECONDS))
   }
 }
 
-const isTestEnv = (result: SignAndSendSuccessResponse) => {
-  // TODO
-  return result.result.blockNumber.toNumber() < 1000
-}
+const isTest = () => process.env.NODE_ENV === 'test'
 
 export const deployFaucet = async ({
   api,
