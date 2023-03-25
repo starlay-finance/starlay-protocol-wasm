@@ -6,10 +6,7 @@ pub mod contract {
     use ink::prelude::vec::Vec;
     use logics::traits::{
         controller::ControllerRef,
-        pool::{
-            pool_external::PoolWrapper,
-            PoolRef,
-        },
+        pool::PoolRef,
         price_oracle::PriceOracleRef,
         types::WrappedU256,
     };
