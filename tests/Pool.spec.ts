@@ -18,7 +18,7 @@ import {
 } from '../scripts/helper/deploy_helper'
 import { ONE_ETHER } from '../scripts/tokens'
 import PSP22Token from '../types/contracts/psp22_token'
-import { Redeem } from '../types/event-types/pool'
+import { Mint, Redeem } from '../types/event-types/pool'
 import { Transfer } from '../types/event-types/psp22_token'
 
 describe('Pool spec', () => {
@@ -103,37 +103,41 @@ describe('Pool spec', () => {
       ;({ deployer, token, pool } = await setup())
     })
 
+    const balance = 10_000
     it('preparations', async () => {
-      await shouldNotRevert(token, 'mint', [deployer.address, 10_000])
+      await shouldNotRevert(token, 'mint', [deployer.address, balance])
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(10_000)
+      ).toBe(balance)
     })
 
     it('execute', async () => {
-      await shouldNotRevert(token, 'approve', [pool.address, 3_000])
-      const { events } = await shouldNotRevert(pool, 'mint', [3_000])
+      const depositAmount = 3_000
+      const mintAmount = depositAmount
+      await shouldNotRevert(token, 'approve', [pool.address, depositAmount])
+      const { events } = await shouldNotRevert(pool, 'mint', [depositAmount])
 
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(7000)
+      ).toBe(balance - depositAmount)
       expect(
         (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
-      ).toEqual(3000)
+      ).toBe(depositAmount)
       expect(
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(3000)
+      ).toBe(mintAmount)
 
-      const transfer_event = events[0]
-      expect(transfer_event.name).toEqual('Transfer')
-      expect(transfer_event.args.from).toBeNull
-      expect(transfer_event.args.to).toEqual(deployer.address)
-      expect(transfer_event.args.value.toNumber()).toEqual(3_000)
-      const mint_event = events[1]
-      expect(mint_event.name).toEqual('Mint')
-      expect(mint_event.args.minter).toEqual(deployer.address)
-      expect(mint_event.args.mintAmount.toNumber()).toEqual(3_000)
-      expect(mint_event.args.mintTokens.toNumber()).toEqual(3_000)
+      expect(events).toHaveLength(2)
+      expectToEmit<Transfer>(events[0], 'Transfer', {
+        from: null,
+        to: deployer.address,
+        value: depositAmount,
+      })
+      expectToEmit<Mint>(events[1], 'Mint', {
+        minter: deployer.address,
+        mintAmount,
+        mintTokens: depositAmount,
+      })
     })
   })
 
@@ -189,8 +193,11 @@ describe('Pool spec', () => {
   describe('.redeem (fail case)', () => {
     it('when no cash in pool', async () => {
       const { pool } = await setup()
-      const { value } = await pool.query.redeem(3_000)
-      expect(value.ok.err).toStrictEqual({ redeemTransferOutNotPossible: null })
+      const {
+        value: { ok: cash },
+      } = await pool.query.getCashPrior()
+      const { value } = await pool.query.redeemUnderlying(cash.toNumber() + 1)
+      expect(value.ok.err).toHaveProperty('redeemTransferOutNotPossible')
     })
   })
 
