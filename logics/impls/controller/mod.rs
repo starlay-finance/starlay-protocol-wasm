@@ -71,9 +71,10 @@ impl Default for PoolAttributes {
     fn default() -> Self {
         PoolAttributes {
             underlying: ZERO_ADDRESS.into(),
-            balance: Default::default(),
-            borrow_balance: Default::default(),
+            account_balance: Default::default(),
+            account_borrow_balance: Default::default(),
             exchange_rate: Default::default(),
+            total_borrows: Default::default(),
         }
     }
 }
@@ -107,6 +108,7 @@ pub trait Internal {
         pool: AccountId,
         borrower: AccountId,
         borrow_amount: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()>;
     fn _borrow_verify(
         &self,
@@ -294,8 +296,9 @@ impl<T: Storage<Data>> Controller for T {
         pool: AccountId,
         borrower: AccountId,
         borrow_amount: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()> {
-        self._borrow_allowed(pool, borrower, borrow_amount)
+        self._borrow_allowed(pool, borrower, borrow_amount, pool_attribure)
     }
 
     default fn borrow_verify(
@@ -642,31 +645,42 @@ impl<T: Storage<Data>> Internal for T {
         pool: AccountId,
         borrower: AccountId,
         borrow_amount: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()> {
         if let Some(true) | None = self._borrow_guardian_paused(pool) {
             return Err(Error::BorrowIsPaused)
         }
 
-        if let None | Some(0) = PriceOracleRef::get_underlying_price(&self._oracle(), pool) {
+        let (price, total_borrow, caller_pool) = if pool_attribure.is_none() {
+            (
+                PriceOracleRef::get_underlying_price(&self._oracle(), pool),
+                PoolRef::total_borrows(&pool),
+                None,
+            )
+        } else {
+            let attrs = pool_attribure.unwrap();
+            (
+                PriceOracleRef::get_price(&self._oracle(), attrs.underlying),
+                attrs.total_borrows,
+                Some((pool, attrs)),
+            )
+        };
+        if let None | Some(0) = price {
             return Err(Error::PriceError)
         }
-
         let borrow_cap = self._borrow_cap(pool).unwrap();
-        // borrow cap of 0 corresponds to unlimited borrowing
         if borrow_cap != 0 {
-            let total_borrow = PoolRef::total_borrows(&pool);
             if total_borrow > borrow_cap - borrow_amount {
                 return Err(Error::BorrowCapReached)
             }
         }
 
-        // TODO: revert
-        // let (_, shortfall) = self
-        //     ._get_hypothetical_account_liquidity(borrower, pool, 0, borrow_amount)
-        //     .unwrap();
-        // if !shortfall.is_zero() {
-        //     return Err(Error::InsufficientLiquidity)
-        // }
+        let (_, shortfall) = self
+            ._get_hypothetical_account_liquidity(borrower, pool, 0, borrow_amount, caller_pool)
+            .unwrap();
+        if !shortfall.is_zero() {
+            return Err(Error::InsufficientLiquidity)
+        }
 
         // FEATURE: update governance token borrow index & distribute
 
@@ -1014,8 +1028,8 @@ impl<T: Storage<Data>> Internal for T {
 
                 asset_params.push(HypotheticalAccountLiquidityCalculationParam {
                     asset: *asset,
-                    token_balance: attrs.balance,
-                    borrow_balance: attrs.borrow_balance,
+                    token_balance: attrs.account_balance,
+                    borrow_balance: attrs.account_borrow_balance,
                     exchange_rate_mantissa: Exp {
                         mantissa: WrappedU256::from(attrs.exchange_rate),
                     },

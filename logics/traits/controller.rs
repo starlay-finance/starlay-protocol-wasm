@@ -52,6 +52,7 @@ pub trait Controller {
         pool: AccountId,
         borrower: AccountId,
         borrow_amount: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()>;
 
     #[ink(message)]
@@ -237,9 +238,10 @@ pub trait Controller {
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributes {
     pub underlying: AccountId,
-    pub balance: Balance,
-    pub borrow_balance: Balance,
+    pub account_balance: Balance,
+    pub account_borrow_balance: Balance,
     pub exchange_rate: U256,
+    pub total_borrows: Balance,
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]

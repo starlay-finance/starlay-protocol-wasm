@@ -538,12 +538,14 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         }
 
         let contract_addr = Self::env().account_id();
-        let (balance, borrow_balance, exchange_rate) = self.get_account_snapshot(redeemer);
+        let (account_balance, account_borrow_balance, exchange_rate) =
+            self.get_account_snapshot(redeemer);
         let pool_attribute = PoolAttributes {
             underlying: self._underlying(),
-            balance,
-            borrow_balance,
+            account_balance,
+            account_borrow_balance,
             exchange_rate,
+            total_borrows: self._total_borrows(),
         };
         ControllerRef::redeem_allowed(
             &self._controller(),
@@ -574,8 +576,23 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
     default fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
         let contract_addr = Self::env().account_id();
-        ControllerRef::borrow_allowed(&self._controller(), contract_addr, borrower, borrow_amount)
-            .unwrap();
+        let (account_balance, account_borrow_balance, exchange_rate) =
+            self.get_account_snapshot(borrower);
+        let pool_attribute = PoolAttributes {
+            underlying: self._underlying(),
+            account_balance,
+            account_borrow_balance,
+            exchange_rate,
+            total_borrows: self._total_borrows(),
+        };
+        ControllerRef::borrow_allowed(
+            &self._controller(),
+            contract_addr,
+            borrower,
+            borrow_amount,
+            Some(pool_attribute),
+        )
+        .unwrap();
 
         let current_timestamp = Self::env().block_timestamp();
         if self._accural_block_timestamp() != current_timestamp {
