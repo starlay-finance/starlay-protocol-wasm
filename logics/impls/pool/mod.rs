@@ -1,6 +1,9 @@
-use super::exp_no_err::{
-    exp_scale,
-    Exp,
+use super::{
+    controller::PoolAttributes,
+    exp_no_err::{
+        exp_scale,
+        Exp,
+    },
 };
 use crate::traits::{
     controller,
@@ -535,8 +538,21 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         }
 
         let contract_addr = Self::env().account_id();
-        ControllerRef::redeem_allowed(&self._controller(), contract_addr, redeemer, redeem_tokens)
-            .unwrap();
+        let (balance, borrow_balance, exchange_rate) = self.get_account_snapshot(redeemer);
+        let pool_attribute = PoolAttributes {
+            underlying: self._underlying(),
+            balance,
+            borrow_balance,
+            exchange_rate,
+        };
+        ControllerRef::redeem_allowed(
+            &self._controller(),
+            contract_addr,
+            redeemer,
+            redeem_tokens,
+            Some(pool_attribute),
+        )
+        .unwrap();
         let current_timestamp = Self::env().block_timestamp();
         if self._accural_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)

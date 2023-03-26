@@ -67,6 +67,17 @@ impl Default for Data {
     }
 }
 
+impl Default for PoolAttributes {
+    fn default() -> Self {
+        PoolAttributes {
+            underlying: ZERO_ADDRESS.into(),
+            balance: Default::default(),
+            borrow_balance: Default::default(),
+            exchange_rate: Default::default(),
+        }
+    }
+}
+
 pub trait Internal {
     fn _mint_allowed(&self, pool: AccountId, minter: AccountId, mint_amount: Balance)
         -> Result<()>;
@@ -82,6 +93,7 @@ pub trait Internal {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()>;
     fn _redeem_verify(
         &self,
@@ -218,6 +230,7 @@ pub trait Internal {
         token: AccountId,
         redeem_tokens: Balance,
         borrow_amount: Balance,
+        caller_pool: Option<(AccountId, PoolAttributes)>,
     ) -> Result<(U256, U256)>;
 
     // event emission
@@ -261,8 +274,9 @@ impl<T: Storage<Data>> Controller for T {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()> {
-        self._redeem_allowed(pool, redeemer, redeem_amount)
+        self._redeem_allowed(pool, redeemer, redeem_amount, pool_attribure)
     }
 
     default fn redeem_verify(
@@ -563,7 +577,7 @@ impl<T: Storage<Data>> Controller for T {
         redeem_tokens: Balance,
         borrow_amount: Balance,
     ) -> Result<(U256, U256)> {
-        self._get_hypothetical_account_liquidity(account, token, redeem_tokens, borrow_amount)
+        self._get_hypothetical_account_liquidity(account, token, redeem_tokens, borrow_amount, None)
     }
 }
 
@@ -596,14 +610,19 @@ impl<T: Storage<Data>> Internal for T {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()> {
-        // TODO: revert
-        // let (_, shortfall) = self
-        //     ._get_hypothetical_account_liquidity(redeemer, pool, redeem_amount, 0)
-        //     .unwrap();
-        // if !shortfall.is_zero() {
-        //     return Err(Error::InsufficientLiquidity)
-        // }
+        let caller_pool = if pool_attribure.is_some() {
+            Some((pool, pool_attribure.unwrap()))
+        } else {
+            None
+        };
+        let (_, shortfall) = self
+            ._get_hypothetical_account_liquidity(redeemer, pool, redeem_amount, 0, caller_pool)
+            .unwrap();
+        if !shortfall.is_zero() {
+            return Err(Error::InsufficientLiquidity)
+        }
 
         // FEATURE: update governance token supply index & distribute
 
@@ -769,7 +788,7 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::TransferIsPaused)
         }
 
-        self._redeem_allowed(pool, src, transfer_tokens)?;
+        self._redeem_allowed(pool, src, transfer_tokens, None)?;
 
         // FEATURE: update governance token supply index & distribute
 
@@ -951,7 +970,7 @@ impl<T: Storage<Data>> Internal for T {
         let markets = self._markets();
         for pool in markets {
             if pool == Self::env().caller() {
-                continue // if caller is pool, need to check by the pool itself
+                continue // NOTE: if caller is pool, need to check by the pool itself
             }
             let (balance, borrowed, _) = PoolRef::get_account_snapshot(&pool, account);
 
@@ -964,7 +983,7 @@ impl<T: Storage<Data>> Internal for T {
     }
 
     default fn _get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)> {
-        self._get_hypothetical_account_liquidity(account, ZERO_ADDRESS.into(), 0, 0)
+        self._get_hypothetical_account_liquidity(account, ZERO_ADDRESS.into(), 0, 0, None)
     }
 
     default fn _get_hypothetical_account_liquidity(
@@ -973,38 +992,65 @@ impl<T: Storage<Data>> Internal for T {
         token_modify: AccountId,
         redeem_tokens: Balance,
         borrow_amount: Balance,
+        caller_pool: Option<(AccountId, PoolAttributes)>,
     ) -> Result<(U256, U256)> {
         // For each asset the account is in
         let account_assets = self._account_assets(account);
         let mut asset_params = Vec::<HypotheticalAccountLiquidityCalculationParam>::new();
+        let (caller_pool_id, attrs) =
+            caller_pool.unwrap_or((ZERO_ADDRESS.into(), PoolAttributes::default()));
 
         // Prepare parameters for calculation
         for asset in &account_assets {
-            // Read the balances and exchange rate from the pool
-            let (token_balance, borrow_balance, exchange_rate_mantissa) =
-                PoolRef::get_account_snapshot(asset, account);
+            if asset == &caller_pool_id {
+                // Without call the pool, get parameters for calculation
+                let oracle_price = PriceOracleRef::get_price(&self._oracle(), attrs.underlying);
+                if let None | Some(0) = oracle_price {
+                    return Err(Error::PriceError)
+                }
+                let oracle_price_mantissa = Exp {
+                    mantissa: WrappedU256::from(U256::from(oracle_price.clone().unwrap())),
+                };
 
-            // Get the normalized price of the asset
-            let oracle_price = PriceOracleRef::get_underlying_price(&self._oracle(), *asset);
-            if let None | Some(0) = oracle_price {
-                return Err(Error::PriceError)
+                asset_params.push(HypotheticalAccountLiquidityCalculationParam {
+                    asset: *asset,
+                    token_balance: attrs.balance,
+                    borrow_balance: attrs.borrow_balance,
+                    exchange_rate_mantissa: Exp {
+                        mantissa: WrappedU256::from(attrs.exchange_rate),
+                    },
+                    collateral_factor_mantissa: Exp {
+                        mantissa: self._collateral_factor_mantissa(*asset).unwrap(),
+                    },
+                    oracle_price_mantissa: oracle_price_mantissa.clone(),
+                })
+            } else {
+                // Read the balances and exchange rate from the pool
+                let (token_balance, borrow_balance, exchange_rate_mantissa) =
+                    PoolRef::get_account_snapshot(asset, account);
+
+                // Get the normalized price of the asset
+                let oracle_price = PriceOracleRef::get_underlying_price(&self._oracle(), *asset);
+                if let None | Some(0) = oracle_price {
+                    return Err(Error::PriceError)
+                }
+                let oracle_price_mantissa = Exp {
+                    mantissa: WrappedU256::from(U256::from(oracle_price.clone().unwrap())),
+                };
+
+                asset_params.push(HypotheticalAccountLiquidityCalculationParam {
+                    asset: *asset,
+                    token_balance,
+                    borrow_balance,
+                    exchange_rate_mantissa: Exp {
+                        mantissa: WrappedU256::from(exchange_rate_mantissa),
+                    },
+                    collateral_factor_mantissa: Exp {
+                        mantissa: self._collateral_factor_mantissa(*asset).unwrap(),
+                    },
+                    oracle_price_mantissa: oracle_price_mantissa.clone(),
+                });
             }
-            let oracle_price_mantissa = Exp {
-                mantissa: WrappedU256::from(U256::from(oracle_price.clone().unwrap())),
-            };
-
-            asset_params.push(HypotheticalAccountLiquidityCalculationParam {
-                asset: *asset,
-                token_balance,
-                borrow_balance,
-                exchange_rate_mantissa: Exp {
-                    mantissa: WrappedU256::from(exchange_rate_mantissa),
-                },
-                collateral_factor_mantissa: Exp {
-                    mantissa: self._collateral_factor_mantissa(*asset).unwrap(),
-                },
-                oracle_price_mantissa: oracle_price_mantissa.clone(),
-            });
         }
 
         let (sum_collateral, sum_borrow_plus_effect) =
