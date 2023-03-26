@@ -186,6 +186,8 @@ pub trait Internal {
     fn _balance_of_underlying(&self, account: AccountId) -> Balance;
     fn _accural_block_timestamp(&self) -> Timestamp;
     fn _borrow_index(&self) -> Exp;
+    fn _borrow_index_raw(&self) -> WrappedU256;
+    fn _account_borrows(&self, account: AccountId) -> Option<BorrowSnapshot>;
     fn _reserve_factor_mantissa(&self) -> WrappedU256;
     fn _exchange_rate_stored(&self) -> U256;
 
@@ -881,6 +883,14 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         }
     }
 
+    default fn _borrow_index_raw(&self) -> WrappedU256 {
+        self.data::<Data>().borrow_index
+    }
+
+    default fn _account_borrows(&self, account: AccountId) -> Option<BorrowSnapshot> {
+        self.data::<Data>().account_borrows.get(&account)
+    }
+
     default fn _borrow_balance_stored(&self, account: AccountId) -> Balance {
         let snapshot = match self.data::<Data>().account_borrows.get(&account) {
             Some(value) => value,
@@ -891,6 +901,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             return 0
         }
         let borrow_index = self._borrow_index();
+        // temp / TODO: check calculation interest_rate
+        if U256::from(borrow_index.mantissa).is_zero()
+            && U256::from(snapshot.interest_index).is_zero()
+        {
+            return snapshot.principal
+        }
         let prinicipal_times_index =
             U256::from(snapshot.principal).mul(U256::from(borrow_index.mantissa));
         prinicipal_times_index
