@@ -950,6 +950,9 @@ impl<T: Storage<Data>> Internal for T {
         let mut account_assets = Vec::<AccountId>::new();
         let markets = self._markets();
         for pool in markets {
+            if pool == Self::env().caller() {
+                continue // if caller is pool, need to check by the pool itself
+            }
             let (balance, borrowed, _) = PoolRef::get_account_snapshot(&pool, account);
 
             // whether deposits or loans exist
