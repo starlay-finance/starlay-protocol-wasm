@@ -160,6 +160,9 @@ describe('Pool spec', () => {
       expect(
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(minted)
+      expect(
+        (await pool.query.exchangeRateCurrent()).value.ok.ok.toString(),
+      ).toBe(ONE_ETHER.toString())
     })
 
     it('execute', async () => {
@@ -190,6 +193,59 @@ describe('Pool spec', () => {
     })
   })
 
+  describe('.redeem_underlying', () => {
+    let deployer: KeyringPair
+    let token: PSP22Token
+    let pool: Pool
+
+    beforeAll(async () => {
+      ;({ deployer, token, pool } = await setup())
+    })
+
+    const deposited = 10_000
+    const minted = deposited
+    it('setup', async () => {
+      await shouldNotRevert(token, 'mint', [deployer.address, deposited])
+
+      await shouldNotRevert(token, 'approve', [pool.address, deposited])
+      await shouldNotRevert(pool, 'mint', [deposited])
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toBe(minted)
+      expect(
+        (await pool.query.exchangeRateCurrent()).value.ok.ok.toString(),
+      ).toBe(ONE_ETHER.toString())
+    })
+    it('execute', async () => {
+      const redeemAmount = 3_000
+      const { events } = await shouldNotRevert(pool, 'redeemUnderlying', [
+        redeemAmount,
+      ])
+
+      expect(
+        (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toBe(redeemAmount)
+      expect(
+        (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
+      ).toBe(deposited - redeemAmount)
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toBe(minted - redeemAmount)
+
+      expect(events).toHaveLength(2)
+      expectToEmit<Transfer>(events[0], 'Transfer', {
+        from: deployer.address,
+        to: null,
+        value: redeemAmount,
+      })
+      expectToEmit<Redeem>(events[1], 'Redeem', {
+        redeemer: deployer.address,
+        redeemAmount,
+        redeemTokens: redeemAmount,
+      })
+    })
+  })
+
   describe('.redeem (fail case)', () => {
     it('when no cash in pool', async () => {
       const { pool } = await setup()
@@ -199,14 +255,6 @@ describe('Pool spec', () => {
       const { value } = await pool.query.redeemUnderlying(cash.toNumber() + 1)
       expect(value.ok.err).toHaveProperty('redeemTransferOutNotPossible')
     })
-  })
-
-  it('.redeem_underlying', async () => {
-    const { pool, users } = await setup()
-    const { value } = await pool
-      .withSigner(users[0])
-      .query.redeemUnderlying(3_000)
-    expect(value.ok.err).toStrictEqual({ notImplemented: null })
   })
 
   describe('.borrow', () => {
