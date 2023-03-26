@@ -117,6 +117,38 @@ pub fn exchange_rate(
         .div(U256::from(total_supply))
 }
 
+pub fn calculate_redeem_values(
+    redeem_tokens_in: Balance,
+    redeem_amount_in: Balance,
+    exchange_rate: U256,
+) -> Option<(Balance, Balance)> {
+    let exchange_rate_exp = Exp {
+        mantissa: WrappedU256::from(exchange_rate),
+    };
+    let (redeem_tokens, redeem_amount) = match (redeem_tokens_in, redeem_amount_in) {
+        (_, _) if redeem_tokens_in > 0 && redeem_amount_in > 0 => return None,
+        (tokens, _) if tokens > 0 => {
+            (
+                tokens,
+                exchange_rate_exp
+                    .mul_scalar_truncate(U256::from(tokens))
+                    .as_u128(),
+            )
+        }
+        (_, amount) if amount > 0 => {
+            (
+                U256::from(amount)
+                    .mul(exp_scale())
+                    .div(exchange_rate)
+                    .as_u128(),
+                amount,
+            )
+        }
+        _ => return None,
+    };
+    return Some((redeem_tokens, redeem_amount))
+}
+
 #[cfg(test)]
 mod tests {
     use super::Exp;
@@ -291,6 +323,88 @@ mod tests {
                     case.total_reserves
                 ),
                 rate_want
+            )
+        }
+    }
+
+    #[test]
+    fn test_calculate_redeem_values() {
+        let mantissa = 10_u128.pow(18);
+        struct Input {
+            redeem_tokens_in: u128,
+            redeem_amount_in: u128,
+            exchange_rate: u128,
+        }
+        struct Output {
+            redeem_tokens: u128,
+            redeem_amount: u128,
+        }
+        struct Case {
+            input: Input,
+            output: Output,
+        }
+        let cases: &[Case] = &[
+            Case {
+                input: Input {
+                    redeem_tokens_in: 10000,
+                    redeem_amount_in: 0,
+                    exchange_rate: mantissa * 12 / 10,
+                },
+                output: Output {
+                    redeem_tokens: 10000,
+                    redeem_amount: 12000,
+                },
+            },
+            Case {
+                input: Input {
+                    redeem_tokens_in: 0,
+                    redeem_amount_in: 12000,
+                    exchange_rate: mantissa * 12 / 10,
+                },
+                output: Output {
+                    redeem_tokens: 10000,
+                    redeem_amount: 12000,
+                },
+            },
+        ];
+        for case in cases {
+            let Case { input, output } = case;
+            assert_eq!(
+                calculate_redeem_values(
+                    input.redeem_tokens_in,
+                    input.redeem_amount_in,
+                    U256::from(input.exchange_rate)
+                ),
+                Some((output.redeem_tokens, output.redeem_amount))
+            )
+        }
+    }
+
+    #[test]
+    fn test_calculate_redeem_values_is_none() {
+        let with_dec = |val: u128| 10_u128.pow(18).mul(val);
+        struct Case {
+            redeem_tokens_in: u128,
+            redeem_amount_in: u128,
+        }
+        let cases: &[Case] = &[
+            Case {
+                redeem_tokens_in: 0,
+                redeem_amount_in: 0,
+            },
+            Case {
+                redeem_tokens_in: 1,
+                redeem_amount_in: 1,
+            },
+        ];
+        for case in cases {
+            assert_eq!(
+                calculate_redeem_values(
+                    case.redeem_tokens_in,
+                    case.redeem_amount_in,
+                    U256::from(1)
+                ),
+                None
             )
         }
     }
