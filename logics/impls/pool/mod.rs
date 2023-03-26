@@ -1,6 +1,9 @@
-use super::exp_no_err::{
-    exp_scale,
-    Exp,
+use super::{
+    controller::PoolAttributes,
+    exp_no_err::{
+        exp_scale,
+        Exp,
+    },
 };
 use crate::traits::{
     controller,
@@ -183,6 +186,8 @@ pub trait Internal {
     fn _balance_of_underlying(&self, account: AccountId) -> Balance;
     fn _accural_block_timestamp(&self) -> Timestamp;
     fn _borrow_index(&self) -> Exp;
+    fn _borrow_index_raw(&self) -> WrappedU256;
+    fn _account_borrows(&self, account: AccountId) -> Option<BorrowSnapshot>;
     fn _reserve_factor_mantissa(&self) -> WrappedU256;
     fn _exchange_rate_stored(&self) -> U256;
 
@@ -535,8 +540,23 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         }
 
         let contract_addr = Self::env().account_id();
-        ControllerRef::redeem_allowed(&self._controller(), contract_addr, redeemer, redeem_tokens)
-            .unwrap();
+        let (account_balance, account_borrow_balance, exchange_rate) =
+            self.get_account_snapshot(redeemer);
+        let pool_attribute = PoolAttributes {
+            underlying: self._underlying(),
+            account_balance,
+            account_borrow_balance,
+            exchange_rate,
+            total_borrows: self._total_borrows(),
+        };
+        ControllerRef::redeem_allowed(
+            &self._controller(),
+            contract_addr,
+            redeemer,
+            redeem_tokens,
+            Some(pool_attribute),
+        )
+        .unwrap();
         let current_timestamp = Self::env().block_timestamp();
         if self._accural_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
@@ -558,8 +578,23 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
     default fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
         let contract_addr = Self::env().account_id();
-        ControllerRef::borrow_allowed(&self._controller(), contract_addr, borrower, borrow_amount)
-            .unwrap();
+        let (account_balance, account_borrow_balance, exchange_rate) =
+            self.get_account_snapshot(borrower);
+        let pool_attribute = PoolAttributes {
+            underlying: self._underlying(),
+            account_balance,
+            account_borrow_balance,
+            exchange_rate,
+            total_borrows: self._total_borrows(),
+        };
+        ControllerRef::borrow_allowed(
+            &self._controller(),
+            contract_addr,
+            borrower,
+            borrow_amount,
+            Some(pool_attribute),
+        )
+        .unwrap();
 
         let current_timestamp = Self::env().block_timestamp();
         if self._accural_block_timestamp() != current_timestamp {
@@ -848,6 +883,14 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         }
     }
 
+    default fn _borrow_index_raw(&self) -> WrappedU256 {
+        self.data::<Data>().borrow_index
+    }
+
+    default fn _account_borrows(&self, account: AccountId) -> Option<BorrowSnapshot> {
+        self.data::<Data>().account_borrows.get(&account)
+    }
+
     default fn _borrow_balance_stored(&self, account: AccountId) -> Balance {
         let snapshot = match self.data::<Data>().account_borrows.get(&account) {
             Some(value) => value,
@@ -858,6 +901,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             return 0
         }
         let borrow_index = self._borrow_index();
+        // temp / TODO: check calculation interest_rate
+        if U256::from(borrow_index.mantissa).is_zero()
+            && U256::from(snapshot.interest_index).is_zero()
+        {
+            return snapshot.principal
+        }
         let prinicipal_times_index =
             U256::from(snapshot.principal).mul(U256::from(borrow_index.mantissa));
         prinicipal_times_index
