@@ -1,6 +1,11 @@
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
-import { hexToUtf8, shouldNotRevert, zeroAddress } from './testHelpers'
+import {
+  expectToEmit,
+  hexToUtf8,
+  shouldNotRevert,
+  zeroAddress,
+} from './testHelpers'
 
 import Pool from '../types/contracts/pool'
 
@@ -13,6 +18,8 @@ import {
 } from '../scripts/helper/deploy_helper'
 import { ONE_ETHER } from '../scripts/tokens'
 import PSP22Token from '../types/contracts/psp22_token'
+import { Redeem } from '../types/event-types/pool'
+import { Transfer } from '../types/event-types/psp22_token'
 
 describe('Pool spec', () => {
   const setup = async () => {
@@ -139,34 +146,43 @@ describe('Pool spec', () => {
       ;({ deployer, token, pool } = await setup())
     })
 
+    const deposited = 10_000
+    const minted = deposited
     it('preparations', async () => {
-      await shouldNotRevert(token, 'mint', [deployer.address, 10_000])
+      await shouldNotRevert(token, 'mint', [deployer.address, deposited])
 
-      await shouldNotRevert(token, 'approve', [pool.address, 10_000])
-      await shouldNotRevert(pool, 'mint', [10_000])
+      await shouldNotRevert(token, 'approve', [pool.address, deposited])
+      await shouldNotRevert(pool, 'mint', [deposited])
       expect(
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(10_000)
+      ).toEqual(minted)
     })
 
     it('execute', async () => {
-      const { events } = await shouldNotRevert(pool, 'redeem', [3_000])
+      const redeemAmount = 3_000
+      const { events } = await shouldNotRevert(pool, 'redeem', [redeemAmount])
 
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(3000)
+      ).toEqual(redeemAmount)
       expect(
         (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
-      ).toEqual(7000)
+      ).toEqual(deposited - redeemAmount)
       expect(
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(7000)
+      ).toEqual(minted - redeemAmount)
 
-      const event = events[0]
-      expect(event.name).toEqual('Redeem')
-      expect(event.args.redeemer).toEqual(deployer.address)
-      expect(event.args.redeemAmount.toNumber()).toEqual(3_000)
-      expect(event.args.redeemTokens.toNumber()).toEqual(3_000)
+      expect(events).toHaveLength(2)
+      expectToEmit<Transfer>(events[0], 'Transfer', {
+        from: deployer.address,
+        to: null,
+        value: redeemAmount,
+      })
+      expectToEmit<Redeem>(events[1], 'Redeem', {
+        redeemer: deployer.address,
+        redeemAmount,
+        redeemTokens: redeemAmount,
+      })
     })
   })
 
