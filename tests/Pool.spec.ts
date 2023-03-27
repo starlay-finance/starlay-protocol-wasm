@@ -7,6 +7,7 @@ import {
   deployPoolFromAsset,
   deployPriceOracle,
   deployPSP22Token,
+  ZERO_ADDRESS,
 } from '../scripts/helper/deploy_helper'
 import { ONE_ETHER } from '../scripts/tokens'
 import Controller from '../types/contracts/controller'
@@ -168,6 +169,7 @@ describe('Pool spec', () => {
 
     // initialize
     await controller.tx.setPriceOracle(priceOracle.address)
+    await controller.tx.setCloseFactorMantissa(toParam(ONE_ETHER))
     //// for pool
     for (const sym of [pools.dai, pools.usdc, pools.usdt]) {
       await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
@@ -545,77 +547,101 @@ describe('Pool spec', () => {
   })
 
   describe('.liquidate_borrow', () => {
-    // TODO: check seize
     let deployer: KeyringPair
-    let token: PSP22Token
-    let pool: Pool
+    let controller: Controller
+    let pools: Pools
     let users: KeyringPair[]
-    let secondToken: PSP22Token
-    let secondPool: Pool
 
     beforeAll(async () => {
-      let api
-      let controller
-      let pools
-      ;({ api, deployer, controller, pools, users } = await setup())
-
-      token = pools.dai.token
-      pool = pools.dai.pool
-      secondToken = pools.usdc.token
-      secondPool = pools.usdc.pool
+      ;({ deployer, controller, pools, users } = await setup())
     })
 
     it('preparations', async () => {
-      await token.tx.mint(deployer.address, 10_000)
-      await token.tx.approve(pool.address, 10_000)
-      await pool.tx.mint(10_000)
+      const { dai, usdc } = pools
+
+      // add liquidity to usdc pool
+      await usdc.token.tx.mint(deployer.address, 10_000)
+      await usdc.token.tx.approve(usdc.pool.address, 10_000)
+      await usdc.pool.tx.mint(10_000)
       expect(
-        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+        (await usdc.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(10_000)
 
-      const [borrower, repayer] = users
-      await pool.withSigner(borrower).tx.borrow(10_000)
-      await token.tx.mint(repayer.address, 10_000)
+      // mint to dai pool for collateral
+      const [borrower, _] = users
+      await dai.token.tx.mint(borrower.address, 20_000)
+      await dai.token.withSigner(borrower).tx.approve(dai.pool.address, 20_000)
+      await dai.pool.withSigner(borrower).tx.mint(20_000)
       expect(
-        (await token.query.balanceOf(repayer.address)).value.ok.toNumber(),
-      ).toEqual(10_000)
-      expect(
-        (await token.query.balanceOf(borrower.address)).value.ok.toNumber(),
-      ).toEqual(10_000)
+        (await dai.pool.query.balanceOf(borrower.address)).value.ok.toNumber(),
+      ).toEqual(20_000)
+
+      // borrow usdc
+      await usdc.pool.withSigner(borrower).tx.borrow(10_000)
       expect(
         (
-          await pool.query.borrowBalanceStored(borrower.address)
+          await usdc.token.query.balanceOf(borrower.address)
         ).value.ok.toNumber(),
       ).toEqual(10_000)
+
+      // down collateral_factor for dai
+      const toParam = (m: BN) => [m.toString()]
+      await controller.tx.setCollateralFactorMantissa(
+        dai.pool.address,
+        toParam(new BN(1)),
+      )
+      const [collateralValue, shortfallValue] = (
+        await controller.query.getHypotheticalAccountLiquidity(
+          borrower.address,
+          ZERO_ADDRESS,
+          0,
+          0,
+          null,
+        )
+      ).value.ok.ok
+      expect(collateralValue).toEqual(0)
+      expect(shortfallValue).toBeGreaterThanOrEqual(9999)
     })
 
-    // TODO: fix
-    it.skip('execute', async () => {
+    // TODO: fix/check calculation seize token amount
+    it('execute', async () => {
       const [borrower, repayer] = users
-      await token.withSigner(repayer).tx.approve(pool.address, 10_000)
-      const { events } = await pool
+      const collateral = pools.dai
+      const borrowing = pools.usdc
+      await borrowing.token.tx.mint(repayer.address, 5_000)
+      await borrowing.token
         .withSigner(repayer)
-        .tx.liquidateBorrow(borrower.address, 10_000, secondPool.address)
+        .tx.approve(borrowing.pool.address, 5_000)
+
+      const { events } = await borrowing.pool
+        .withSigner(repayer)
+        .tx.liquidateBorrow(borrower.address, 5_000, collateral.pool.address)
+
       expect(
-        (await token.query.balanceOf(repayer.address)).value.ok.toNumber(),
+        (
+          await borrowing.token.query.balanceOf(repayer.address)
+        ).value.ok.toNumber(),
       ).toEqual(0)
       expect(
-        (await token.query.balanceOf(borrower.address)).value.ok.toNumber(),
+        (
+          await borrowing.token.query.balanceOf(borrower.address)
+        ).value.ok.toNumber(),
       ).toEqual(10_000)
       expect(
         (
-          await pool.query.borrowBalanceStored(borrower.address)
+          await borrowing.pool.query.borrowBalanceStored(borrower.address)
         ).value.ok.toNumber(),
-      ).toEqual(0)
+      ).toEqual(5000)
+      // TODO: check seized
 
       expect(events[0].name).toEqual('RepayBorrow')
       const event = events[1]
       expect(event.name).toEqual('LiquidateBorrow')
       expect(event.args.liquidator).toEqual(repayer.address)
       expect(event.args.borrower).toEqual(borrower.address)
-      expect(event.args.repayAmount.toNumber()).toEqual(10_000)
-      expect(event.args.tokenCollateral).toEqual(secondPool.address)
-      expect(event.args.seizeTokens.toNumber()).toEqual(0)
+      expect(event.args.repayAmount.toNumber()).toEqual(5_000)
+      expect(event.args.tokenCollateral).toEqual(collateral.pool.address)
+      expect(event.args.seizeTokens.toNumber()).toEqual(0) // TODO: fix
     })
   })
 
