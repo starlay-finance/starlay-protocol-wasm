@@ -701,6 +701,15 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         collateral: AccountId,
     ) -> Result<()> {
         let contract_addr = Self::env().account_id();
+        let (account_balance, account_borrow_balance, exchange_rate) =
+            self.get_account_snapshot(borrower);
+        let pool_attribute = PoolAttributes {
+            underlying: self._underlying(),
+            account_balance,
+            account_borrow_balance,
+            exchange_rate,
+            total_borrows: self._total_borrows(),
+        };
         ControllerRef::liquidate_borrow_allowed(
             &self._controller(),
             contract_addr,
@@ -708,8 +717,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             liquidator,
             borrower,
             repay_amount,
-        )
-        .unwrap();
+            Some(pool_attribute),
+        )?;
 
         let current_timestamp = Self::env().block_timestamp();
         if self._accural_block_timestamp() != current_timestamp {
@@ -736,6 +745,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             collateral,
             WrappedU256::from(exchange_rate),
             actual_repay_amount,
+            Some(self._underlying()),
+            None,
         )
         .unwrap();
         if collateral == contract_addr {
@@ -1114,6 +1125,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     default fn _emit_new_controller_event(&self, _old: AccountId, _new: AccountId) {}
     default fn _emit_new_interest_rate_model_event(&self, _old: AccountId, _new: AccountId) {}
     default fn _emit_new_reserve_factor_event(&self, _old: WrappedU256, _new: WrappedU256) {}
+}
+
+pub fn to_controller_error(e: controller::Error) -> Error {
+    Error::Controller(e)
 }
 
 pub fn to_psp22_error(e: PSP22Error) -> Error {

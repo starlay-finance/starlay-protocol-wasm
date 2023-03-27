@@ -12,7 +12,10 @@ use openbrush::{
 };
 use primitive_types::U256;
 
-use super::types::WrappedU256;
+use super::{
+    controller::Error as ControllerError,
+    types::WrappedU256,
+};
 
 #[openbrush::wrapper]
 pub type PoolRef = dyn Pool + PSP22;
@@ -126,8 +129,15 @@ pub enum Error {
     SetReserveFactorBoundsCheck,
     CannotSweepUnderlyingToken,
     CallerIsNotManager,
+    Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),
+}
+
+impl From<ControllerError> for Error {
+    fn from(error: ControllerError) -> Self {
+        Error::Controller(error)
+    }
 }
 
 impl From<PSP22Error> for Error {

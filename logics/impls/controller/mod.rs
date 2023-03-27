@@ -138,6 +138,7 @@ pub trait Internal {
         liquidator: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()>;
     fn _liquidate_borrow_verify(
         &self,
@@ -184,6 +185,8 @@ pub trait Internal {
         pool_collateral: AccountId,
         exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
+        pool_borrowed_underlying: Option<AccountId>,
+        pool_collateral_underlying: Option<AccountId>,
     ) -> Result<Balance>;
     fn _assert_manager(&self) -> Result<()>;
 
@@ -338,6 +341,7 @@ impl<T: Storage<Data>> Controller for T {
         liquidator: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()> {
         self._liquidate_borrow_allowed(
             pool_borrowed,
@@ -345,6 +349,7 @@ impl<T: Storage<Data>> Controller for T {
             liquidator,
             borrower,
             repay_amount,
+            pool_attribure,
         )
     }
 
@@ -427,12 +432,16 @@ impl<T: Storage<Data>> Controller for T {
         pool_collateral: AccountId,
         exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
+        pool_borrowed_underlying: Option<AccountId>,
+        pool_collateral_underlying: Option<AccountId>,
     ) -> Result<Balance> {
         self._liquidate_calculate_seize_tokens(
             pool_borrowed,
             pool_collateral,
             exchange_rate_mantissa,
             repay_amount,
+            pool_borrowed_underlying,
+            pool_collateral_underlying,
         )
     }
 
@@ -722,23 +731,38 @@ impl<T: Storage<Data>> Internal for T {
         _liquidator: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()> {
         if !self._is_listed(pool_borrowed) || !self._is_listed(pool_collateral) {
             return Err(Error::MarketNotListed)
         }
 
+        let (caller_pool, borrow_balance) = if pool_attribure.is_some() {
+            let attrs = pool_attribure.unwrap();
+            (
+                Some((pool_borrowed, attrs.clone())),
+                attrs.account_borrow_balance,
+            )
+        } else {
+            (
+                None,
+                PoolRef::borrow_balance_stored(&pool_borrowed, borrower),
+            )
+        };
+
         // The borrower must have shortfall in order to be liquidatable
-        let (_, shortfall) = self._get_account_liquidity(borrower).unwrap();
+        let (_, shortfall) = self
+            ._get_hypothetical_account_liquidity(borrower, ZERO_ADDRESS.into(), 0, 0, caller_pool)
+            .unwrap();
         if shortfall.is_zero() {
             return Err(Error::InsufficientShortfall)
         }
 
         // The liquidator may not repay more than what is allowed by the closeFactor
-        let bollow_balance = PoolRef::borrow_balance_stored(&pool_borrowed, borrower);
         let max_close = Exp {
             mantissa: self._close_factor_mantissa(),
         }
-        .mul_scalar_truncate(U256::from(bollow_balance));
+        .mul_scalar_truncate(U256::from(borrow_balance));
         if U256::from(repay_amount).gt(&max_close) {
             return Err(Error::TooMuchRepay)
         }
@@ -823,14 +847,23 @@ impl<T: Storage<Data>> Internal for T {
         pool_collateral: AccountId,
         exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
+        pool_borrowed_underlying: Option<AccountId>,
+        pool_collateral_underlying: Option<AccountId>,
     ) -> Result<Balance> {
-        let price_borrowed_mantissa =
-            PriceOracleRef::get_underlying_price(&self._oracle(), pool_borrowed);
+        let price_borrowed_mantissa = if let Some(underlying) = pool_borrowed_underlying {
+            PriceOracleRef::get_price(&self._oracle(), underlying)
+        } else {
+            PriceOracleRef::get_underlying_price(&self._oracle(), pool_borrowed)
+        };
+
         if let None | Some(0) = price_borrowed_mantissa {
             return Err(Error::PriceError)
         }
-        let price_collateral_mantissa =
-            PriceOracleRef::get_underlying_price(&self._oracle(), pool_collateral);
+        let price_collateral_mantissa = if let Some(underlying) = pool_collateral_underlying {
+            PriceOracleRef::get_price(&self._oracle(), underlying)
+        } else {
+            PriceOracleRef::get_underlying_price(&self._oracle(), pool_collateral)
+        };
         if let None | Some(0) = price_collateral_mantissa {
             return Err(Error::PriceError)
         }

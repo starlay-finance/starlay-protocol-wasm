@@ -191,7 +191,8 @@ pub mod contract {
                         pool2,
                         ZERO_ADDRESS.into(),
                         ZERO_ADDRESS.into(),
-                        0
+                        0,
+                        None
                     )
                     .unwrap_err(),
                 Error::MarketNotListed
@@ -204,7 +205,8 @@ pub mod contract {
                         pool2,
                         ZERO_ADDRESS.into(),
                         ZERO_ADDRESS.into(),
-                        0
+                        0,
+                        None
                     )
                     .unwrap_err(),
                 Error::MarketNotListed
