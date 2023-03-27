@@ -14,6 +14,7 @@ import Controller from '../types/contracts/controller'
 import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
+import { shouldNotRevert } from './testHelpers'
 
 const TOKENS = ['dai', 'usdc', 'usdt'] as const
 const METADATAS: {
@@ -276,34 +277,61 @@ describe('Controller spec', () => {
     })
   })
 
-  describe('.account_assets', () => {
-    const toParam = (m: BN) => [m.toString()] // temp
-
-    it('success', async () => {
-      const { api, deployer, controller, rateModel, priceOracle, users } =
-        await setup()
-      const user = users[0]
-      const pools = await preparePoolsWithPreparedTokens({
-        api,
-        controller,
-        rateModel,
-        manager: deployer,
-      })
-      const { dai, usdc, usdt } = pools
-
-      // prepares
-      const toParam = (m: BN) => [m.toString()] // temp
-      for (const sym of [dai, usdc, usdt]) {
-        await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
-        await controller.tx.supportMarketWithCollateralFactorMantissa(
-          sym.pool.address,
-          toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
-        )
-      }
-
-      const accountAssets = (await controller.query.accountAssets(user.address))
-        .value.ok
-      expect(accountAssets).toEqual([])
+  it('.account_assets', async () => {
+    const { api, deployer, controller, rateModel, priceOracle, users } =
+      await setup()
+    const user = users[0]
+    const pools = await preparePoolsWithPreparedTokens({
+      api,
+      controller,
+      rateModel,
+      manager: deployer,
     })
+    const { dai, usdc, usdt } = pools
+
+    // prepares
+    const toParam = (m: BN) => [m.toString()] // temp
+    for (const sym of [dai, usdc, usdt]) {
+      await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+      await controller.tx.supportMarketWithCollateralFactorMantissa(
+        sym.pool.address,
+        toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+      )
+    }
+
+    const getAccountAssets = async (address: string) =>
+      (await controller.query.accountAssets(address)).value.ok
+    expect(await getAccountAssets(user.address)).toEqual([])
+
+    for (const sym of [dai, usdc, usdt]) {
+      const { token, pool } = sym
+      await shouldNotRevert(token.withSigner(user), 'mint', [
+        user.address,
+        10_000,
+      ])
+      await shouldNotRevert(token.withSigner(user), 'approve', [
+        pool.address,
+        10_000,
+      ])
+    }
+
+    await shouldNotRevert(dai.pool.withSigner(user), 'mint', [1_000])
+    expect(await getAccountAssets(user.address)).toEqual([dai.pool.address])
+
+    await shouldNotRevert(usdc.pool.withSigner(user), 'mint', [1_000])
+    await shouldNotRevert(usdc.pool.withSigner(user), 'mint', [1_000])
+    expect(await getAccountAssets(user.address)).toEqual([
+      dai.pool.address,
+      usdc.pool.address,
+    ])
+
+    await shouldNotRevert(usdt.pool.withSigner(user), 'mint', [1_000])
+    await shouldNotRevert(usdt.pool.withSigner(user), 'mint', [1_000])
+    await shouldNotRevert(usdt.pool.withSigner(user), 'mint', [1_000])
+    expect(await getAccountAssets(user.address)).toEqual([
+      dai.pool.address,
+      usdc.pool.address,
+      usdt.pool.address,
+    ])
   })
 })
