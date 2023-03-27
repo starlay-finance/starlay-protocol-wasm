@@ -53,7 +53,9 @@ use self::utils::{
     protocol_seize_amount,
     protocol_seize_share_mantissa,
     reserve_factor_max_mantissa,
+    underlying_balance,
     CalculateInterestInput,
+    CalculateInterestOutput,
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
@@ -103,7 +105,8 @@ impl Default for Data {
 pub trait Internal {
     fn _accrue_interest(&mut self) -> Result<()>;
     fn _accure_interest_at(&mut self, at: Timestamp) -> Result<()>;
-
+    fn _balance_of(&self, owner: &AccountId) -> Balance;
+    fn _total_supply(&self) -> Balance;
     // use in PSP22#transfer,transfer_from interface
     // return PSP22Error as Error for this
     fn _transfer_tokens(
@@ -142,6 +145,8 @@ pub trait Internal {
         borrower: AccountId,
         seize_tokens: Balance,
     ) -> Result<()>;
+
+    // admin functions
     fn _set_controller(&mut self, new_controller: AccountId) -> Result<()>;
     fn _set_reserve_factor_mantissa(
         &mut self,
@@ -152,6 +157,7 @@ pub trait Internal {
     fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()>;
     fn _sweep_token(&mut self, asset: AccountId) -> Result<()>;
 
+    // utilities
     fn _transfer_underlying_from(
         &self,
         from: AccountId,
@@ -159,9 +165,9 @@ pub trait Internal {
         value: Balance,
     ) -> Result<()>;
     fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()>;
-
     fn _assert_manager(&self) -> Result<()>;
 
+    // view functions
     fn _underlying(&self) -> AccountId;
     fn _controller(&self) -> AccountId;
     fn _manager(&self) -> AccountId;
@@ -186,10 +192,9 @@ pub trait Internal {
     fn _balance_of_underlying(&self, account: AccountId) -> Balance;
     fn _accural_block_timestamp(&self) -> Timestamp;
     fn _borrow_index(&self) -> Exp;
-    fn _borrow_index_raw(&self) -> WrappedU256;
-    fn _account_borrows(&self, account: AccountId) -> Option<BorrowSnapshot>;
     fn _reserve_factor_mantissa(&self) -> WrappedU256;
     fn _exchange_rate_stored(&self) -> U256;
+    fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput>;
 
     // event emission
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
@@ -301,39 +306,6 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         self._seize(Self::env().caller(), liquidator, borrower, seize_tokens)
     }
 
-    default fn underlying(&self) -> AccountId {
-        self._underlying()
-    }
-
-    default fn controller(&self) -> AccountId {
-        self._controller()
-    }
-
-    default fn manager(&self) -> AccountId {
-        self._manager()
-    }
-
-    default fn exchage_rate_stored(&self) -> WrappedU256 {
-        WrappedU256::from(self._exchange_rate_stored())
-    }
-
-    default fn exchange_rate_current(&mut self) -> Result<WrappedU256> {
-        self._accrue_interest()?;
-        Ok(self.exchage_rate_stored())
-    }
-
-    default fn get_cash_prior(&self) -> Balance {
-        self._get_cash_prior()
-    }
-
-    default fn total_borrows(&self) -> Balance {
-        self._total_borrows()
-    }
-
-    default fn total_reserves(&self) -> Balance {
-        self._total_reserves()
-    }
-
     default fn set_controller(&mut self, new_controller: AccountId) -> Result<()> {
         self._assert_manager()?;
         let old = self._controller();
@@ -380,9 +352,42 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         self._sweep_token(asset)
     }
 
+    default fn underlying(&self) -> AccountId {
+        self._underlying()
+    }
+
+    default fn controller(&self) -> AccountId {
+        self._controller()
+    }
+
+    default fn manager(&self) -> AccountId {
+        self._manager()
+    }
+
+    default fn exchage_rate_stored(&self) -> WrappedU256 {
+        WrappedU256::from(self._exchange_rate_stored())
+    }
+
+    default fn exchange_rate_current(&mut self) -> Result<WrappedU256> {
+        self._accrue_interest()?;
+        Ok(self.exchage_rate_stored())
+    }
+
+    default fn get_cash_prior(&self) -> Balance {
+        self._get_cash_prior()
+    }
+
+    default fn total_borrows(&self) -> Balance {
+        self._total_borrows()
+    }
+
+    default fn total_reserves(&self) -> Balance {
+        self._total_reserves()
+    }
+
     default fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256) {
         (
-            self._balance_of(&account),
+            Internal::_balance_of(self, &account),
             self._borrow_balance_stored(account),
             self._exchange_rate_stored(),
         )
@@ -395,11 +400,6 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
     default fn borrow_balance_current(&mut self, account: AccountId) -> Result<Balance> {
         self._accrue_interest()?;
         Ok(self._borrow_balance_stored(account))
-    }
-
-    default fn balance_of_underlying_current(&mut self, account: AccountId) -> Result<Balance> {
-        self._accrue_interest()?;
-        Ok(self._balance_of_underlying(account))
     }
 
     default fn borrow_rate_per_msec(&self) -> WrappedU256 {
@@ -431,22 +431,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         if accural.eq(&at) {
             return Ok(())
         }
-        let cash = self._get_cash_prior();
-        let borrows = self._total_borrows();
-        let reserves = self._total_reserves();
-        let idx = self._borrow_index();
-        let borrow_rate =
-            InterestRateModelRef::get_borrow_rate(&self._rate_model(), cash, borrows, reserves);
-        let out = calculate_interest(&CalculateInterestInput {
-            total_borrows: borrows,
-            total_reserves: reserves,
-            borrow_index: idx,
-            borrow_rate: borrow_rate.into(),
-            old_block_timestamp: self._accural_block_timestamp(),
-            new_block_timestamp: at,
-            reserve_factor_mantissa: self._reserve_factor_mantissa().into(),
-        })?;
 
+        let out = self._get_interest_at(at)?;
         let mut data = self.data::<Data>();
         data.accural_block_timestamp = at;
         data.borrow_index = out.borrow_index.mantissa;
@@ -458,6 +444,24 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             out.total_borrows,
         );
         Ok(())
+    }
+
+    fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput> {
+        let cash = self._get_cash_prior();
+        let borrows = self._total_borrows();
+        let reserves = self._total_reserves();
+        let idx = self._borrow_index();
+        let borrow_rate =
+            InterestRateModelRef::get_borrow_rate(&self._rate_model(), cash, borrows, reserves);
+        calculate_interest(&CalculateInterestInput {
+            total_borrows: borrows,
+            total_reserves: reserves,
+            borrow_index: idx,
+            borrow_rate: borrow_rate.into(),
+            old_block_timestamp: self._accural_block_timestamp(),
+            new_block_timestamp: at,
+            reserve_factor_mantissa: self._reserve_factor_mantissa().into(),
+        })
     }
     default fn _transfer_tokens(
         &mut self,
@@ -796,207 +800,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         Ok(())
     }
 
-    fn _transfer_underlying_from(
-        &self,
-        from: AccountId,
-        to: AccountId,
-        value: Balance,
-    ) -> Result<()> {
-        PSP22Ref::transfer_from_builder(&self._underlying(), from, to, value, Vec::<u8>::new())
-            .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
-            .try_invoke()
-            .unwrap()
-            .unwrap()
-            .map_err(to_psp22_error)
-    }
-    fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()> {
-        PSP22Ref::transfer(&self._underlying(), to, value, Vec::<u8>::new()).map_err(to_psp22_error)
-    }
-
-    default fn _assert_manager(&self) -> Result<()> {
-        if Self::env().caller() != self._manager() {
-            return Err(Error::CallerIsNotManager)
-        }
-        Ok(())
-    }
-
-    default fn _underlying(&self) -> AccountId {
-        self.data::<Data>().underlying
-    }
-
-    default fn _controller(&self) -> AccountId {
-        self.data::<Data>().controller
-    }
-
-    default fn _manager(&self) -> AccountId {
-        self.data::<Data>().manager
-    }
-
-    default fn _get_cash_prior(&self) -> Balance {
-        PSP22Ref::balance_of(&self._underlying(), Self::env().account_id())
-    }
-
-    default fn _total_borrows(&self) -> Balance {
-        self.data::<Data>().total_borrows
-    }
-
-    default fn _rate_model(&self) -> AccountId {
-        self.data::<Data>().rate_model
-    }
-
-    default fn _borrow_rate_per_msec(
-        &self,
-        cash: Balance,
-        borrows: Balance,
-        reserves: Balance,
-    ) -> WrappedU256 {
-        InterestRateModelRef::get_borrow_rate(&self._rate_model(), cash, borrows, reserves)
-    }
-
-    default fn _supply_rate_per_msec(
-        &self,
-        cash: Balance,
-        borrows: Balance,
-        reserves: Balance,
-        reserve_factor_mantissa: WrappedU256,
-    ) -> WrappedU256 {
-        InterestRateModelRef::get_supply_rate(
-            &self._rate_model(),
-            cash,
-            borrows,
-            reserves,
-            reserve_factor_mantissa,
-        )
-    }
-
-    default fn _accural_block_timestamp(&self) -> Timestamp {
-        Timestamp::from(self.data::<Data>().accural_block_timestamp)
-    }
-
-    default fn _total_reserves(&self) -> Balance {
-        self.data::<Data>().total_reserves
-    }
-
-    default fn _borrow_index(&self) -> Exp {
-        Exp {
-            mantissa: self.data::<Data>().borrow_index,
-        }
-    }
-
-    default fn _borrow_index_raw(&self) -> WrappedU256 {
-        self.data::<Data>().borrow_index
-    }
-
-    default fn _account_borrows(&self, account: AccountId) -> Option<BorrowSnapshot> {
-        self.data::<Data>().account_borrows.get(&account)
-    }
-
-    default fn _borrow_balance_stored(&self, account: AccountId) -> Balance {
-        let snapshot = match self.data::<Data>().account_borrows.get(&account) {
-            Some(value) => value,
-            None => return 0,
-        };
-
-        if snapshot.principal == 0 {
-            return 0
-        }
-        let borrow_index = self._borrow_index();
-        // temp / TODO: check calculation interest_rate
-        if U256::from(borrow_index.mantissa).is_zero()
-            && U256::from(snapshot.interest_index).is_zero()
-        {
-            return snapshot.principal
-        }
-        let prinicipal_times_index =
-            U256::from(snapshot.principal).mul(U256::from(borrow_index.mantissa));
-        prinicipal_times_index
-            .div(U256::from(snapshot.interest_index))
-            .as_u128()
-    }
-
-    default fn _balance_of_underlying(&self, account: AccountId) -> Balance {
-        let exchange_rate = Exp {
-            mantissa: self._exchange_rate_stored().into(),
-        };
-        let balance_of_underlying = self._balance_of(&account);
-        exchange_rate
-            .mul_scalar_truncate(balance_of_underlying.into())
-            .as_u128()
-    }
-
-    default fn _reserve_factor_mantissa(&self) -> WrappedU256 {
-        self.data::<Data>().reserve_factor_mantissa
-    }
-
-    // event emission
-    default fn _emit_mint_event(
-        &self,
-        _minter: AccountId,
-        _mint_amount: Balance,
-        _mint_tokens: Balance,
-    ) {
-    }
-    default fn _emit_redeem_event(
-        &self,
-        _redeemer: AccountId,
-        _redeem_amount: Balance,
-        _redeem_tokens: Balance,
-    ) {
-    }
-    default fn _emit_borrow_event(
-        &self,
-        _borrower: AccountId,
-        _borrow_amount: Balance,
-        _account_borrows: Balance,
-        _total_borrows: Balance,
-    ) {
-    }
-    default fn _emit_repay_borrow_event(
-        &self,
-        _payer: AccountId,
-        _borrower: AccountId,
-        _repay_amount: Balance,
-        _account_borrows: Balance,
-        _total_borrows: Balance,
-    ) {
-    }
-    default fn _emit_liquidate_borrow_event(
-        &self,
-        _liquidator: AccountId,
-        _borrower: AccountId,
-        _repay_amount: Balance,
-        _token_collateral: AccountId,
-        _seize_tokens: Balance,
-    ) {
-    }
-
-    default fn _emit_reserves_added_event(
-        &self,
-        _benefactor: AccountId,
-        _add_amount: Balance,
-        _new_total_reserves: Balance,
-    ) {
-    }
-
-    default fn _emit_accrue_interest_event(
-        &self,
-        _interest_accumulated: Balance,
-        _new_index: WrappedU256,
-        _new_total_borrows: Balance,
-    ) {
-    }
-
-    default fn _emit_reserves_reduced_event(
-        &self,
-        _reduce_amount: Balance,
-        _total_reserves_new: Balance,
-    ) {
-    }
-
-    default fn _emit_new_controller_event(&self, _old: AccountId, _new: AccountId) {}
-    default fn _emit_new_interest_rate_model_event(&self, _old: AccountId, _new: AccountId) {}
-    default fn _emit_new_reserve_factor_event(&self, _old: WrappedU256, _new: WrappedU256) {}
-
+    // admin functions
     default fn _set_controller(&mut self, new_controller: AccountId) -> Result<()> {
         self.data::<Data>().controller = new_controller;
         Ok(())
@@ -1085,14 +889,231 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         Ok(())
     }
 
+    // utilities
+    default fn _transfer_underlying_from(
+        &self,
+        from: AccountId,
+        to: AccountId,
+        value: Balance,
+    ) -> Result<()> {
+        PSP22Ref::transfer_from_builder(&self._underlying(), from, to, value, Vec::<u8>::new())
+            .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
+            .try_invoke()
+            .unwrap()
+            .unwrap()
+            .map_err(to_psp22_error)
+    }
+
+    default fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()> {
+        PSP22Ref::transfer(&self._underlying(), to, value, Vec::<u8>::new()).map_err(to_psp22_error)
+    }
+
+    default fn _assert_manager(&self) -> Result<()> {
+        if Self::env().caller() != self._manager() {
+            return Err(Error::CallerIsNotManager)
+        }
+        Ok(())
+    }
+
+    // view functions
+    default fn _underlying(&self) -> AccountId {
+        self.data::<Data>().underlying
+    }
+
+    default fn _controller(&self) -> AccountId {
+        self.data::<Data>().controller
+    }
+
+    default fn _manager(&self) -> AccountId {
+        self.data::<Data>().manager
+    }
+
+    default fn _get_cash_prior(&self) -> Balance {
+        PSP22Ref::balance_of(&self._underlying(), Self::env().account_id())
+    }
+
+    default fn _total_borrows(&self) -> Balance {
+        self.data::<Data>().total_borrows
+    }
+
+    default fn _rate_model(&self) -> AccountId {
+        self.data::<Data>().rate_model
+    }
+
+    default fn _borrow_rate_per_msec(
+        &self,
+        cash: Balance,
+        borrows: Balance,
+        reserves: Balance,
+    ) -> WrappedU256 {
+        InterestRateModelRef::get_borrow_rate(&self._rate_model(), cash, borrows, reserves)
+    }
+
+    default fn _supply_rate_per_msec(
+        &self,
+        cash: Balance,
+        borrows: Balance,
+        reserves: Balance,
+        reserve_factor_mantissa: WrappedU256,
+    ) -> WrappedU256 {
+        InterestRateModelRef::get_supply_rate(
+            &self._rate_model(),
+            cash,
+            borrows,
+            reserves,
+            reserve_factor_mantissa,
+        )
+    }
+
+    default fn _accural_block_timestamp(&self) -> Timestamp {
+        Timestamp::from(self.data::<Data>().accural_block_timestamp)
+    }
+
+    default fn _total_reserves(&self) -> Balance {
+        self.data::<Data>().total_reserves
+    }
+
+    default fn _borrow_index(&self) -> Exp {
+        Exp {
+            mantissa: self.data::<Data>().borrow_index,
+        }
+    }
+
+    default fn _borrow_balance_stored(&self, account: AccountId) -> Balance {
+        let snapshot = match self.data::<Data>().account_borrows.get(&account) {
+            Some(value) => value,
+            None => return 0,
+        };
+
+        if snapshot.principal == 0 {
+            return 0
+        }
+        let borrow_index = self._borrow_index();
+        // temp / TODO: check calculation interest_rate
+        if U256::from(borrow_index.mantissa).is_zero()
+            && U256::from(snapshot.interest_index).is_zero()
+        {
+            return snapshot.principal
+        }
+        let prinicipal_times_index =
+            U256::from(snapshot.principal).mul(U256::from(borrow_index.mantissa));
+        prinicipal_times_index
+            .div(U256::from(snapshot.interest_index))
+            .as_u128()
+    }
+
+    default fn _balance_of(&self, owner: &AccountId) -> Balance {
+        self._balance_of_underlying(*owner)
+    }
+
+    default fn _total_supply(&self) -> Balance {
+        let supply = self.data::<PSP22Data>().supply;
+        let interest = self
+            ._get_interest_at(Self::env().block_timestamp())
+            .unwrap();
+        let rate = exchange_rate(
+            supply.into(),
+            self._get_cash_prior(),
+            interest.total_borrows,
+            interest.total_reserves,
+        );
+        underlying_balance(
+            Exp {
+                mantissa: rate.into(),
+            },
+            supply,
+        )
+    }
+
+    default fn _balance_of_underlying(&self, account: AccountId) -> Balance {
+        let exchange_rate = Exp {
+            mantissa: self._exchange_rate_stored().into(),
+        };
+        let pool_token_balance = psp22::Internal::_balance_of(self, &account);
+        underlying_balance(exchange_rate, pool_token_balance)
+    }
+
+    default fn _reserve_factor_mantissa(&self) -> WrappedU256 {
+        self.data::<Data>().reserve_factor_mantissa
+    }
+
     default fn _exchange_rate_stored(&self) -> U256 {
         exchange_rate(
-            self.total_supply(),
+            self.data::<PSP22Data>().supply,
             self._get_cash_prior(),
             self._total_borrows(),
             self._total_reserves(),
         )
     }
+
+    // event emission
+    default fn _emit_mint_event(
+        &self,
+        _minter: AccountId,
+        _mint_amount: Balance,
+        _mint_tokens: Balance,
+    ) {
+    }
+    default fn _emit_redeem_event(
+        &self,
+        _redeemer: AccountId,
+        _redeem_amount: Balance,
+        _redeem_tokens: Balance,
+    ) {
+    }
+    default fn _emit_borrow_event(
+        &self,
+        _borrower: AccountId,
+        _borrow_amount: Balance,
+        _account_borrows: Balance,
+        _total_borrows: Balance,
+    ) {
+    }
+    default fn _emit_repay_borrow_event(
+        &self,
+        _payer: AccountId,
+        _borrower: AccountId,
+        _repay_amount: Balance,
+        _account_borrows: Balance,
+        _total_borrows: Balance,
+    ) {
+    }
+    default fn _emit_liquidate_borrow_event(
+        &self,
+        _liquidator: AccountId,
+        _borrower: AccountId,
+        _repay_amount: Balance,
+        _token_collateral: AccountId,
+        _seize_tokens: Balance,
+    ) {
+    }
+
+    default fn _emit_reserves_added_event(
+        &self,
+        _benefactor: AccountId,
+        _add_amount: Balance,
+        _new_total_reserves: Balance,
+    ) {
+    }
+
+    default fn _emit_accrue_interest_event(
+        &self,
+        _interest_accumulated: Balance,
+        _new_index: WrappedU256,
+        _new_total_borrows: Balance,
+    ) {
+    }
+
+    default fn _emit_reserves_reduced_event(
+        &self,
+        _reduce_amount: Balance,
+        _total_reserves_new: Balance,
+    ) {
+    }
+
+    default fn _emit_new_controller_event(&self, _old: AccountId, _new: AccountId) {}
+    default fn _emit_new_interest_rate_model_event(&self, _old: AccountId, _new: AccountId) {}
+    default fn _emit_new_reserve_factor_event(&self, _old: WrappedU256, _new: WrappedU256) {}
 }
 
 pub fn to_psp22_error(e: PSP22Error) -> Error {
