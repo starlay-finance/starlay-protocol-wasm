@@ -1,14 +1,6 @@
+import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
-import {
-  expectToEmit,
-  hexToUtf8,
-  shouldNotRevert,
-  zeroAddress,
-} from './testHelpers'
-
-import Pool from '../types/contracts/pool'
-
 import {
   deployController,
   deployDefaultInterestRateModel,
@@ -17,24 +9,128 @@ import {
   deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
 import { ONE_ETHER } from '../scripts/tokens'
+import Controller from '../types/contracts/controller'
+import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
+import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
 import { Mint, Redeem } from '../types/event-types/pool'
 import { Transfer } from '../types/event-types/psp22_token'
+import {
+  expectToEmit,
+  hexToUtf8,
+  shouldNotRevert,
+  zeroAddress,
+} from './testHelpers'
+
+const TOKENS = ['dai', 'usdc', 'usdt'] as const
+const METADATAS: {
+  [key in (typeof TOKENS)[number]]: {
+    name: string
+    symbol: string
+    decimals: number
+  }
+} = {
+  dai: {
+    name: 'Dai Stablecoin',
+    symbol: 'DAI',
+    decimals: 8,
+  },
+  usdc: {
+    name: 'USD Coin',
+    symbol: 'USDC',
+    decimals: 6,
+  },
+  usdt: {
+    name: 'USD Tether',
+    symbol: 'USDT',
+    decimals: 6,
+  },
+} as const
+const preparePoolWithMockToken = async ({
+  api,
+  metadata,
+  controller,
+  rateModel,
+  manager,
+}: {
+  api: ApiPromise
+  metadata: {
+    name: string
+    symbol: string
+    decimals: number
+  }
+  controller: Controller
+  rateModel: DefaultInterestRateModel
+  manager: KeyringPair
+}): Promise<{
+  token: PSP22Token
+  pool: Pool
+}> => {
+  const token = await deployPSP22Token({
+    api,
+    signer: manager,
+    args: [
+      0,
+      metadata.name as unknown as string[],
+      metadata.symbol as unknown as string[],
+      metadata.decimals,
+    ],
+  })
+
+  const pool = await deployPoolFromAsset({
+    api,
+    signer: manager,
+    args: [token.address, controller.address, rateModel.address],
+    token,
+  })
+
+  return { token, pool }
+}
+
+type Pools = {
+  [key in (typeof TOKENS)[number]]: {
+    token: PSP22Token
+    pool: Pool
+  }
+}
+const preparePoolsWithPreparedTokens = async ({
+  api,
+  controller,
+  rateModel,
+  manager,
+}: {
+  api: ApiPromise
+  controller: Controller
+  rateModel: DefaultInterestRateModel
+  manager: KeyringPair
+}): Promise<Pools> => {
+  const dai = await preparePoolWithMockToken({
+    api,
+    controller,
+    rateModel,
+    manager: manager,
+    metadata: METADATAS.dai,
+  })
+  const usdc = await preparePoolWithMockToken({
+    api,
+    controller,
+    rateModel,
+    manager: manager,
+    metadata: METADATAS.usdc,
+  })
+  const usdt = await preparePoolWithMockToken({
+    api,
+    controller,
+    rateModel,
+    manager: manager,
+    metadata: METADATAS.usdt,
+  })
+  return { dai, usdc, usdt }
+}
 
 describe('Pool spec', () => {
   const setup = async () => {
     const { api, alice: deployer, bob, charlie } = globalThis.setup
-
-    const token = await deployPSP22Token({
-      api,
-      signer: deployer,
-      args: [
-        0,
-        'Dai Stablecoin' as unknown as string[],
-        'DAI' as unknown as string[],
-        8,
-      ],
-    })
 
     const controller = await deployController({
       api,
@@ -61,29 +157,30 @@ describe('Pool spec', () => {
       ],
     })
 
-    const pool = await deployPoolFromAsset({
+    const pools = await preparePoolsWithPreparedTokens({
       api,
-      signer: deployer,
-      args: [token.address, controller.address, rateModel.address],
-      token,
+      controller,
+      rateModel,
+      manager: deployer,
     })
+
     const users = [bob, charlie]
 
     // initialize
     await controller.tx.setPriceOracle(priceOracle.address)
     //// for pool
-    await controller.tx.supportMarket(pool.address)
-    await priceOracle.tx.setFixedPrice(token.address, ONE_ETHER)
-    await controller.tx.setCollateralFactorMantissa(
-      pool.address,
-      toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
-    )
+    for (const sym of [pools.dai, pools.usdc, pools.usdt]) {
+      await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+      await controller.tx.supportMarketWithCollateralFactorMantissa(
+        sym.pool.address,
+        toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+      )
+    }
 
     return {
       api,
       deployer,
-      token,
-      pool,
+      pools,
       rateModel,
       controller,
       priceOracle,
@@ -92,7 +189,8 @@ describe('Pool spec', () => {
   }
 
   it('instantiate', async () => {
-    const { token, pool, controller } = await setup()
+    const { pools, controller } = await setup()
+    const { pool, token } = pools.dai
     expect(pool.address).not.toBe(zeroAddress)
     expect((await pool.query.underlying()).value.ok).toEqual(token.address)
     expect((await pool.query.controller()).value.ok).toEqual(controller.address)
@@ -109,7 +207,10 @@ describe('Pool spec', () => {
     let pool: Pool
 
     beforeAll(async () => {
-      ;({ deployer, token, pool } = await setup())
+      const { deployer: _deployer, pools } = await setup()
+      deployer = _deployer
+      token = pools.dai.token
+      pool = pools.dai.pool
     })
 
     const balance = 10_000
@@ -156,7 +257,10 @@ describe('Pool spec', () => {
     let pool: Pool
 
     beforeAll(async () => {
-      ;({ deployer, token, pool } = await setup())
+      const { deployer: _deployer, pools } = await setup()
+      deployer = _deployer
+      token = pools.dai.token
+      pool = pools.dai.pool
     })
 
     const deposited = 10_000
@@ -208,7 +312,10 @@ describe('Pool spec', () => {
     let pool: Pool
 
     beforeAll(async () => {
-      ;({ deployer, token, pool } = await setup())
+      const { deployer: _deployer, pools } = await setup()
+      deployer = _deployer
+      token = pools.dai.token
+      pool = pools.dai.pool
     })
 
     const deposited = 10_000
@@ -257,7 +364,11 @@ describe('Pool spec', () => {
 
   describe('.redeem (fail case)', () => {
     it('when no cash in pool', async () => {
-      const { pool } = await setup()
+      const {
+        pools: {
+          dai: { pool },
+        },
+      } = await setup()
       const {
         value: { ok: cash },
       } = await pool.query.getCashPrior()
@@ -273,25 +384,36 @@ describe('Pool spec', () => {
     let users: KeyringPair[]
 
     beforeAll(async () => {
-      ;({ deployer, token, pool, users } = await setup())
+      const { deployer: _deployer, pools, users: _users } = await setup()
+      deployer = _deployer
+      token = pools.dai.token
+      pool = pools.dai.pool
+      users = _users
     })
 
     it('preparations', async () => {
-      await token.tx.mint(deployer.address, 10_000)
-      await token.tx.approve(pool.address, 10_000)
-      await pool.tx.mint(10_000)
+      const [user1, user2] = users
+      await token.withSigner(deployer).tx.mint(user1.address, 5_000)
+      await token.withSigner(deployer).tx.mint(user2.address, 5_000)
+      await token.withSigner(user1).tx.approve(pool.address, 5_000)
+      await pool.withSigner(user1).tx.mint(5_000)
+      await token.withSigner(user2).tx.approve(pool.address, 5_000)
+      await pool.withSigner(user2).tx.mint(5_000)
+      expect((await pool.query.totalSupply()).value.ok.toNumber()).toEqual(
+        10_000,
+      )
       expect(
-        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(10_000)
+        (await pool.query.balanceOf(user1.address)).value.ok.toNumber(),
+      ).toEqual(5_000)
+      expect(
+        (await pool.query.balanceOf(user2.address)).value.ok.toNumber(),
+      ).toEqual(5_000)
     })
 
     it('execute', async () => {
       const [user1, user2] = users
       const { events: events1 } = await pool.withSigner(user1).tx.borrow(3_000)
 
-      expect(
-        (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(0)
       expect(
         (await token.query.balanceOf(user1.address)).value.ok.toNumber(),
       ).toEqual(3_000)
@@ -301,9 +423,6 @@ describe('Pool spec', () => {
       expect(
         (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
       ).toEqual(7_000)
-      expect(
-        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(10_000)
       const event1 = events1[0]
       expect(event1.name).toEqual('Borrow')
       expect(event1.args.borrower).toEqual(user1.address)
@@ -314,9 +433,6 @@ describe('Pool spec', () => {
       const { events: events2 } = await pool.withSigner(user2).tx.borrow(2_500)
 
       expect(
-        (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(0)
-      expect(
         (await token.query.balanceOf(user1.address)).value.ok.toNumber(),
       ).toEqual(3_000)
       expect(
@@ -325,9 +441,6 @@ describe('Pool spec', () => {
       expect(
         (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
       ).toEqual(4_500)
-      expect(
-        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(10_000)
       const event2 = events2[0]
       expect(event2.name).toEqual('Borrow')
       expect(event2.args.borrower).toEqual(user2.address)
@@ -339,38 +452,64 @@ describe('Pool spec', () => {
 
   describe('.borrow (fail case)', () => {
     it('when no cash in pool', async () => {
-      const { pool } = await setup()
-      const { value } = await pool.query.borrow(3_000)
+      const {
+        deployer,
+        pools: { dai, usdc },
+      } = await setup()
+      await dai.token.tx.mint(deployer.address, 5_000)
+      await dai.token.tx.approve(dai.pool.address, 5_000)
+      await dai.pool.tx.mint(5_000)
+
+      const { value } = await usdc.pool.query.borrow(3_000)
       expect(value.ok.err).toStrictEqual({ borrowCashNotAvailable: null })
     })
   })
 
   describe('.repay_borrow', () => {
     let deployer: KeyringPair
-    let token: PSP22Token
-    let pool: Pool
+    let pools: Pools
     let users: KeyringPair[]
 
     beforeAll(async () => {
-      ;({ deployer, token, pool, users } = await setup())
+      const {
+        deployer: _deployer,
+        pools: _pools,
+        users: _users,
+      } = await setup()
+      deployer = _deployer
+      pools = _pools
+      users = _users
     })
 
     it('preparations', async () => {
-      await token.tx.mint(deployer.address, 10_000)
-      await token.tx.approve(pool.address, 10_000)
-      await pool.tx.mint(10_000)
+      const { dai, usdc } = pools
+
+      // add liquidity to usdc pool
+      await usdc.token.tx.mint(deployer.address, 10_000)
+      await usdc.token.tx.approve(usdc.pool.address, 10_000)
+      await usdc.pool.tx.mint(10_000)
       expect(
-        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+        (await usdc.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(10_000)
 
+      // mint to dai pool for collateral
       const [user1, _] = users
-      await pool.withSigner(user1).tx.borrow(10_000)
+      await dai.token.tx.mint(user1.address, 20_000)
+      await dai.token.withSigner(user1).tx.approve(dai.pool.address, 20_000)
+      await dai.pool.withSigner(user1).tx.mint(20_000)
       expect(
-        (await token.query.balanceOf(user1.address)).value.ok.toNumber(),
+        (await dai.pool.query.balanceOf(user1.address)).value.ok.toNumber(),
+      ).toEqual(20_000)
+
+      // borrow usdc
+      await usdc.pool.withSigner(user1).tx.borrow(10_000)
+      expect(
+        (await usdc.token.query.balanceOf(user1.address)).value.ok.toNumber(),
       ).toEqual(10_000)
     })
 
     it('execute', async () => {
+      const { token, pool } = pools.usdc
       const [user1, _] = users
       await token.withSigner(user1).tx.approve(pool.address, 4_500)
       const { events } = await pool.withSigner(user1).tx.repayBorrow(4_500)
@@ -393,7 +532,12 @@ describe('Pool spec', () => {
   })
 
   it('.repay_borrow_behalf', async () => {
-    const { pool, users } = await setup()
+    const {
+      pools: {
+        dai: { pool },
+      },
+      users,
+    } = await setup()
     const { value } = await pool
       .withSigner(users[0])
       .query.repayBorrowBehalf(users[1].address, 0)
@@ -412,27 +556,13 @@ describe('Pool spec', () => {
     beforeAll(async () => {
       let api
       let controller
-      ;({ api, deployer, controller, token, pool, users } = await setup())
-      secondToken = await deployPSP22Token({
-        api: api,
-        signer: deployer,
-        args: [
-          0,
-          'Dai Stablecoin' as unknown as string[],
-          'DAI' as unknown as string[],
-          8,
-        ],
-      })
+      let pools
+      ;({ api, deployer, controller, pools, users } = await setup())
 
-      secondPool = await deployPoolFromAsset({
-        api,
-        signer: deployer,
-        args: [secondToken.address, secondToken.address, zeroAddress],
-        token: secondToken,
-      })
-
-      // initialize
-      await controller.tx.supportMarket(secondPool.address)
+      token = pools.dai.token
+      pool = pools.dai.pool
+      secondToken = pools.usdc.token
+      secondPool = pools.usdc.pool
     })
 
     it('preparations', async () => {
@@ -489,7 +619,7 @@ describe('Pool spec', () => {
     })
   })
 
-  describe.skip('.liquidate_borrow (fail case)', () => {
+  describe('.liquidate_borrow (fail case)', () => {
     const setup_extended = async () => {
       const args = await setup()
 
@@ -531,7 +661,13 @@ describe('Pool spec', () => {
     }
 
     it('when liquidator is equal to borrower', async () => {
-      const { pool, users, secondPool } = await setup_extended()
+      const {
+        pools: {
+          dai: { pool },
+        },
+        users,
+        secondPool,
+      } = await setup_extended()
       const [user1] = users
       const { value } = await pool
         .withSigner(user1)
@@ -541,7 +677,13 @@ describe('Pool spec', () => {
       })
     })
     it('when repay_amount is zero', async () => {
-      const { pool, users, secondPool } = await setup_extended()
+      const {
+        pools: {
+          dai: { pool },
+        },
+        users,
+        secondPool,
+      } = await setup_extended()
       const [user1, user2] = users
       const { value } = await pool
         .withSigner(user1)
