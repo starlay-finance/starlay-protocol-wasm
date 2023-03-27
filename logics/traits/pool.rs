@@ -23,6 +23,9 @@ pub type PoolRef = dyn Pool + PSP22;
 #[openbrush::trait_definition]
 pub trait Pool: PSP22 {
     #[ink(message)]
+    fn accrue_interest(&mut self) -> Result<()>;
+
+    #[ink(message)]
     fn mint(&mut self, mint_amount: Balance) -> Result<()>;
 
     #[ink(message)]

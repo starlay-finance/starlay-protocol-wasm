@@ -242,6 +242,10 @@ pub trait Internal {
 }
 
 impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
+    default fn accrue_interest(&mut self) -> Result<()> {
+        self._accrue_interest()
+    }
+
     default fn mint(&mut self, mint_amount: Balance) -> Result<()> {
         self._accrue_interest()?;
         self._mint(Self::env().caller(), mint_amount)
@@ -289,6 +293,9 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         collateral: AccountId,
     ) -> Result<()> {
         self._accrue_interest()?;
+        if collateral != Self::env().account_id() {
+            PoolRef::accrue_interest(&collateral)?;
+        }
         self._liquidate_borrow(Self::env().caller(), borrower, repay_amount, collateral)
     }
 
@@ -714,10 +721,11 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         if self._accural_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
-        if PoolRef::get_accrual_block_timestamp(&collateral) != current_timestamp {
-            return Err(Error::AccrualBlockNumberIsNotFresh)
+        if collateral != contract_addr {
+            if PoolRef::get_accrual_block_timestamp(&collateral) != current_timestamp {
+                return Err(Error::AccrualBlockNumberIsNotFresh)
+            }
         }
-
         if liquidator == borrower {
             return Err(Error::LiquidateLiquidatorIsBorrower)
         }
@@ -727,6 +735,11 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
 
         let actual_repay_amount = self._repay_borrow(liquidator, borrower, repay_amount)?;
         let exchange_rate = self._exchange_rate_stored();
+        let pool_collateral_underlying = if contract_addr == collateral {
+            Some(self._underlying())
+        } else {
+            None
+        };
         let seize_tokens = ControllerRef::liquidate_calculate_seize_tokens(
             &self._controller(),
             contract_addr,
@@ -734,7 +747,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             WrappedU256::from(exchange_rate),
             actual_repay_amount,
             Some(self._underlying()),
-            None,
+            pool_collateral_underlying,
         )?;
         if collateral == contract_addr {
             self._seize(contract_addr, liquidator, borrower, seize_tokens)?;

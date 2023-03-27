@@ -588,8 +588,15 @@ impl<T: Storage<Data>> Controller for T {
         token: AccountId,
         redeem_tokens: Balance,
         borrow_amount: Balance,
+        caller_pool: Option<(AccountId, PoolAttributes)>,
     ) -> Result<(U256, U256)> {
-        self._get_hypothetical_account_liquidity(account, token, redeem_tokens, borrow_amount, None)
+        self._get_hypothetical_account_liquidity(
+            account,
+            token,
+            redeem_tokens,
+            borrow_amount,
+            caller_pool,
+        )
     }
 }
 
@@ -795,11 +802,13 @@ impl<T: Storage<Data>> Internal for T {
         if !self._is_listed(pool_collateral) || !self._is_listed(pool_borrowed) {
             return Err(Error::MarketNotListed)
         }
-        let p_collateral_ctrler = PoolRef::controller(&pool_collateral);
-        let p_borrowed_ctrler = PoolRef::controller(&pool_borrowed);
-        if p_collateral_ctrler != p_borrowed_ctrler {
-            return Err(Error::ControllerMismatch)
-        }
+
+        // TODO: how to check controller in pool (comment out to avoid cross-contract call to caller)
+        // let p_collateral_ctrler = PoolRef::controller(&pool_collateral);
+        // let p_borrowed_ctrler = PoolRef::controller(&pool_borrowed);
+        // if p_collateral_ctrler != p_borrowed_ctrler {
+        //     return Err(Error::ControllerMismatch)
+        // }
 
         // FEATURE: update governance token supply index & distribute to borrower,liquidator
 
