@@ -1,5 +1,6 @@
 import { Result, ReturnNumber } from '@727-ventures/typechain-types'
 import { encodeAddress } from '@polkadot/keyring'
+import { waitForTx } from '../scripts/helper/deploy_helper'
 import { ReplacedType } from './utilityTypes'
 
 export const zeroAddress = encodeAddress(
@@ -56,10 +57,13 @@ export const shouldNotRevert = async <
     const preview = await contract.query[fn](...args)
     expect(preview.value.ok.err).toBeUndefined()
   } catch (e) {
-    console.log(
-      `failed to preview ${contract.name}.${fn as string}(${args}):`,
-      e,
+    throw new Error(
+      `failed to preview ${contract.name}.${
+        fn as string
+      }(${args}): ${JSON.stringify(e)}`,
     )
   }
-  return contract.tx[fn](...args)
+  const res = contract.tx[fn](...args)
+  await waitForTx(res)
+  return res
 }

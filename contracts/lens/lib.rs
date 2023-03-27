@@ -183,7 +183,6 @@ pub mod contract {
             PoolBalances {
                 pool,
                 balance_of: PSP22Ref::balance_of(&pool, account),
-
                 borrow_balance_current: PoolRef::borrow_balance_current(&pool, account)
                     .unwrap_or_default(),
                 token_balance: PSP22Ref::balance_of(&underlying, account),
