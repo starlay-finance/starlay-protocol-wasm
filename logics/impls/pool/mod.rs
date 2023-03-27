@@ -20,10 +20,7 @@ use core::ops::{
     Mul,
     Sub,
 };
-use ink::{
-    prelude::vec::Vec,
-    LangError,
-};
+use ink::prelude::vec::Vec;
 use openbrush::{
     contracts::psp22::{
         self,
