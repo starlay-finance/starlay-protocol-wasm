@@ -588,15 +588,8 @@ impl<T: Storage<Data>> Controller for T {
         token: AccountId,
         redeem_tokens: Balance,
         borrow_amount: Balance,
-        caller_pool: Option<(AccountId, PoolAttributes)>,
     ) -> Result<(U256, U256)> {
-        self._get_hypothetical_account_liquidity(
-            account,
-            token,
-            redeem_tokens,
-            borrow_amount,
-            caller_pool,
-        )
+        self._get_hypothetical_account_liquidity(account, token, redeem_tokens, borrow_amount, None)
     }
 }
 
