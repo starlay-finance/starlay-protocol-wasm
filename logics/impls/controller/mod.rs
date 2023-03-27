@@ -795,11 +795,13 @@ impl<T: Storage<Data>> Internal for T {
         if !self._is_listed(pool_collateral) || !self._is_listed(pool_borrowed) {
             return Err(Error::MarketNotListed)
         }
-        let p_collateral_ctrler = PoolRef::controller(&pool_collateral);
-        let p_borrowed_ctrler = PoolRef::controller(&pool_borrowed);
-        if p_collateral_ctrler != p_borrowed_ctrler {
-            return Err(Error::ControllerMismatch)
-        }
+
+        // TODO: how to check controller in pool (comment out to avoid cross-contract call to caller)
+        // let p_collateral_ctrler = PoolRef::controller(&pool_collateral);
+        // let p_borrowed_ctrler = PoolRef::controller(&pool_borrowed);
+        // if p_collateral_ctrler != p_borrowed_ctrler {
+        //     return Err(Error::ControllerMismatch)
+        // }
 
         // FEATURE: update governance token supply index & distribute to borrower,liquidator
 
@@ -1044,60 +1046,58 @@ impl<T: Storage<Data>> Internal for T {
         // For each asset the account is in
         let account_assets = self._account_assets(account);
         let mut asset_params = Vec::<HypotheticalAccountLiquidityCalculationParam>::new();
-        let (caller_pool_id, attrs) =
-            caller_pool.unwrap_or((ZERO_ADDRESS.into(), PoolAttributes::default()));
+
+        // if caller is a pool, get parameters for the pool without call the pool
+        if let Some((caller_pool_id, attrs)) = caller_pool {
+            let oracle_price = PriceOracleRef::get_price(&self._oracle(), attrs.underlying);
+            if let None | Some(0) = oracle_price {
+                return Err(Error::PriceError)
+            }
+            let oracle_price_mantissa = Exp {
+                mantissa: WrappedU256::from(U256::from(oracle_price.clone().unwrap())),
+            };
+
+            asset_params.push(HypotheticalAccountLiquidityCalculationParam {
+                asset: caller_pool_id,
+                token_balance: attrs.account_balance,
+                borrow_balance: attrs.account_borrow_balance,
+                exchange_rate_mantissa: Exp {
+                    mantissa: WrappedU256::from(attrs.exchange_rate),
+                },
+                collateral_factor_mantissa: Exp {
+                    mantissa: self._collateral_factor_mantissa(caller_pool_id).unwrap(),
+                },
+                oracle_price_mantissa: oracle_price_mantissa.clone(),
+            })
+        }
 
         // Prepare parameters for calculation
         for asset in &account_assets {
-            if asset == &caller_pool_id {
-                // Without call the pool, get parameters for calculation
-                let oracle_price = PriceOracleRef::get_price(&self._oracle(), attrs.underlying);
-                if let None | Some(0) = oracle_price {
-                    return Err(Error::PriceError)
-                }
-                let oracle_price_mantissa = Exp {
-                    mantissa: WrappedU256::from(U256::from(oracle_price.clone().unwrap())),
-                };
+            // Read the balances and exchange rate from the pool
+            let (token_balance, borrow_balance, exchange_rate_mantissa) =
+                PoolRef::get_account_snapshot(asset, account);
 
-                asset_params.push(HypotheticalAccountLiquidityCalculationParam {
-                    asset: *asset,
-                    token_balance: attrs.account_balance,
-                    borrow_balance: attrs.account_borrow_balance,
-                    exchange_rate_mantissa: Exp {
-                        mantissa: WrappedU256::from(attrs.exchange_rate),
-                    },
-                    collateral_factor_mantissa: Exp {
-                        mantissa: self._collateral_factor_mantissa(*asset).unwrap(),
-                    },
-                    oracle_price_mantissa: oracle_price_mantissa.clone(),
-                })
-            } else {
-                // Read the balances and exchange rate from the pool
-                let (token_balance, borrow_balance, exchange_rate_mantissa) =
-                    PoolRef::get_account_snapshot(asset, account);
-
-                // Get the normalized price of the asset
-                let oracle_price = PriceOracleRef::get_underlying_price(&self._oracle(), *asset);
-                if let None | Some(0) = oracle_price {
-                    return Err(Error::PriceError)
-                }
-                let oracle_price_mantissa = Exp {
-                    mantissa: WrappedU256::from(U256::from(oracle_price.clone().unwrap())),
-                };
-
-                asset_params.push(HypotheticalAccountLiquidityCalculationParam {
-                    asset: *asset,
-                    token_balance,
-                    borrow_balance,
-                    exchange_rate_mantissa: Exp {
-                        mantissa: WrappedU256::from(exchange_rate_mantissa),
-                    },
-                    collateral_factor_mantissa: Exp {
-                        mantissa: self._collateral_factor_mantissa(*asset).unwrap(),
-                    },
-                    oracle_price_mantissa: oracle_price_mantissa.clone(),
-                });
+            // Get the normalized price of the asset
+            let oracle_price = PriceOracleRef::get_underlying_price(&self._oracle(), *asset);
+            if let None | Some(0) = oracle_price {
+                return Err(Error::PriceError)
             }
+            let oracle_price_mantissa = Exp {
+                mantissa: WrappedU256::from(U256::from(oracle_price.clone().unwrap())),
+            };
+
+            asset_params.push(HypotheticalAccountLiquidityCalculationParam {
+                asset: *asset,
+                token_balance,
+                borrow_balance,
+                exchange_rate_mantissa: Exp {
+                    mantissa: WrappedU256::from(exchange_rate_mantissa),
+                },
+                collateral_factor_mantissa: Exp {
+                    mantissa: self._collateral_factor_mantissa(*asset).unwrap(),
+                },
+                oracle_price_mantissa: oracle_price_mantissa.clone(),
+            });
         }
 
         let (sum_collateral, sum_borrow_plus_effect) =
