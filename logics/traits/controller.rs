@@ -90,6 +90,7 @@ pub trait Controller {
         liquidator: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()>;
 
     #[ink(message)]
@@ -148,6 +149,8 @@ pub trait Controller {
         pool_collateral: AccountId,
         exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
+        pool_borrowed_underlying: Option<AccountId>,
+        pool_collateral_underlying: Option<AccountId>,
     ) -> Result<Balance>;
 
     // admin functions
@@ -234,7 +237,7 @@ pub trait Controller {
     ) -> Result<(U256, U256)>;
 }
 
-#[derive(Decode, Encode)]
+#[derive(Clone, Decode, Encode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributes {
     pub underlying: AccountId,
