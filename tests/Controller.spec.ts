@@ -81,6 +81,46 @@ const preparePoolWithMockToken = async ({
   return { token, pool }
 }
 
+const preparePoolsWithPreparedTokens = async ({
+  api,
+  controller,
+  rateModel,
+  manager,
+}: {
+  api: ApiPromise
+  controller: Controller
+  rateModel: DefaultInterestRateModel
+  manager: KeyringPair
+}): Promise<{
+  [key in (typeof TOKENS)[number]]: {
+    token: PSP22Token
+    pool: Pool
+  }
+}> => {
+  const dai = await preparePoolWithMockToken({
+    api,
+    controller,
+    rateModel,
+    manager: manager,
+    metadata: METADATAS['DAI'],
+  })
+  const usdc = await preparePoolWithMockToken({
+    api,
+    controller,
+    rateModel,
+    manager: manager,
+    metadata: METADATAS['USDC'],
+  })
+  const usdt = await preparePoolWithMockToken({
+    api,
+    controller,
+    rateModel,
+    manager: manager,
+    metadata: METADATAS['USDT'],
+  })
+  return { DAI: dai, USDC: usdc, USDT: usdt }
+}
+
 describe('Controller spec', () => {
   const setup = async () => {
     const { api, alice: deployer, bob, charie } = globalThis.setup
@@ -174,31 +214,17 @@ describe('Controller spec', () => {
     it('success', async () => {
       const { api, deployer, controller, rateModel, priceOracle } =
         await setup()
-      const dai = await preparePoolWithMockToken({
+      const pools = await preparePoolsWithPreparedTokens({
         api,
         controller,
         rateModel,
         manager: deployer,
-        metadata: METADATAS['DAI'],
       })
-      const usdc = await preparePoolWithMockToken({
-        api,
-        controller,
-        rateModel,
-        manager: deployer,
-        metadata: METADATAS['USDC'],
-      })
-      const usdt = await preparePoolWithMockToken({
-        api,
-        controller,
-        rateModel,
-        manager: deployer,
-        metadata: METADATAS['USDT'],
-      })
+      const poolsVec = [pools['DAI'], pools['USDC'], pools['USDT']]
 
       // prepares
       const toParam = (m: BN) => [m.toString()] // temp
-      for (const sym of [dai, usdc, usdt]) {
+      for (const sym of [pools['DAI'], pools['USDC'], pools['USDT']]) {
         await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
         await controller.tx.supportMarketWithCollateralFactorMantissa(
           sym.pool.address,
@@ -209,9 +235,9 @@ describe('Controller spec', () => {
       const markets = (await controller.query.markets()).value.ok
       expect(markets.length).toBe(3)
       expect(markets).toEqual([
-        dai.pool.address,
-        usdc.pool.address,
-        usdt.pool.address,
+        pools['DAI'].pool.address,
+        pools['USDC'].pool.address,
+        pools['USDT'].pool.address,
       ])
     })
   })
