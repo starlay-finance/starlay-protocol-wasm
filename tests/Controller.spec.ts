@@ -211,6 +211,8 @@ describe('Controller spec', () => {
   })
 
   describe('.support_market_with_collateral_factor_mantissa', () => {
+    const toParam = (m: BN) => [m.toString()] // temp
+
     it('success', async () => {
       const { api, deployer, controller, rateModel, priceOracle } =
         await setup()
@@ -220,7 +222,6 @@ describe('Controller spec', () => {
         rateModel,
         manager: deployer,
       })
-      const poolsVec = [pools['DAI'], pools['USDC'], pools['USDT']]
 
       // prepares
       const toParam = (m: BN) => [m.toString()] // temp
@@ -239,6 +240,39 @@ describe('Controller spec', () => {
         pools['USDC'].pool.address,
         pools['USDT'].pool.address,
       ])
+    })
+    describe('fail', () => {
+      const setupWithOnePool = async () => {
+        const { api, deployer, controller, rateModel } = await setup()
+        const dai = await preparePoolWithMockToken({
+          api,
+          controller,
+          rateModel,
+          manager: deployer,
+          metadata: METADATAS['DAI'],
+        })
+        return { controller, pool: dai.pool }
+      }
+      it('if collateral_factor is over limit', async () => {
+        const { controller, pool } = await setupWithOnePool()
+
+        const res =
+          await controller.query.supportMarketWithCollateralFactorMantissa(
+            pool.address,
+            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100)).add(new BN(1))),
+          )
+        expect(res.value.ok.err).toStrictEqual('InvalidCollateralFactor')
+      })
+      it('if cannot get price', async () => {
+        const { controller, pool } = await setupWithOnePool()
+
+        const res =
+          await controller.query.supportMarketWithCollateralFactorMantissa(
+            pool.address,
+            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+          )
+        expect(res.value.ok.err).toStrictEqual('PriceError')
+      })
     })
   })
 })
