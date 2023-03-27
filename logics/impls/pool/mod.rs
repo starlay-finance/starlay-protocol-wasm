@@ -31,7 +31,6 @@ use openbrush::{
         Internal as PSP22Internal,
         PSP22Error,
         PSP22Ref,
-        PSP22,
     },
     storage::Mapping,
     traits::{
