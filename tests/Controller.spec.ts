@@ -15,7 +15,7 @@ import DefaultInterestRateModel from '../types/contracts/default_interest_rate_m
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
 
-const TOKENS = ['DAI', 'USDC', 'USDT'] as const
+const TOKENS = ['dai', 'usdc', 'usdt'] as const
 const METADATAS: {
   [key in (typeof TOKENS)[number]]: {
     name: string
@@ -23,17 +23,17 @@ const METADATAS: {
     decimals: number
   }
 } = {
-  DAI: {
+  dai: {
     name: 'Dai Stablecoin',
     symbol: 'DAI',
     decimals: 8,
   },
-  USDC: {
+  usdc: {
     name: 'USD Coin',
     symbol: 'USDC',
     decimals: 6,
   },
-  USDT: {
+  usdt: {
     name: 'USD Tether',
     symbol: 'USDT',
     decimals: 6,
@@ -102,23 +102,23 @@ const preparePoolsWithPreparedTokens = async ({
     controller,
     rateModel,
     manager: manager,
-    metadata: METADATAS['DAI'],
+    metadata: METADATAS.dai,
   })
   const usdc = await preparePoolWithMockToken({
     api,
     controller,
     rateModel,
     manager: manager,
-    metadata: METADATAS['USDC'],
+    metadata: METADATAS.usdc,
   })
   const usdt = await preparePoolWithMockToken({
     api,
     controller,
     rateModel,
     manager: manager,
-    metadata: METADATAS['USDT'],
+    metadata: METADATAS.usdt,
   })
-  return { DAI: dai, USDC: usdc, USDT: usdt }
+  return { dai, usdc, usdt }
 }
 
 describe('Controller spec', () => {
@@ -225,7 +225,7 @@ describe('Controller spec', () => {
 
       // prepares
       const toParam = (m: BN) => [m.toString()] // temp
-      for (const sym of [pools['DAI'], pools['USDC'], pools['USDT']]) {
+      for (const sym of [pools.dai, pools.usdc, pools.usdt]) {
         await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
         await controller.tx.supportMarketWithCollateralFactorMantissa(
           sym.pool.address,
@@ -236,9 +236,9 @@ describe('Controller spec', () => {
       const markets = (await controller.query.markets()).value.ok
       expect(markets.length).toBe(3)
       expect(markets).toEqual([
-        pools['DAI'].pool.address,
-        pools['USDC'].pool.address,
-        pools['USDT'].pool.address,
+        pools.dai.pool.address,
+        pools.usdc.pool.address,
+        pools.usdt.pool.address,
       ])
     })
     describe('fail', () => {
@@ -249,7 +249,7 @@ describe('Controller spec', () => {
           controller,
           rateModel,
           manager: deployer,
-          metadata: METADATAS['DAI'],
+          metadata: METADATAS.dai,
         })
         return { controller, pool: dai.pool }
       }
@@ -273,6 +273,37 @@ describe('Controller spec', () => {
           )
         expect(res.value.ok.err).toStrictEqual('PriceError')
       })
+    })
+  })
+
+  describe('.account_assets', () => {
+    const toParam = (m: BN) => [m.toString()] // temp
+
+    it('success', async () => {
+      const { api, deployer, controller, rateModel, priceOracle, users } =
+        await setup()
+      const user = users[0]
+      const pools = await preparePoolsWithPreparedTokens({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+      })
+      const { dai, usdc, usdt } = pools
+
+      // prepares
+      const toParam = (m: BN) => [m.toString()] // temp
+      for (const sym of [dai, usdc, usdt]) {
+        await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+        await controller.tx.supportMarketWithCollateralFactorMantissa(
+          sym.pool.address,
+          toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+        )
+      }
+
+      const accountAssets = (await controller.query.accountAssets(user.address))
+        .value.ok
+      expect(accountAssets).toEqual([])
     })
   })
 })
