@@ -1,6 +1,9 @@
-use super::exp_no_err::{
-    exp_scale,
-    Exp,
+use super::{
+    controller::PoolAttributes,
+    exp_no_err::{
+        exp_scale,
+        Exp,
+    },
 };
 use crate::traits::{
     controller,
@@ -45,6 +48,7 @@ use primitive_types::U256;
 mod utils;
 use self::utils::{
     calculate_interest,
+    calculate_redeem_values,
     exchange_rate,
     protocol_seize_amount,
     protocol_seize_share_mantissa,
@@ -504,9 +508,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         };
 
+        let exchange_rate = self._exchange_rate_stored(); // NOTE: need exchange_rate calculation before transfer underlying
         self._mint_to(minter, mint_amount).unwrap();
         let actual_mint_amount = U256::from(mint_amount)
-            .mul(self._exchange_rate_stored())
+            .mul(exchange_rate)
             .div(exp_scale())
             .as_u128();
         self._transfer_underlying_from(minter, contract_addr, actual_mint_amount)
@@ -525,45 +530,41 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         redeem_tokens_in: Balance,
         redeem_amount_in: Balance,
     ) -> Result<()> {
-        let exchange_rate = Exp {
-            mantissa: WrappedU256::from(self._exchange_rate_stored()),
-        };
-        let (redeem_tokens, redeem_amount) = match (redeem_tokens_in, redeem_amount_in) {
-            (tokens, _) if tokens > 0 => {
-                (
-                    tokens,
-                    exchange_rate
-                        .mul_scalar_truncate(U256::from(tokens))
-                        .as_u128(),
-                )
-            }
-            (_, amount) if amount > 0 => {
-                (
-                    Exp {
-                        mantissa: WrappedU256::from(
-                            U256::from(amount)
-                                .mul(exp_scale())
-                                .div(U256::from(exchange_rate.mantissa)),
-                        ),
-                    }
-                    .truncate()
-                    .as_u128(),
-                    amount,
-                )
-            }
-            _ => return Err(Error::InvalidParameter),
-        };
+        let values = calculate_redeem_values(
+            redeem_tokens_in,
+            redeem_amount_in,
+            self._exchange_rate_stored(),
+        );
+        if values.is_none() {
+            return Err(Error::InvalidParameter)
+        }
+        let (redeem_tokens, redeem_amount) = values.unwrap();
         if (redeem_tokens == 0 && redeem_amount > 0) || (redeem_tokens > 0 && redeem_amount == 0) {
             return Err(Error::OnlyEitherRedeemTokensOrRedeemAmountIsZero)
         }
 
         let contract_addr = Self::env().account_id();
-        ControllerRef::redeem_allowed(&self._controller(), contract_addr, redeemer, redeem_tokens)
-            .unwrap();
+        let (account_balance, account_borrow_balance, exchange_rate) =
+            self.get_account_snapshot(redeemer);
+        let pool_attribute = PoolAttributes {
+            underlying: self._underlying(),
+            account_balance,
+            account_borrow_balance,
+            exchange_rate,
+            total_borrows: self._total_borrows(),
+        };
+        ControllerRef::redeem_allowed(
+            &self._controller(),
+            contract_addr,
+            redeemer,
+            redeem_tokens,
+            Some(pool_attribute),
+        )
+        .unwrap();
         let current_timestamp = Self::env().block_timestamp();
         if self._accural_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
-        };
+        }
 
         if self._get_cash_prior() < redeem_amount {
             return Err(Error::RedeemTransferOutNotPossible)
@@ -581,8 +582,23 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     }
     default fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
         let contract_addr = Self::env().account_id();
-        ControllerRef::borrow_allowed(&self._controller(), contract_addr, borrower, borrow_amount)
-            .unwrap();
+        let (account_balance, account_borrow_balance, exchange_rate) =
+            self.get_account_snapshot(borrower);
+        let pool_attribute = PoolAttributes {
+            underlying: self._underlying(),
+            account_balance,
+            account_borrow_balance,
+            exchange_rate,
+            total_borrows: self._total_borrows(),
+        };
+        ControllerRef::borrow_allowed(
+            &self._controller(),
+            contract_addr,
+            borrower,
+            borrow_amount,
+            Some(pool_attribute),
+        )
+        .unwrap();
 
         let current_timestamp = Self::env().block_timestamp();
         if self._accural_block_timestamp() != current_timestamp {
@@ -973,6 +989,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             return 0
         }
         let borrow_index = self._borrow_index();
+        // temp / TODO: check calculation interest_rate
+        if U256::from(borrow_index.mantissa).is_zero()
+            && U256::from(snapshot.interest_index).is_zero()
+        {
+            return snapshot.principal
+        }
         let prinicipal_times_index =
             U256::from(snapshot.principal).mul(U256::from(borrow_index.mantissa));
         prinicipal_times_index

@@ -151,7 +151,9 @@ pub mod contract {
 
             let pool = AccountId::from([0x01; 32]);
             assert_eq!(
-                contract.borrow_allowed(pool, accounts.bob, 0).unwrap_err(),
+                contract
+                    .borrow_allowed(pool, accounts.bob, 0, None)
+                    .unwrap_err(),
                 Error::BorrowIsPaused
             );
         }
@@ -166,7 +168,9 @@ pub mod contract {
             assert!(contract.support_market(pool).is_ok());
             assert!(contract.set_borrow_guardian_paused(pool, true).is_ok());
             assert_eq!(
-                contract.borrow_allowed(pool, accounts.bob, 0).unwrap_err(),
+                contract
+                    .borrow_allowed(pool, accounts.bob, 0, None)
+                    .unwrap_err(),
                 Error::BorrowIsPaused
             );
         }

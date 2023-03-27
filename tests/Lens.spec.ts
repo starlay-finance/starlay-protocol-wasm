@@ -54,12 +54,14 @@ const setup = async () => {
     api,
     signer: deployer,
     args: [token1.address, controller.address, interestRateModel.address],
+    token: token1,
   })
 
   const pool2 = await deployPoolFromAsset({
     api,
     signer: deployer,
     args: [token2.address, controller.address, interestRateModel.address],
+    token: token2,
   })
 
   const priceOracle = await deployPriceOracle({

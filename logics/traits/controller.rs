@@ -4,6 +4,10 @@ use openbrush::traits::{
     Balance,
 };
 use primitive_types::U256;
+use scale::{
+    Decode,
+    Encode,
+};
 
 use super::types::WrappedU256;
 
@@ -30,6 +34,7 @@ pub trait Controller {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()>;
 
     #[ink(message)]
@@ -47,6 +52,7 @@ pub trait Controller {
         pool: AccountId,
         borrower: AccountId,
         borrow_amount: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()>;
 
     #[ink(message)]
@@ -226,6 +232,16 @@ pub trait Controller {
         redeem_tokens: Balance,
         borrow_amount: Balance,
     ) -> Result<(U256, U256)>;
+}
+
+#[derive(Decode, Encode)]
+#[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+pub struct PoolAttributes {
+    pub underlying: AccountId,
+    pub account_balance: Balance,
+    pub account_borrow_balance: Balance,
+    pub exchange_rate: U256,
+    pub total_borrows: Balance,
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]

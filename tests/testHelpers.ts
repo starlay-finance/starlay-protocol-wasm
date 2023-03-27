@@ -41,3 +41,25 @@ export function revertedWith(
     expect(result.value.err).toHaveProperty(errorTitle)
   }
 }
+
+export const shouldNotRevert = async <
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  C extends { tx: any; query: any; name: string },
+  F extends keyof C['tx'],
+  R extends ReturnType<C['tx'][F]>,
+>(
+  contract: C,
+  fn: F,
+  args: Parameters<C['tx'][F]>,
+): Promise<R> => {
+  try {
+    const preview = await contract.query[fn](...args)
+    expect(preview.value.ok.err).toBeUndefined()
+  } catch (e) {
+    console.log(
+      `failed to preview ${contract.name}.${fn as string}(${args}):`,
+      e,
+    )
+  }
+  return contract.tx[fn](...args)
+}

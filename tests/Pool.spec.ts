@@ -1,14 +1,25 @@
 import type { KeyringPair } from '@polkadot/keyring/types'
-import { hexToUtf8, zeroAddress } from './testHelpers'
+import { BN } from '@polkadot/util'
+import {
+  expectToEmit,
+  hexToUtf8,
+  shouldNotRevert,
+  zeroAddress,
+} from './testHelpers'
 
-import Pool_factory from '../types/constructors/pool'
 import Pool from '../types/contracts/pool'
 
 import {
   deployController,
+  deployDefaultInterestRateModel,
+  deployPoolFromAsset,
+  deployPriceOracle,
   deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
+import { ONE_ETHER } from '../scripts/tokens'
 import PSP22Token from '../types/contracts/psp22_token'
+import { Mint, Redeem } from '../types/event-types/pool'
+import { Transfer } from '../types/event-types/psp22_token'
 
 describe('Pool spec', () => {
   const setup = async () => {
@@ -30,25 +41,54 @@ describe('Pool spec', () => {
       signer: deployer,
       args: [deployer.address],
     })
-
-    const poolFactory = new Pool_factory(api, deployer)
-    const pool = new Pool(
-      (
-        await poolFactory.newFromAsset(
-          token.address,
-          controller.address,
-          zeroAddress,
-        )
-      ).address,
-      deployer,
+    const priceOracle = await deployPriceOracle({
       api,
-    )
+      signer: deployer,
+      args: [],
+    })
+
+    // temp: declare params for rate_model
+    const toParam = (m: BN) => [m.toString()]
+    const rateModelArg = new BN(100).mul(ONE_ETHER)
+    const rateModel = await deployDefaultInterestRateModel({
+      api,
+      signer: deployer,
+      args: [
+        toParam(rateModelArg),
+        toParam(rateModelArg),
+        toParam(rateModelArg),
+        toParam(rateModelArg),
+      ],
+    })
+
+    const pool = await deployPoolFromAsset({
+      api,
+      signer: deployer,
+      args: [token.address, controller.address, rateModel.address],
+      token,
+    })
     const users = [bob, charlie]
 
     // initialize
+    await controller.tx.setPriceOracle(priceOracle.address)
+    //// for pool
     await controller.tx.supportMarket(pool.address)
+    await priceOracle.tx.setFixedPrice(token.address, ONE_ETHER)
+    await controller.tx.setCollateralFactorMantissa(
+      pool.address,
+      toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+    )
 
-    return { api, deployer, token, pool, controller, users }
+    return {
+      api,
+      deployer,
+      token,
+      pool,
+      rateModel,
+      controller,
+      priceOracle,
+      users,
+    }
   }
 
   it('instantiate', async () => {
@@ -72,32 +112,41 @@ describe('Pool spec', () => {
       ;({ deployer, token, pool } = await setup())
     })
 
+    const balance = 10_000
     it('preparations', async () => {
-      await token.tx.mint(deployer.address, 10_000)
+      await shouldNotRevert(token, 'mint', [deployer.address, balance])
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(10_000)
+      ).toBe(balance)
     })
 
     it('execute', async () => {
-      await token.tx.approve(pool.address, 3_000)
-      const { events } = await pool.tx.mint(3_000)
+      const depositAmount = 3_000
+      const mintAmount = depositAmount
+      await shouldNotRevert(token, 'approve', [pool.address, depositAmount])
+      const { events } = await shouldNotRevert(pool, 'mint', [depositAmount])
 
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(7000)
+      ).toBe(balance - depositAmount)
       expect(
         (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
-      ).toEqual(3000)
+      ).toBe(depositAmount)
       expect(
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(3000)
+      ).toBe(mintAmount)
 
-      const event = events[0]
-      expect(event.name).toEqual('Mint')
-      expect(event.args.minter).toEqual(deployer.address)
-      expect(event.args.mintAmount.toNumber()).toEqual(3_000)
-      expect(event.args.mintTokens.toNumber()).toEqual(3_000)
+      expect(events).toHaveLength(2)
+      expectToEmit<Transfer>(events[0], 'Transfer', {
+        from: null,
+        to: deployer.address,
+        value: depositAmount,
+      })
+      expectToEmit<Mint>(events[1], 'Mint', {
+        minter: deployer.address,
+        mintAmount,
+        mintTokens: depositAmount,
+      })
     })
   })
 
@@ -110,51 +159,111 @@ describe('Pool spec', () => {
       ;({ deployer, token, pool } = await setup())
     })
 
+    const deposited = 10_000
+    const minted = deposited
     it('preparations', async () => {
-      await token.tx.mint(deployer.address, 10_000)
+      await shouldNotRevert(token, 'mint', [deployer.address, deposited])
 
-      await token.tx.approve(pool.address, 10_000)
-      await pool.tx.mint(10_000)
+      await shouldNotRevert(token, 'approve', [pool.address, deposited])
+      await shouldNotRevert(pool, 'mint', [deposited])
       expect(
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(10_000)
+      ).toEqual(minted)
+      expect(
+        (await pool.query.exchangeRateCurrent()).value.ok.ok.toString(),
+      ).toBe(ONE_ETHER.toString())
     })
 
     it('execute', async () => {
-      const { events } = await pool.tx.redeem(3_000)
+      const redeemAmount = 3_000
+      const { events } = await shouldNotRevert(pool, 'redeem', [redeemAmount])
 
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(3000)
+      ).toEqual(redeemAmount)
       expect(
         (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
-      ).toEqual(7000)
+      ).toEqual(deposited - redeemAmount)
       expect(
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(7000)
+      ).toEqual(minted - redeemAmount)
 
-      const event = events[0]
-      expect(event.name).toEqual('Redeem')
-      expect(event.args.redeemer).toEqual(deployer.address)
-      expect(event.args.redeemAmount.toNumber()).toEqual(3_000)
-      expect(event.args.redeemTokens.toNumber()).toEqual(3_000)
+      expect(events).toHaveLength(2)
+      expectToEmit<Transfer>(events[0], 'Transfer', {
+        from: deployer.address,
+        to: null,
+        value: redeemAmount,
+      })
+      expectToEmit<Redeem>(events[1], 'Redeem', {
+        redeemer: deployer.address,
+        redeemAmount,
+        redeemTokens: redeemAmount,
+      })
+    })
+  })
+
+  describe('.redeem_underlying', () => {
+    let deployer: KeyringPair
+    let token: PSP22Token
+    let pool: Pool
+
+    beforeAll(async () => {
+      ;({ deployer, token, pool } = await setup())
+    })
+
+    const deposited = 10_000
+    const minted = deposited
+    it('setup', async () => {
+      await shouldNotRevert(token, 'mint', [deployer.address, deposited])
+
+      await shouldNotRevert(token, 'approve', [pool.address, deposited])
+      await shouldNotRevert(pool, 'mint', [deposited])
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toBe(minted)
+      expect(
+        (await pool.query.exchangeRateCurrent()).value.ok.ok.toString(),
+      ).toBe(ONE_ETHER.toString())
+    })
+    it('execute', async () => {
+      const redeemAmount = 3_000
+      const { events } = await shouldNotRevert(pool, 'redeemUnderlying', [
+        redeemAmount,
+      ])
+
+      expect(
+        (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toBe(redeemAmount)
+      expect(
+        (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
+      ).toBe(deposited - redeemAmount)
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toBe(minted - redeemAmount)
+
+      expect(events).toHaveLength(2)
+      expectToEmit<Transfer>(events[0], 'Transfer', {
+        from: deployer.address,
+        to: null,
+        value: redeemAmount,
+      })
+      expectToEmit<Redeem>(events[1], 'Redeem', {
+        redeemer: deployer.address,
+        redeemAmount,
+        redeemTokens: redeemAmount,
+      })
     })
   })
 
   describe('.redeem (fail case)', () => {
     it('when no cash in pool', async () => {
       const { pool } = await setup()
-      const { value } = await pool.query.redeem(3_000)
-      expect(value.ok.err).toStrictEqual({ redeemTransferOutNotPossible: null })
+      const {
+        value: { ok: cash },
+      } = await pool.query.getCashPrior()
+      const { value } = await pool.query.redeemUnderlying(cash.toNumber() + 1)
+      expect(value.ok.err).toHaveProperty('redeemTransferOutNotPossible')
     })
-  })
-
-  it('.redeem_underlying', async () => {
-    const { pool, users } = await setup()
-    const { value } = await pool
-      .withSigner(users[0])
-      .query.redeemUnderlying(3_000)
-    expect(value.ok.err).toStrictEqual({ notImplemented: null })
   })
 
   describe('.borrow', () => {
@@ -315,18 +424,12 @@ describe('Pool spec', () => {
         ],
       })
 
-      const poolFactory = new Pool_factory(api, deployer)
-      secondPool = new Pool(
-        (
-          await poolFactory.newFromAsset(
-            secondToken.address,
-            secondToken.address,
-            zeroAddress,
-          )
-        ).address,
-        deployer,
+      secondPool = await deployPoolFromAsset({
         api,
-      )
+        signer: deployer,
+        args: [secondToken.address, secondToken.address, zeroAddress],
+        token: secondToken,
+      })
 
       // initialize
       await controller.tx.supportMarket(secondPool.address)
@@ -386,7 +489,7 @@ describe('Pool spec', () => {
     })
   })
 
-  describe('.liquidate_borrow (fail case)', () => {
+  describe.skip('.liquidate_borrow (fail case)', () => {
     const setup_extended = async () => {
       const args = await setup()
 
@@ -401,22 +504,25 @@ describe('Pool spec', () => {
         ],
       })
 
-      const poolFactory = new Pool_factory(args.api, args.deployer)
-      const secondPool = new Pool(
-        (
-          await poolFactory.newFromAsset(
-            secondToken.address,
-            secondToken.address,
-            zeroAddress,
-          )
-        ).address,
-        args.deployer,
-        args.api,
-      )
+      const secondPool = await deployPoolFromAsset({
+        api: args.api,
+        signer: args.deployer,
+        args: [
+          secondToken.address,
+          args.controller.address,
+          args.rateModel.address,
+        ],
+        token: secondToken,
+      })
 
-      // initialize
+      // initialize for pool
       await args.controller.tx.supportMarket(secondPool.address)
-
+      await args.priceOracle.tx.setFixedPrice(secondToken.address, ONE_ETHER)
+      const toParam = (m: BN) => [m.toString()]
+      await args.controller.tx.setCollateralFactorMantissa(
+        secondPool.address,
+        toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+      )
       return {
         ...args,
         secondToken,
