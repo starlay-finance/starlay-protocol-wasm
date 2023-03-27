@@ -1,26 +1,134 @@
+import type { ApiPromise } from '@polkadot/api'
 import { encodeAddress } from '@polkadot/keyring'
+import type { KeyringPair } from '@polkadot/keyring/types'
 import BN from 'bn.js'
-import { deployController } from '../scripts/helper/deploy_helper'
-import { zeroAddress } from './testHelpers'
+import {
+  deployController,
+  deployDefaultInterestRateModel,
+  deployPoolFromAsset,
+  deployPriceOracle,
+  deployPSP22Token,
+} from '../scripts/helper/deploy_helper'
+import { ONE_ETHER } from '../scripts/tokens'
+import Controller from '../types/contracts/controller'
+import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
+import Pool from '../types/contracts/pool'
+import PSP22Token from '../types/contracts/psp22_token'
+
+const TOKENS = ['DAI', 'USDC', 'USDT'] as const
+const METADATAS: {
+  [key in (typeof TOKENS)[number]]: {
+    name: string
+    symbol: string
+    decimals: number
+  }
+} = {
+  DAI: {
+    name: 'Dai Stablecoin',
+    symbol: 'DAI',
+    decimals: 8,
+  },
+  USDC: {
+    name: 'USD Coin',
+    symbol: 'USDC',
+    decimals: 6,
+  },
+  USDT: {
+    name: 'USD Tether',
+    symbol: 'USDT',
+    decimals: 6,
+  },
+} as const
+
+const preparePoolWithMockToken = async ({
+  api,
+  metadata,
+  controller,
+  rateModel,
+  manager,
+}: {
+  api: ApiPromise
+  metadata: {
+    name: string
+    symbol: string
+    decimals: number
+  }
+  controller: Controller
+  rateModel: DefaultInterestRateModel
+  manager: KeyringPair
+}): Promise<{
+  token: PSP22Token
+  pool: Pool
+}> => {
+  const token = await deployPSP22Token({
+    api,
+    signer: manager,
+    args: [
+      0,
+      metadata.name as unknown as string[],
+      metadata.symbol as unknown as string[],
+      metadata.decimals,
+    ],
+  })
+
+  const pool = await deployPoolFromAsset({
+    api,
+    signer: manager,
+    args: [token.address, controller.address, rateModel.address],
+    token,
+  })
+
+  return { token, pool }
+}
 
 describe('Controller spec', () => {
   const setup = async () => {
-    const { api, alice: deployer } = globalThis.setup
+    const { api, alice: deployer, bob, charie } = globalThis.setup
 
     const controller = await deployController({
       api,
       signer: deployer,
       args: [deployer.address],
     })
+    const priceOracle = await deployPriceOracle({
+      api,
+      signer: deployer,
+      args: [],
+    })
+    // temp: declare params for rate_model
+    const toParam = (m: BN) => [m.toString()]
+    const rateModelArg = new BN(100).mul(ONE_ETHER)
+    const rateModel = await deployDefaultInterestRateModel({
+      api,
+      signer: deployer,
+      args: [
+        toParam(rateModelArg),
+        toParam(rateModelArg),
+        toParam(rateModelArg),
+        toParam(rateModelArg),
+      ],
+    })
 
-    return { controller }
+    // initialize
+    await controller.tx.setPriceOracle(priceOracle.address)
+
+    return {
+      api,
+      deployer,
+      controller,
+      rateModel,
+      priceOracle,
+      users: [bob, charie],
+    }
   }
 
   it('instantiate', async () => {
-    const { controller } = await setup()
+    const { controller, priceOracle } = await setup()
     const markets = (await controller.query.markets()).value.ok
     expect(markets.length).toBe(0)
-    expect((await controller.query.oracle()).value.ok).toEqual(zeroAddress)
+    expect((await controller.query.oracle()).value.ok).toEqual(
+      priceOracle.address,
+    )
     const closeFactorMantissa = (await controller.query.closeFactorMantissa())
       .value.ok
     expect(closeFactorMantissa.toNumber()).toEqual(0)
@@ -60,5 +168,51 @@ describe('Controller spec', () => {
     const markets = (await controller.query.markets()).value.ok
     expect(markets.length).toBe(1)
     expect(markets[0]).toBe(tokenAddress)
+  })
+
+  describe('.support_market_with_collateral_factor_mantissa', () => {
+    it('success', async () => {
+      const { api, deployer, controller, rateModel, priceOracle } =
+        await setup()
+      const dai = await preparePoolWithMockToken({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+        metadata: METADATAS['DAI'],
+      })
+      const usdc = await preparePoolWithMockToken({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+        metadata: METADATAS['USDC'],
+      })
+      const usdt = await preparePoolWithMockToken({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+        metadata: METADATAS['USDT'],
+      })
+
+      // prepares
+      const toParam = (m: BN) => [m.toString()] // temp
+      for (const sym of [dai, usdc, usdt]) {
+        await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+        await controller.tx.supportMarketWithCollateralFactorMantissa(
+          sym.pool.address,
+          toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+        )
+      }
+
+      const markets = (await controller.query.markets()).value.ok
+      expect(markets.length).toBe(3)
+      expect(markets).toEqual([
+        dai.pool.address,
+        usdc.pool.address,
+        usdt.pool.address,
+      ])
+    })
   })
 })
