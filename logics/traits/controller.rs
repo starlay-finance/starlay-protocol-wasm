@@ -241,6 +241,7 @@ pub trait Controller {
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributes {
     pub underlying: AccountId,
+    pub decimals: u8,
     pub account_balance: Balance,
     pub account_borrow_balance: Balance,
     pub exchange_rate: U256,
