@@ -2,20 +2,20 @@ import { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
 import PSP22Token from '../../types/contracts/psp22_token'
-import { ZERO_ADDRESS, defaultOption, sendTxWithPreview } from '../helper/utils'
+import { defaultOption, sendTxWithPreview, ZERO_ADDRESS } from '../helper/utils'
 import { deployer, provider } from '../helper/wallet_helper'
-import { DUMMY_TOKENS, Token } from '../tokens'
+import { DUMMY_TOKENS, ONE_ETHER, Token } from '../tokens'
 import { ENV, Env } from './../env'
 import {
-  ROLE,
   deployController,
   deployDefaultInterestRateModel,
   deployFaucet,
   deployLens,
   deployManager,
-  deployPSP22Token,
   deployPool,
   deployPriceOracle,
+  deployPSP22Token,
+  ROLE,
 } from './../helper/deploy_helper'
 
 const main = async () => {
@@ -67,6 +67,8 @@ const deployContracts = async (env: Env) => {
     option,
   ])
   console.log(`PriceOracle ${priceOracle.address} has been set`)
+
+  const initialExchangeRateMantissa = ONE_ETHER
   for (const token of await deployDummyTokens(api, signer)) {
     const {
       baseRatePerYear,
@@ -93,6 +95,7 @@ const deployContracts = async (env: Env) => {
         token.contract.address,
         controller.address,
         rateModelContract.address,
+        [initialExchangeRateMantissa.toString()],
         [resolvePoolName(token.token.name)],
         [token.token.symbol],
         token.token.decimal,
