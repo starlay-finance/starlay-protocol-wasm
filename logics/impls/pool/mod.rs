@@ -78,6 +78,7 @@ pub struct Data {
     pub account_borrows: Mapping<AccountId, BorrowSnapshot>,
     pub accural_block_timestamp: Timestamp,
     pub borrow_index: Balance,
+    pub initial_exchange_rate_mantissa: WrappedU256,
     pub reserve_factor_mantissa: WrappedU256,
 }
 
@@ -93,6 +94,7 @@ impl Default for Data {
             account_borrows: Default::default(),
             accural_block_timestamp: 0,
             borrow_index: 0,
+            initial_exchange_rate_mantissa: WrappedU256::from(U256::zero()),
             reserve_factor_mantissa: WrappedU256::from(U256::zero()),
         }
     }
@@ -188,6 +190,7 @@ pub trait Internal {
     fn _balance_of_underlying(&self, account: AccountId) -> Balance;
     fn _accural_block_timestamp(&self) -> Timestamp;
     fn _borrow_index(&self) -> Balance;
+    fn _initial_exchange_rate_mantissa(&self) -> WrappedU256;
     fn _reserve_factor_mantissa(&self) -> WrappedU256;
     fn _exchange_rate_stored(&self) -> U256;
     fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput>;
@@ -418,6 +421,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
         let reserves = self._total_reserves();
         let reserve_factor = self._reserve_factor_mantissa();
         self._supply_rate_per_msec(cash, borrows, reserves, reserve_factor)
+    }
+
+    default fn initial_exchange_rate_mantissa(&self) -> WrappedU256 {
+        self._initial_exchange_rate_mantissa()
     }
 
     default fn reserve_factor_mantissa(&self) -> WrappedU256 {
@@ -1015,6 +1022,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             self._get_cash_prior(),
             interest.total_borrows,
             interest.total_reserves,
+            U256::from(self._initial_exchange_rate_mantissa()),
         );
         underlying_balance(
             Exp {
@@ -1032,6 +1040,10 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         underlying_balance(exchange_rate, pool_token_balance)
     }
 
+    default fn _initial_exchange_rate_mantissa(&self) -> WrappedU256 {
+        self.data::<Data>().initial_exchange_rate_mantissa
+    }
+
     default fn _reserve_factor_mantissa(&self) -> WrappedU256 {
         self.data::<Data>().reserve_factor_mantissa
     }
@@ -1042,6 +1054,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             self._get_cash_prior(),
             self._total_borrows(),
             self._total_reserves(),
+            U256::from(self._initial_exchange_rate_mantissa()),
         )
     }
 

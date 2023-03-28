@@ -65,14 +65,24 @@ const setup = async (
   const pool1 = await deployPoolFromAsset({
     api,
     signer: deployer,
-    args: [token1.address, controller.address, interestRateModel.address],
+    args: [
+      token1.address,
+      controller.address,
+      interestRateModel.address,
+      [ONE_ETHER.toString()],
+    ],
     token: token1,
   })
 
   const pool2 = await deployPoolFromAsset({
     api,
     signer: deployer,
-    args: [token2.address, controller.address, interestRateModel.address],
+    args: [
+      token2.address,
+      controller.address,
+      interestRateModel.address,
+      [ONE_ETHER.toString()],
+    ],
     token: token2,
   })
 

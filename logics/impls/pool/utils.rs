@@ -110,9 +110,10 @@ pub fn exchange_rate(
     total_cash: Balance,
     total_borrows: Balance,
     total_reserves: Balance,
+    default_exchange_rate_mantissa: U256,
 ) -> U256 {
     if total_supply == 0 {
-        return U256::one().mul(exp_scale()) // (temp) TODO: set initial exchange_rate
+        return default_exchange_rate_mantissa
     };
     let cash_plus_borrows_minus_reserves = total_cash.add(total_borrows).sub(total_reserves);
     U256::from(cash_plus_borrows_minus_reserves)
@@ -266,7 +267,8 @@ mod tests {
     }
     #[test]
     fn test_exchange_rate_in_case_total_supply_is_zero() {
-        assert_eq!(exchange_rate(0, 1, 1, 1), U256::one().mul(exp_scale()));
+        let initial = U256::one().mul(exp_scale());
+        assert_eq!(exchange_rate(0, 1, 1, 1, initial), initial);
     }
 
     #[test]
@@ -315,7 +317,8 @@ mod tests {
                     case.total_supply,
                     case.total_cash,
                     case.total_borrows,
-                    case.total_reserves
+                    case.total_reserves,
+                    U256::from(0)
                 ),
                 rate_want
             )
