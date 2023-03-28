@@ -1,18 +1,10 @@
 import { Result, ReturnNumber } from '@727-ventures/typechain-types'
-import { encodeAddress } from '@polkadot/keyring'
-import { waitForTx } from '../scripts/helper/deploy_helper'
-import { ReplacedType } from './utilityTypes'
-
-export const zeroAddress = encodeAddress(
-  '0x0000000000000000000000000000000000000000000000000000000000000000',
-)
+import { ReplacedType } from '../scripts/helper/utilityTypes'
+import { waitForTx } from '../scripts/helper/utils'
 
 export function parseUnits(amount: bigint | number, decimals = 18): bigint {
   return BigInt(amount) * 10n ** BigInt(decimals)
 }
-
-export const hexToUtf8 = (hexArray: number[]): string =>
-  Buffer.from(hexArray.toString().replace('0x', ''), 'hex').toString('utf-8')
 
 export const expectToEmit = <T = unknown>(
   event: { name: string; args: T },
@@ -58,12 +50,12 @@ export const shouldNotRevert = async <
     expect(preview.value.ok.err).toBeUndefined()
   } catch (e) {
     throw new Error(
-      `failed to preview ${contract.name}.${
-        fn as string
-      }(${args}): ${JSON.stringify(e)}`,
+      `failed to preview ${contract.name}.${fn as string}(${JSON.stringify(
+        args,
+      )}): ${JSON.stringify(e)}`,
     )
   }
-  const res = contract.tx[fn](...args)
+  const res = await contract.tx[fn](...args)
   await waitForTx(res)
   return res
 }

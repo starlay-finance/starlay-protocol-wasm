@@ -1,7 +1,5 @@
 import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
-import { WeightV2 } from '@polkadot/types/interfaces'
-import { BN, BN_ONE } from '@polkadot/util'
 import Faucet_factory from '../../types/constructors/faucet'
 import Lens_factory from '../../types/constructors/lens'
 import Manager_factory from '../../types/constructors/manager'
@@ -19,13 +17,12 @@ import DefaultInterestRateModel from '../../types/contracts/default_interest_rat
 import PSP22Token from '../../types/contracts/psp22_token'
 
 import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
-import { encodeAddress } from '@polkadot/keyring'
 import { LastArrayElement } from 'type-fest'
-import { hexToUtf8 } from '../../tests/testHelpers'
-import { ExcludeLastArrayElement } from '../../tests/utilityTypes'
 import Controller from '../../types/contracts/controller'
 import Pool from '../../types/contracts/pool'
 import Token from '../../types/contracts/psp22_token'
+import { ExcludeLastArrayElement } from './utilityTypes'
+import { defaultOption, hexToUtf8, isTest, waitForTx } from './utils'
 
 type FactoryArgs<C extends (...args: unknown[]) => unknown> = {
   api: ApiPromise
@@ -35,35 +32,15 @@ type FactoryArgs<C extends (...args: unknown[]) => unknown> = {
   option?: LastArrayElement<Parameters<C>>
 }
 
-const WAIT_FINALIZED_SECONDS = 10000
-
-export const ZERO_ADDRESS = encodeAddress(
-  '0x0000000000000000000000000000000000000000000000000000000000000000',
-)
-const MAX_CALL_WEIGHT = new BN(900_000_000).isub(BN_ONE).mul(new BN(10))
-const PROOFSIZE = new BN(1_000_000)
-export const getGasLimit = (
-  api: ApiPromise,
-  refTime?: BN | number,
-  proofSize?: BN | number,
-): WeightV2 => {
-  refTime = refTime || MAX_CALL_WEIGHT
-  proofSize = proofSize || PROOFSIZE
-  return api.registry.createType('WeightV2', {
-    refTime: refTime,
-    proofSize: proofSize,
-  })
-}
-export const defaultOption = (
-  api: ApiPromise,
-): {
-  storageDepositLimit: BN
-  gasLimit: WeightV2
-} => {
-  return {
-    storageDepositLimit: new BN(10).pow(new BN(18)),
-    gasLimit: getGasLimit(api),
-  }
+const afterDeployment = async (
+  name: string,
+  contract: {
+    result: SignAndSendSuccessResponse
+    address: string
+  },
+) => {
+  if (!isTest()) console.log(name + ' was deployed at: ' + contract.address)
+  await waitForTx(contract.result)
 }
 
 export const ROLE = {
@@ -86,6 +63,7 @@ export const deployController = async ({
   await afterDeployment(result.name, contract)
   return result
 }
+
 export const deployManager = async ({
   api,
   signer,
@@ -111,28 +89,6 @@ export const deployPriceOracle = async ({
   await afterDeployment(result.name, contract)
   return result
 }
-const afterDeployment = async (
-  name: string,
-  contract: {
-    result: SignAndSendSuccessResponse
-    address: string
-  },
-) => {
-  if (!isTest()) console.log(name + ' was deployed at: ' + contract.address)
-  await waitForTx(contract.result)
-}
-
-export const waitForTx = async (
-  result: SignAndSendSuccessResponse,
-): Promise<void> => {
-  if (isTest()) return
-
-  while (!result.result.isFinalized) {
-    await new Promise((resolve) => setTimeout(resolve, WAIT_FINALIZED_SECONDS))
-  }
-}
-
-const isTest = () => process.env.NODE_ENV === 'test'
 
 export const deployFaucet = async ({
   api,

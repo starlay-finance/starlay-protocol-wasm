@@ -2,13 +2,12 @@ import { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
 import PSP22Token from '../../types/contracts/psp22_token'
+import { ZERO_ADDRESS, defaultOption, sendTxWithPreview } from '../helper/utils'
 import { deployer, provider } from '../helper/wallet_helper'
-import { DUMMY_TOKENS, ONE_ETHER, Token } from '../tokens'
+import { DUMMY_TOKENS, Token } from '../tokens'
 import { ENV, Env } from './../env'
 import {
   ROLE,
-  ZERO_ADDRESS,
-  defaultOption,
   deployController,
   deployDefaultInterestRateModel,
   deployFaucet,
@@ -17,7 +16,6 @@ import {
   deployPSP22Token,
   deployPool,
   deployPriceOracle,
-  waitForTx,
 } from './../helper/deploy_helper'
 
 const main = async () => {
@@ -43,15 +41,30 @@ const deployContracts = async (env: Env) => {
     args: [],
   })
 
-  await waitForTx(await manager.tx.setController(controller.address, option))
+  await sendTxWithPreview(manager, 'setController', [
+    controller.address,
+    option,
+  ])
+  console.log(
+    `Controller ${controller.address} has been set to manager ${manager.address}`,
+  )
+
   for (const key of Object.keys(ROLE)) {
     const role = ROLE[key]
     if (role === ROLE.DEFAULT_ADMIN_ROLE) continue
-    await waitForTx(await manager.tx.grantRole(role, signer.address, option))
+    await sendTxWithPreview(manager, 'grantRole', [
+      role,
+      signer.address,
+      option,
+    ])
     console.log(`Role ${key} has been granted to ${signer.address}`)
   }
 
-  await waitForTx(await manager.tx.setPriceOracle(priceOracle.address, option))
+  await sendTxWithPreview(manager, 'setPriceOracle', [
+    priceOracle.address,
+    option,
+  ])
+  console.log(`PriceOracle ${priceOracle.address} has been set`)
   for (const token of await deployDummyTokens(api, signer)) {
     const {
       baseRatePerYear,
@@ -83,14 +96,26 @@ const deployContracts = async (env: Env) => {
         token.token.decimal,
       ],
     })
-    await waitForTx(
-      await priceOracle.tx.setFixedPrice(
-        token.contract.address,
-        ONE_ETHER,
-        option,
-      ),
+    await sendTxWithPreview(priceOracle, 'setFixedPrice', [
+      token.contract.address,
+      token.token.price,
+      option,
+    ])
+    console.log(
+      `Price of ${
+        token.token.name
+      } has been set to ${token.token.price.toString()}`,
     )
-    await waitForTx(await manager.tx.supportMarket(pool.address, option))
+    await sendTxWithPreview(
+      manager,
+      'supportMarketWithCollateralFactorMantissa',
+      [pool.address, [token.token.collateralFator], option],
+    )
+    console.log(
+      `${
+        token.token.name
+      } has added to market with collateral factor = ${token.token.collateralFator.toString()}`,
+    )
   }
   await deployLens({ api, signer, args: [] })
   await deployFaucet({ api, signer, args: [] })

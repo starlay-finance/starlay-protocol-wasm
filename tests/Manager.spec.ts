@@ -4,7 +4,7 @@ import {
   deployController,
   deployManager,
 } from '../scripts/helper/deploy_helper'
-import { zeroAddress } from './testHelpers'
+import { ZERO_ADDRESS } from '../scripts/helper/utils'
 
 describe('Manager spec', () => {
   const setup = async () => {
@@ -13,7 +13,7 @@ describe('Manager spec', () => {
     const manager = await deployManager({
       api,
       signer: deployer,
-      args: [zeroAddress],
+      args: [ZERO_ADDRESS],
     })
 
     const controller = await deployController({
