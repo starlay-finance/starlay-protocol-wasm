@@ -1,135 +1,21 @@
-import type { ApiPromise } from '@polkadot/api'
 import { encodeAddress } from '@polkadot/keyring'
-import type { KeyringPair } from '@polkadot/keyring/types'
 import BN from 'bn.js'
 import {
   deployController,
   deployDefaultInterestRateModel,
-  deployPoolFromAsset,
   deployPriceOracle,
-  deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
 import { ONE_ETHER } from '../scripts/tokens'
-import Controller from '../types/contracts/controller'
-import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
-import Pool from '../types/contracts/pool'
-import PSP22Token from '../types/contracts/psp22_token'
+import {
+  preparePoolsWithPreparedTokens,
+  preparePoolWithMockToken,
+  TEST_METADATAS,
+} from './testContractHelper'
 import { shouldNotRevert } from './testHelpers'
-
-const TOKENS = ['dai', 'usdc', 'usdt'] as const
-const METADATAS: {
-  [key in (typeof TOKENS)[number]]: {
-    name: string
-    symbol: string
-    decimals: number
-  }
-} = {
-  dai: {
-    name: 'Dai Stablecoin',
-    symbol: 'DAI',
-    decimals: 8,
-  },
-  usdc: {
-    name: 'USD Coin',
-    symbol: 'USDC',
-    decimals: 6,
-  },
-  usdt: {
-    name: 'USD Tether',
-    symbol: 'USDT',
-    decimals: 6,
-  },
-} as const
-
-const preparePoolWithMockToken = async ({
-  api,
-  metadata,
-  controller,
-  rateModel,
-  manager,
-}: {
-  api: ApiPromise
-  metadata: {
-    name: string
-    symbol: string
-    decimals: number
-  }
-  controller: Controller
-  rateModel: DefaultInterestRateModel
-  manager: KeyringPair
-}): Promise<{
-  token: PSP22Token
-  pool: Pool
-}> => {
-  const token = await deployPSP22Token({
-    api,
-    signer: manager,
-    args: [
-      0,
-      metadata.name as unknown as string[],
-      metadata.symbol as unknown as string[],
-      metadata.decimals,
-    ],
-  })
-
-  const pool = await deployPoolFromAsset({
-    api,
-    signer: manager,
-    args: [
-      token.address,
-      controller.address,
-      rateModel.address,
-      [ONE_ETHER.toString()],
-    ],
-    token,
-  })
-
-  return { token, pool }
-}
-
-const preparePoolsWithPreparedTokens = async ({
-  api,
-  controller,
-  rateModel,
-  manager,
-}: {
-  api: ApiPromise
-  controller: Controller
-  rateModel: DefaultInterestRateModel
-  manager: KeyringPair
-}): Promise<{
-  [key in (typeof TOKENS)[number]]: {
-    token: PSP22Token
-    pool: Pool
-  }
-}> => {
-  const dai = await preparePoolWithMockToken({
-    api,
-    controller,
-    rateModel,
-    manager: manager,
-    metadata: METADATAS.dai,
-  })
-  const usdc = await preparePoolWithMockToken({
-    api,
-    controller,
-    rateModel,
-    manager: manager,
-    metadata: METADATAS.usdc,
-  })
-  const usdt = await preparePoolWithMockToken({
-    api,
-    controller,
-    rateModel,
-    manager: manager,
-    metadata: METADATAS.usdt,
-  })
-  return { dai, usdc, usdt }
-}
 
 describe('Controller spec', () => {
   const setup = async () => {
-    const { api, alice: deployer, bob, charie } = globalThis.setup
+    const { api, alice: deployer, bob, charlie } = globalThis.setup
 
     const controller = await deployController({
       api,
@@ -164,7 +50,7 @@ describe('Controller spec', () => {
       controller,
       rateModel,
       priceOracle,
-      users: [bob, charie],
+      users: [bob, charlie],
     }
   }
 
@@ -255,7 +141,7 @@ describe('Controller spec', () => {
           controller,
           rateModel,
           manager: deployer,
-          metadata: METADATAS.dai,
+          metadata: TEST_METADATAS.dai,
         })
         return { controller, pool: dai.pool }
       }
@@ -338,5 +224,134 @@ describe('Controller spec', () => {
       usdc.pool.address,
       usdt.pool.address,
     ])
+  })
+
+  describe('.get_account_liquidity', () => {
+    const pow10 = (exponent: number) => new BN(10).pow(new BN(exponent))
+    const mantissa = () => pow10(18)
+    const to_dec6 = (val: number | string) => new BN(val).mul(pow10(6))
+    const to_dec18 = (val: number | string) => new BN(val).mul(pow10(18))
+    const trimPrefix = (hex: string) => hex.replace(/^0x/, '')
+
+    describe('only mint', () => {
+      it('single asset', async () => {
+        const { api, deployer, controller, rateModel, priceOracle, users } =
+          await setup()
+        const { dai, usdc } = await preparePoolsWithPreparedTokens({
+          api,
+          controller,
+          rateModel,
+          manager: deployer,
+        })
+        const [daiUser, usdcUser] = users
+
+        // prerequisite
+        //// initialize
+        const toParam = (m: BN) => [m.toString()]
+        for (const sym of [dai, usdc]) {
+          await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+          await controller.tx.supportMarketWithCollateralFactorMantissa(
+            sym.pool.address,
+            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+          )
+        }
+        //// use protocol
+        for await (const { sym, value, user } of [
+          {
+            sym: dai,
+            value: to_dec18(100),
+            user: daiUser,
+          },
+          {
+            sym: usdc,
+            value: to_dec6(500),
+            user: usdcUser,
+          },
+        ]) {
+          const { pool, token } = sym
+          await token.withSigner(deployer).tx.mint(user.address, value)
+          await token.withSigner(user).tx.approve(pool.address, value)
+          await pool.withSigner(user).tx.mint(value)
+        }
+
+        // execute
+        const resDaiUser = (
+          await controller.query.getAccountLiquidity(daiUser.address)
+        ).value.ok.ok
+        const collateral1 = BigInt(resDaiUser[0].toString()).toString()
+        const shortfall1 = BigInt(resDaiUser[1].toString()).toString()
+        expect(collateral1.toString()).toEqual(
+          new BN(90).mul(mantissa()).toString(),
+        )
+        expect(shortfall1.toString()).toEqual(
+          new BN(0).mul(mantissa()).toString(),
+        )
+
+        const resUsdcUser = (
+          await controller.query.getAccountLiquidity(usdcUser.address)
+        ).value.ok.ok
+        const collateral2 = BigInt(resUsdcUser[0].toString()).toString()
+        const shortfall2 = BigInt(resUsdcUser[1].toString()).toString()
+        expect(collateral2.toString()).toEqual(
+          new BN(450).mul(mantissa()).toString(),
+        )
+        expect(shortfall2.toString()).toEqual(
+          new BN(0).mul(mantissa()).toString(),
+        )
+      })
+      it('multi asset', async () => {
+        const { api, deployer, controller, rateModel, priceOracle, users } =
+          await setup()
+        const { dai, usdc, usdt } = await preparePoolsWithPreparedTokens({
+          api,
+          controller,
+          rateModel,
+          manager: deployer,
+        })
+        const user = users[0]
+
+        // prerequisite
+        //// initialize
+        const toParam = (m: BN) => [m.toString()]
+        for (const sym of [dai, usdc, usdt]) {
+          await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+          await controller.tx.supportMarketWithCollateralFactorMantissa(
+            sym.pool.address,
+            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+          )
+        }
+
+        //// use protocol
+        for await (const { sym, value } of [
+          {
+            sym: dai,
+            value: to_dec18(1_000),
+          },
+          {
+            sym: usdc,
+            value: to_dec6(2_000),
+          },
+          {
+            sym: usdt,
+            value: to_dec6(3_000),
+          },
+        ]) {
+          const { pool, token } = sym
+          await token.withSigner(deployer).tx.mint(user.address, value)
+          await token.withSigner(user).tx.approve(pool.address, value)
+          await pool.withSigner(user).tx.mint(value)
+        }
+
+        // execute
+        const res = (await controller.query.getAccountLiquidity(user.address))
+          .value.ok.ok
+        const collateral = new BN(trimPrefix(res[0].toString()), 16)
+        const shortfall = new BN(trimPrefix(res[1].toString()), 16)
+        expect(collateral.toString()).toEqual(
+          new BN(5_400).mul(mantissa()).toString(),
+        )
+        expect(shortfall.toString()).toEqual(new BN(0).toString())
+      })
+    })
   })
 })
