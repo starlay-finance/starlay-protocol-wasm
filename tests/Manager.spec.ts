@@ -4,7 +4,9 @@ import {
   deployController,
   deployManager,
 } from '../scripts/helper/deploy_helper'
-import { zeroAddress } from './testHelpers'
+import { ZERO_ADDRESS } from '../scripts/helper/utils'
+import { ONE_ETHER } from '../scripts/tokens'
+import { shouldNotRevert } from './testHelpers'
 
 describe('Manager spec', () => {
   const setup = async () => {
@@ -13,7 +15,7 @@ describe('Manager spec', () => {
     const manager = await deployManager({
       api,
       signer: deployer,
-      args: [zeroAddress],
+      args: [ZERO_ADDRESS],
     })
 
     const controller = await deployController({
@@ -54,6 +56,26 @@ describe('Manager spec', () => {
 
       const { value: value2 } = await controller.query.oracle()
       expect(value2.ok).toEqual(oracleAddr)
+    })
+    it.todo('.support_market_with_collateral_factor_mantissa', async () => {
+      const { deployer, manager, controller } = await setup()
+      const collateralFactor = ONE_ETHER
+
+      await shouldNotRevert(manager, 'grantRole', [
+        ROLE.CONTROLLER_ADMIN,
+        deployer.address,
+      ])
+      // FIXME reverted with: {"issue":"OUTPUT_IS_NULL"}
+      await shouldNotRevert(
+        manager,
+        'supportMarketWithCollateralFactorMantissa',
+        [ZERO_ADDRESS, [collateralFactor]],
+      )
+
+      const {
+        value: { ok: actual },
+      } = await controller.query.collateralFactorMantissa(ZERO_ADDRESS)
+      expect(actual.rawNumber).toEqual(collateralFactor)
     })
     it('.set_borrow_cap', async () => {
       const { deployer, manager, controller } = await setup()

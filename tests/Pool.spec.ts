@@ -7,8 +7,8 @@ import {
   deployPoolFromAsset,
   deployPriceOracle,
   deployPSP22Token,
-  ZERO_ADDRESS,
 } from '../scripts/helper/deploy_helper'
+import { hexToUtf8, ZERO_ADDRESS } from '../scripts/helper/utils'
 import { ONE_ETHER } from '../scripts/tokens'
 import Controller from '../types/contracts/controller'
 import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
@@ -16,12 +16,7 @@ import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
 import { Mint, Redeem } from '../types/event-types/pool'
 import { Transfer } from '../types/event-types/psp22_token'
-import {
-  expectToEmit,
-  hexToUtf8,
-  shouldNotRevert,
-  zeroAddress,
-} from './testHelpers'
+import { expectToEmit, shouldNotRevert } from './testHelpers'
 
 const TOKENS = ['dai', 'usdc', 'usdt'] as const
 const METADATAS: {
@@ -193,7 +188,7 @@ describe('Pool spec', () => {
   it('instantiate', async () => {
     const { pools, controller } = await setup()
     const { pool, token } = pools.dai
-    expect(pool.address).not.toBe(zeroAddress)
+    expect(pool.address).not.toBe(ZERO_ADDRESS)
     expect((await pool.query.underlying()).value.ok).toEqual(token.address)
     expect((await pool.query.controller()).value.ok).toEqual(controller.address)
     expect(hexToUtf8((await pool.query.tokenName()).value.ok)).toEqual(
@@ -209,10 +204,12 @@ describe('Pool spec', () => {
     let pool: Pool
 
     beforeAll(async () => {
-      const { deployer: _deployer, pools } = await setup()
-      deployer = _deployer
-      token = pools.dai.token
-      pool = pools.dai.pool
+      ;({
+        deployer,
+        pools: {
+          dai: { token, pool },
+        },
+      } = await setup())
     })
 
     const balance = 10_000
@@ -259,10 +256,12 @@ describe('Pool spec', () => {
     let pool: Pool
 
     beforeAll(async () => {
-      const { deployer: _deployer, pools } = await setup()
-      deployer = _deployer
-      token = pools.dai.token
-      pool = pools.dai.pool
+      ;({
+        deployer,
+        pools: {
+          dai: { token, pool },
+        },
+      } = await setup())
     })
 
     const deposited = 10_000
@@ -314,10 +313,12 @@ describe('Pool spec', () => {
     let pool: Pool
 
     beforeAll(async () => {
-      const { deployer: _deployer, pools } = await setup()
-      deployer = _deployer
-      token = pools.dai.token
-      pool = pools.dai.pool
+      ;({
+        deployer,
+        pools: {
+          dai: { token, pool },
+        },
+      } = await setup())
     })
 
     const deposited = 10_000
@@ -386,11 +387,13 @@ describe('Pool spec', () => {
     let users: KeyringPair[]
 
     beforeAll(async () => {
-      const { deployer: _deployer, pools, users: _users } = await setup()
-      deployer = _deployer
-      token = pools.dai.token
-      pool = pools.dai.pool
-      users = _users
+      ;({
+        deployer,
+        users,
+        pools: {
+          dai: { token, pool },
+        },
+      } = await setup())
     })
 
     it('preparations', async () => {
@@ -473,14 +476,7 @@ describe('Pool spec', () => {
     let users: KeyringPair[]
 
     beforeAll(async () => {
-      const {
-        deployer: _deployer,
-        pools: _pools,
-        users: _users,
-      } = await setup()
-      deployer = _deployer
-      pools = _pools
-      users = _users
+      ;({ deployer, users, pools } = await setup())
     })
 
     it('preparations', async () => {
@@ -495,7 +491,7 @@ describe('Pool spec', () => {
       ).toEqual(10_000)
 
       // mint to dai pool for collateral
-      const [user1, _] = users
+      const [user1] = users
       await dai.token.tx.mint(user1.address, 20_000)
       await dai.token.withSigner(user1).tx.approve(dai.pool.address, 20_000)
       await dai.pool.withSigner(user1).tx.mint(20_000)
@@ -512,7 +508,7 @@ describe('Pool spec', () => {
 
     it('execute', async () => {
       const { token, pool } = pools.usdc
-      const [user1, _] = users
+      const [user1] = users
       await token.withSigner(user1).tx.approve(pool.address, 4_500)
       const { events } = await pool.withSigner(user1).tx.repayBorrow(4_500)
 
@@ -568,7 +564,7 @@ describe('Pool spec', () => {
       ).toEqual(10_000)
 
       // mint to dai pool for collateral
-      const [borrower, _] = users
+      const [borrower] = users
       await dai.token.tx.mint(borrower.address, 20_000)
       await dai.token.withSigner(borrower).tx.approve(dai.pool.address, 20_000)
       await dai.pool.withSigner(borrower).tx.mint(20_000)
@@ -646,7 +642,7 @@ describe('Pool spec', () => {
   })
 
   describe('.liquidate_borrow (fail case)', () => {
-    const setup_extended = async () => {
+    const setupExtended = async () => {
       const args = await setup()
 
       const secondToken = await deployPSP22Token({
@@ -693,7 +689,7 @@ describe('Pool spec', () => {
         },
         users,
         secondPool,
-      } = await setup_extended()
+      } = await setupExtended()
       const [user1] = users
       const { value } = await pool
         .withSigner(user1)
@@ -709,7 +705,7 @@ describe('Pool spec', () => {
         },
         users,
         secondPool,
-      } = await setup_extended()
+      } = await setupExtended()
       const [user1, user2] = users
       const { value } = await pool
         .withSigner(user1)

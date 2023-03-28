@@ -5,6 +5,8 @@ export interface Token {
   decimal: number
   name: string
   rateModel: InterestRateModel
+  collateralFator: BN
+  price: BN
 }
 export type DummyToken = Token & DummyTokenProp
 
@@ -29,6 +31,8 @@ const TOKEN_BASE: Omit<Token, 'symbol' | 'name'> = {
     multiplierPerYearSlope2: new BN(100).mul(ONE_ETHER),
     kink: new BN(100).mul(ONE_ETHER),
   },
+  collateralFator: ONE_ETHER.mul(new BN(90)).div(new BN(100)),
+  price: ONE_ETHER,
 }
 
 export const SUPPORTED_TOKENS: Token[] = [

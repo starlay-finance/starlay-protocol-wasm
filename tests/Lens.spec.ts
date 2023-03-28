@@ -84,8 +84,6 @@ const setup = async (
 
   const users = [bob, charlie]
 
-  const faucet = await deployFaucet({ api, signer: deployer, args: [] })
-
   // initialize
   await shouldNotRevert(controller, 'setPriceOracle', [priceOracle.address])
   await shouldNotRevert(priceOracle, 'setFixedPrice', [token1.address, price])
@@ -102,15 +100,20 @@ const setup = async (
   )
 
   const lens = await deployLens({ api, signer: deployer, args: [] })
+  const faucet = await deployFaucet({ api, signer: deployer, args: [] })
 
-  console.log({
-    lens: lens.address,
-    controller: controller.address,
-    pools: [pool1.address, pool2.address],
-    interestRateModel: interestRateModel.address,
-    tokens: [token1.address, token2.address],
-    faucet: faucet.address,
-  })
+  console.log(
+    {
+      lens: lens.address,
+      controller: controller.address,
+      faucet: faucet.address,
+    },
+    {
+      tokens: [token1.address, token2.address],
+      pools: [pool1.address, pool2.address],
+      interestRateModel: interestRateModel.address,
+    },
+  )
   return {
     api,
     deployer,
