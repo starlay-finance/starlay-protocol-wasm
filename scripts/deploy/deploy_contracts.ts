@@ -33,7 +33,9 @@ const deployContracts = async (env: Env) => {
   const controller = await deployController({
     api,
     signer,
-    args: [manager.address],
+    // FIXME unable to call supportMarketWithCollateralFactorMantissa via manager
+    // args: [manager.address],
+    args: [signer.address],
   })
   const priceOracle = await deployPriceOracle({
     api,
@@ -60,7 +62,7 @@ const deployContracts = async (env: Env) => {
     console.log(`Role ${key} has been granted to ${signer.address}`)
   }
 
-  await sendTxWithPreview(manager, 'setPriceOracle', [
+  await sendTxWithPreview(controller, 'setPriceOracle', [
     priceOracle.address,
     option,
   ])
@@ -107,7 +109,7 @@ const deployContracts = async (env: Env) => {
       } has been set to ${token.token.price.toString()}`,
     )
     await sendTxWithPreview(
-      manager,
+      controller,
       'supportMarketWithCollateralFactorMantissa',
       [pool.address, [token.token.collateralFator], option],
     )
