@@ -201,6 +201,15 @@ mod tests {
             },
             CalculateInterestInput {
                 old_block_timestamp: old_timestamp,
+                new_block_timestamp: old_timestamp + 1,
+                borrow_index: 123123123,
+                borrow_rate: mantissa().div(123127),
+                reserve_factor_mantissa: mantissa().div(10).mul(2),
+                total_borrows: 123 * (10_u128.pow(18)),
+                total_reserves: 222 * (10_u128.pow(18)),
+            },
+            CalculateInterestInput {
+                old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + 999 * 60 * 60 * 2345 * 123,
                 borrow_index: 123123123,
                 borrow_rate: mantissa().div(123123),
