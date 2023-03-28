@@ -111,6 +111,8 @@ pub trait Pool: PSP22 {
     #[ink(message)]
     fn exchange_rate_current(&mut self) -> Result<WrappedU256>;
     #[ink(message)]
+    fn initial_exchange_rate_mantissa(&self) -> WrappedU256;
+    #[ink(message)]
     fn reserve_factor_mantissa(&self) -> WrappedU256;
 }
 
