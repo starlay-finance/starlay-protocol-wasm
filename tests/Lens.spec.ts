@@ -15,6 +15,7 @@ import Controller from '../types/contracts/controller'
 import Faucet from '../types/contracts/faucet'
 import Lens from '../types/contracts/lens'
 import Pool from '../types/contracts/pool'
+import PriceOracle from '../types/contracts/price_oracle'
 import PSP22Token from '../types/contracts/psp22_token'
 import { shouldNotRevert } from './testHelpers'
 
@@ -24,6 +25,8 @@ const setup = async (
     collateralFactor: string | number | BN
     reserveFactor: string | number | BN
     borrowCap: string | number | BN
+    liquidationIncentive: string | number | BN
+    closeFactor: string | number | BN
   }> = {},
 ) => {
   const {
@@ -31,6 +34,8 @@ const setup = async (
     collateralFactor = ONE_ETHER.mul(new BN(90)).div(new BN(100)),
     reserveFactor = ONE_ETHER.mul(new BN(10)).div(new BN(100)),
     borrowCap = ONE_ETHER,
+    liquidationIncentive = ONE_ETHER.mul(new BN(10)).div(new BN(100)),
+    closeFactor = ONE_ETHER.mul(new BN(90)).div(new BN(100)),
   } = args
   const { api, alice: deployer, bob, charlie } = globalThis.setup
 
@@ -100,6 +105,10 @@ const setup = async (
   const users = [bob, charlie]
 
   // initialize
+  await shouldNotRevert(controller, 'setLiquidationIncentiveMantissa', [
+    [liquidationIncentive],
+  ])
+  await shouldNotRevert(controller, 'setCloseFactorMantissa', [[closeFactor]])
   await shouldNotRevert(controller, 'setPriceOracle', [priceOracle.address])
   await shouldNotRevert(priceOracle, 'setFixedPrice', [token1.address, price])
   await shouldNotRevert(priceOracle, 'setFixedPrice', [token2.address, price])
@@ -115,6 +124,7 @@ const setup = async (
   )
   await shouldNotRevert(pool1, 'setReserveFactorMantissa', [[reserveFactor]])
   await shouldNotRevert(controller, 'setBorrowCap', [pool1.address, borrowCap])
+
   const lens = await deployLens({ api, signer: deployer, args: [] })
   const faucet = await deployFaucet({ api, signer: deployer, args: [] })
 
@@ -136,6 +146,7 @@ const setup = async (
     tokens: [token1, token2],
     pools: [pool1, pool2],
     controller,
+    priceOracle,
     lens,
     faucet,
     users,
@@ -147,22 +158,35 @@ describe('Lens', () => {
   let tokens: PSP22Token[]
   let pools: Pool[]
   let controller: Controller
+  let priceOracle: PriceOracle
   let faucet: Faucet
   let signer: KeyringPair
+  let deployer: KeyringPair
 
   describe('returns value', () => {
     const price = 1
     const collateralFactor = ONE_ETHER.mul(new BN(90)).div(new BN(100))
     const reserveFactor = ONE_ETHER.mul(new BN(10)).div(new BN(100))
     const borrowCap = ONE_ETHER.mul(new BN(100))
+    const liquidationIncentive = ONE_ETHER.mul(new BN(10)).div(new BN(100))
+    const closeFactor = ONE_ETHER.mul(new BN(90)).div(new BN(100))
     beforeAll(async () => {
       ;({
         lens,
         tokens,
         pools,
         controller,
+        priceOracle,
         users: [signer],
-      } = await setup({ price, collateralFactor, reserveFactor, borrowCap }))
+        deployer,
+      } = await setup({
+        price,
+        collateralFactor,
+        reserveFactor,
+        borrowCap,
+        liquidationIncentive,
+        closeFactor,
+      }))
     })
 
     it('Pools', async () => {
@@ -250,6 +274,21 @@ describe('Lens', () => {
       } = await lens.query.underlyingBalanceAll([pool.address], signer.address)
 
       expect(res.toNumber()).toBe(0)
+    })
+
+    it('Configuration', async () => {
+      const {
+        value: { ok: res },
+      } = await lens.query.configuration(controller.address)
+
+      expect(res.manager).toBe(deployer.address)
+      expect(res.oracle).toBe(priceOracle.address)
+      expect(res.seizeGuardianPaused).toBeFalsy()
+      expect(res.transferGuardianPaused).toBeFalsy()
+      expect(res.liquidationIncentiveMantissa.toHuman()).toBe(
+        liquidationIncentive.toString(),
+      )
+      expect(res.closeFactorMantissa.toHuman()).toBe(closeFactor.toString())
     })
   })
 

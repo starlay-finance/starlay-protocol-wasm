@@ -71,6 +71,17 @@ pub mod contract {
         shortfall: Balance,
     }
 
+    #[derive(Decode, Encode)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub struct Configuration {
+        manager: AccountId,
+        oracle: AccountId,
+        seize_guardian_paused: bool,
+        transfer_guardian_paused: bool,
+        liquidation_incentive_mantissa: WrappedU256,
+        close_factor_mantissa: WrappedU256,
+    }
+
     #[ink(storage)]
     #[derive(Default, Storage)]
     pub struct LensContract {}
@@ -144,6 +155,20 @@ pub mod contract {
                 .iter()
                 .map(|pool| self._pool_underlying_price(*pool))
                 .collect()
+        }
+
+        #[ink(message)]
+        pub fn configuration(&self, controller: AccountId) -> Configuration {
+            Configuration {
+                manager: ControllerRef::manager(&controller),
+                oracle: ControllerRef::oracle(&controller),
+                seize_guardian_paused: ControllerRef::seize_guardian_paused(&controller),
+                transfer_guardian_paused: ControllerRef::transfer_guardian_paused(&controller),
+                liquidation_incentive_mantissa: ControllerRef::liquidation_incentive_mantissa(
+                    &controller,
+                ),
+                close_factor_mantissa: ControllerRef::close_factor_mantissa(&controller),
+            }
         }
 
         fn _pools(&self, controller: AccountId) -> Vec<AccountId> {
