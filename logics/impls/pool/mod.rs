@@ -63,7 +63,7 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 )]
 pub struct BorrowSnapshot {
     principal: Balance,
-    interest_index: WrappedU256,
+    interest_index: Balance,
 }
 
 #[derive(Debug)]
@@ -77,7 +77,7 @@ pub struct Data {
     pub total_reserves: Balance,
     pub account_borrows: Mapping<AccountId, BorrowSnapshot>,
     pub accural_block_timestamp: Timestamp,
-    pub borrow_index: WrappedU256,
+    pub borrow_index: Balance,
     pub reserve_factor_mantissa: WrappedU256,
 }
 
@@ -92,7 +92,7 @@ impl Default for Data {
             total_reserves: Default::default(),
             account_borrows: Default::default(),
             accural_block_timestamp: 0,
-            borrow_index: WrappedU256::from(U256::zero()),
+            borrow_index: 0,
             reserve_factor_mantissa: WrappedU256::from(U256::zero()),
         }
     }
@@ -187,7 +187,7 @@ pub trait Internal {
     fn _borrow_balance_stored(&self, account: AccountId) -> Balance;
     fn _balance_of_underlying(&self, account: AccountId) -> Balance;
     fn _accural_block_timestamp(&self) -> Timestamp;
-    fn _borrow_index(&self) -> Exp;
+    fn _borrow_index(&self) -> Balance;
     fn _reserve_factor_mantissa(&self) -> WrappedU256;
     fn _exchange_rate_stored(&self) -> U256;
     fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput>;
@@ -226,7 +226,7 @@ pub trait Internal {
     fn _emit_accrue_interest_event(
         &self,
         interest_accumulated: Balance,
-        new_index: WrappedU256,
+        new_index: Balance,
         new_total_borrows: Balance,
     );
     fn _emit_reserves_added_event(
@@ -438,12 +438,12 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let out = self._get_interest_at(at)?;
         let mut data = self.data::<Data>();
         data.accural_block_timestamp = at;
-        data.borrow_index = out.borrow_index.mantissa;
+        data.borrow_index = out.borrow_index;
         data.total_borrows = out.total_borrows;
         data.total_reserves = out.total_reserves;
         self._emit_accrue_interest_event(
             out.interest_accumulated,
-            WrappedU256::from(out.borrow_index.mantissa),
+            out.borrow_index,
             out.total_borrows,
         );
         Ok(())
@@ -610,7 +610,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let account_borrows_prev = self._borrow_balance_stored(borrower);
         let account_borrows_new = account_borrows_prev + borrow_amount;
         let total_borrows_new = self._total_borrows() + borrow_amount;
-        let idx = self._borrow_index().mantissa;
+        let idx = self._borrow_index();
         self.data::<Data>().account_borrows.insert(
             &borrower,
             &BorrowSnapshot {
@@ -667,7 +667,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         let account_borrows_new = account_borrow_prev - repay_amount_final;
         let total_borrows_new = self._total_borrows() - repay_amount_final;
 
-        let idx = self._borrow_index().mantissa;
+        let idx = self._borrow_index();
         self.data::<Data>().account_borrows.insert(
             &borrower,
             &BorrowSnapshot {
@@ -981,10 +981,8 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         self.data::<Data>().total_reserves
     }
 
-    default fn _borrow_index(&self) -> Exp {
-        Exp {
-            mantissa: self.data::<Data>().borrow_index,
-        }
+    default fn _borrow_index(&self) -> Balance {
+        self.data::<Data>().borrow_index
     }
 
     default fn _borrow_balance_stored(&self, account: AccountId) -> Balance {
@@ -997,14 +995,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             return 0
         }
         let borrow_index = self._borrow_index();
-        // temp / TODO: check calculation interest_rate
-        if U256::from(borrow_index.mantissa).is_zero()
-            && U256::from(snapshot.interest_index).is_zero()
-        {
-            return snapshot.principal
-        }
-        let prinicipal_times_index =
-            U256::from(snapshot.principal).mul(U256::from(borrow_index.mantissa));
+        let prinicipal_times_index = U256::from(snapshot.principal).mul(U256::from(borrow_index));
         prinicipal_times_index
             .div(U256::from(snapshot.interest_index))
             .as_u128()
@@ -1107,7 +1098,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
     default fn _emit_accrue_interest_event(
         &self,
         _interest_accumulated: Balance,
-        _new_index: WrappedU256,
+        _new_index: Balance,
         _new_total_borrows: Balance,
     ) {
     }

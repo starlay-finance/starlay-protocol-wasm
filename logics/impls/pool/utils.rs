@@ -34,7 +34,7 @@ pub fn protocol_seize_share_mantissa() -> U256 {
 pub struct CalculateInterestInput {
     pub total_borrows: Balance,
     pub total_reserves: Balance,
-    pub borrow_index: Exp,
+    pub borrow_index: Balance,
     pub borrow_rate: U256,
     pub old_block_timestamp: Timestamp,
     pub new_block_timestamp: Timestamp,
@@ -42,7 +42,7 @@ pub struct CalculateInterestInput {
 }
 
 pub struct CalculateInterestOutput {
-    pub borrow_index: Exp,
+    pub borrow_index: Balance,
     pub total_borrows: Balance,
     pub total_reserves: Balance,
     pub interest_accumulated: Balance,
@@ -68,14 +68,11 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
         mantissa: WrappedU256::from(input.reserve_factor_mantissa),
     }
     .mul_scalar_truncate_add_uint(interest_accumulated, U256::from(input.total_reserves));
-    let borrow_index_new = simple_interest_factor.mul_scalar_truncate_add_uint(
-        input.borrow_index.mantissa.into(),
-        input.borrow_index.mantissa.into(),
-    );
+    let borrow_index_new = simple_interest_factor
+        .mul_scalar_truncate_add_uint(input.borrow_index.into(), input.borrow_index.into())
+        .as_u128();
     Ok(CalculateInterestOutput {
-        borrow_index: Exp {
-            mantissa: WrappedU256::from(borrow_index_new),
-        },
+        borrow_index: borrow_index_new,
         interest_accumulated: interest_accumulated.as_u128(),
         total_borrows: total_borrows_new,
         total_reserves: total_reserves_new.as_u128(), // TODO
@@ -167,9 +164,7 @@ mod tests {
     #[test]
     fn test_calculate_interest_panic_if_over_borrow_rate_max() {
         let input = CalculateInterestInput {
-            borrow_index: Exp {
-                mantissa: WrappedU256::from(U256::zero()),
-            },
+            borrow_index: 0,
             borrow_rate: U256::one().mul(U256::from(10)).pow(U256::from(18)),
             new_block_timestamp: Timestamp::default(),
             old_block_timestamp: Timestamp::default(),
@@ -188,9 +183,7 @@ mod tests {
             CalculateInterestInput {
                 old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + mantissa().as_u64(),
-                borrow_index: Exp {
-                    mantissa: WrappedU256::from(U256::zero()),
-                },
+                borrow_index: 0,
                 borrow_rate: mantissa().div(100000), // 0.001 %
                 reserve_factor_mantissa: mantissa().div(100), // 1 %
                 total_borrows: 10_000 * (10_u128.pow(18)),
@@ -199,9 +192,7 @@ mod tests {
             CalculateInterestInput {
                 old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + 1000 * 60 * 60, // 1 hour
-                borrow_index: Exp {
-                    mantissa: WrappedU256::from(U256::from(123123123)),
-                },
+                borrow_index: 0,
                 borrow_rate: mantissa().div(1000000),
                 reserve_factor_mantissa: mantissa().div(10),
                 total_borrows: 100_000 * (10_u128.pow(18)),
@@ -210,9 +201,7 @@ mod tests {
             CalculateInterestInput {
                 old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + 999 * 60 * 60 * 2345 * 123,
-                borrow_index: Exp {
-                    mantissa: WrappedU256::from(U256::from(123123123)),
-                },
+                borrow_index: 123123123,
                 borrow_rate: mantissa().div(123123),
                 reserve_factor_mantissa: mantissa().div(10).mul(2),
                 total_borrows: 123_456 * (10_u128.pow(18)),
@@ -243,10 +232,10 @@ mod tests {
             let borrow_idx_want = input
                 .borrow_rate
                 .mul(U256::from(delta))
-                .mul(U256::from(input.borrow_index.mantissa))
+                .mul(U256::from(input.borrow_index))
                 .div(U256::from(10_u128.pow(18)))
-                .add(U256::from(input.borrow_index.mantissa));
-            assert_eq!(U256::from(got.borrow_index.mantissa), borrow_idx_want);
+                .add(U256::from(input.borrow_index));
+            assert_eq!(U256::from(got.borrow_index), borrow_idx_want);
         }
     }
 
