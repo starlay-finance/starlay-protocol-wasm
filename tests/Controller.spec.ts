@@ -75,7 +75,12 @@ const preparePoolWithMockToken = async ({
   const pool = await deployPoolFromAsset({
     api,
     signer: manager,
-    args: [token.address, controller.address, rateModel.address],
+    args: [
+      token.address,
+      controller.address,
+      rateModel.address,
+      [ONE_ETHER.toString()],
+    ],
     token,
   })
 

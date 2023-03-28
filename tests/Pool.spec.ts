@@ -76,7 +76,12 @@ const preparePoolWithMockToken = async ({
   const pool = await deployPoolFromAsset({
     api,
     signer: manager,
-    args: [token.address, controller.address, rateModel.address],
+    args: [
+      token.address,
+      controller.address,
+      rateModel.address,
+      [ONE_ETHER.toString()],
+    ],
     token,
   })
 
@@ -663,6 +668,7 @@ describe('Pool spec', () => {
           secondToken.address,
           args.controller.address,
           args.rateModel.address,
+          [ONE_ETHER.toString()],
         ],
         token: secondToken,
       })
@@ -717,4 +723,49 @@ describe('Pool spec', () => {
   })
 
   it.todo('.reduceReserves')
+
+  describe('.exchange_rate_stored', () => {
+    describe('success', () => {
+      it('return initial_exchange_rate_stored if no total_supply', async () => {
+        const { api, deployer, controller, rateModel } = await setup()
+
+        const newToken = await deployPSP22Token({
+          api: api,
+          signer: deployer,
+          args: [
+            0,
+            'Sample Coin' as unknown as string[],
+            'COIN' as unknown as string[],
+            8,
+          ],
+        })
+        const initialExchangeRate = ONE_ETHER
+        const newPool = await deployPoolFromAsset({
+          api: api,
+          signer: deployer,
+          args: [
+            newToken.address,
+            controller.address,
+            rateModel.address,
+            [initialExchangeRate.toString()],
+          ],
+          token: newToken,
+        })
+
+        // prerequisite
+        expect((await newPool.query.totalSupply()).value.ok.toString()).toBe(
+          '0',
+        )
+        expect(
+          (
+            await newPool.query.initialExchangeRateMantissa()
+          ).value.ok.toString(),
+        ).toBe(initialExchangeRate.toString())
+        // execution
+        expect(
+          (await newPool.query.exchageRateStored()).value.ok.toString(),
+        ).toBe(initialExchangeRate.toString())
+      })
+    })
+  })
 })
