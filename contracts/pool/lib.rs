@@ -10,9 +10,12 @@ pub mod contract {
         },
         prelude::vec::Vec,
     };
-    use logics::impls::pool::{
-        Internal,
-        *,
+    use logics::{
+        impls::pool::{
+            Internal,
+            *,
+        },
+        traits::types::WrappedU256,
     };
     use openbrush::{
         contracts::psp22::{
@@ -264,6 +267,7 @@ pub mod contract {
             underlying: AccountId,
             controller: AccountId,
             rate_model: AccountId,
+            initial_exchange_rate_mantissa: WrappedU256,
             name: String,
             symbol: String,
             decimals: u8,
@@ -280,6 +284,7 @@ pub mod contract {
                 controller,
                 Self::env().caller(),
                 rate_model,
+                initial_exchange_rate_mantissa,
                 name,
                 symbol,
                 decimals,
@@ -292,6 +297,7 @@ pub mod contract {
             underlying: AccountId,
             controller: AccountId,
             rate_model: AccountId,
+            initial_exchange_rate_mantissa: WrappedU256,
         ) -> Self {
             if underlying.is_zero() {
                 panic!("underlying is zero address");
@@ -315,6 +321,7 @@ pub mod contract {
                 controller,
                 Self::env().caller(),
                 rate_model,
+                initial_exchange_rate_mantissa,
                 name,
                 symbol,
                 decimals,
@@ -328,6 +335,7 @@ pub mod contract {
             controller: AccountId,
             manager: AccountId,
             rate_model: AccountId,
+            initial_exchange_rate_mantissa: WrappedU256,
             name: String,
             symbol: String,
             decimals: u8,
@@ -336,6 +344,7 @@ pub mod contract {
             self.pool.controller = controller;
             self.pool.manager = manager;
             self.pool.rate_model = rate_model;
+            self.pool.initial_exchange_rate_mantissa = initial_exchange_rate_mantissa;
             self.metadata.name = Some(name);
             self.metadata.symbol = Some(symbol);
             self.metadata.decimals = decimals;
@@ -366,6 +375,7 @@ pub mod contract {
             contracts::psp22::PSP22,
             traits::ZERO_ADDRESS,
         };
+        use primitive_types::U256;
         use std::ops::{
             Add,
             Div,
@@ -386,10 +396,12 @@ pub mod contract {
             let underlying = AccountId::from([0x01; 32]);
             let controller = AccountId::from([0x02; 32]);
             let rate_model = AccountId::from([0x03; 32]);
+            let initial_exchange_rate_mantissa = WrappedU256::from(exp_scale());
             let contract = PoolContract::new(
                 underlying,
                 controller,
                 rate_model,
+                initial_exchange_rate_mantissa,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -397,6 +409,14 @@ pub mod contract {
             assert_eq!(contract.underlying(), underlying);
             assert_eq!(contract.controller(), controller);
             assert_eq!(contract.manager(), accounts.bob);
+            assert_eq!(
+                contract.initial_exchange_rate_mantissa(),
+                initial_exchange_rate_mantissa
+            );
+            assert_eq!(
+                contract.reserve_factor_mantissa(),
+                WrappedU256::from(U256::from(0))
+            );
             assert_eq!(contract.total_borrows(), 0);
         }
 
@@ -411,6 +431,7 @@ pub mod contract {
                 ZERO_ADDRESS.into(),
                 controller,
                 ZERO_ADDRESS.into(),
+                WrappedU256::from(U256::from(0)),
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -428,6 +449,7 @@ pub mod contract {
                 underlying,
                 ZERO_ADDRESS.into(),
                 ZERO_ADDRESS.into(),
+                WrappedU256::from(U256::from(0)),
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -447,6 +469,7 @@ pub mod contract {
                 dummy_id,
                 dummy_id,
                 dummy_id,
+                WrappedU256::from(U256::from(0)),
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -468,6 +491,7 @@ pub mod contract {
                 dummy_id,
                 dummy_id,
                 dummy_id,
+                WrappedU256::from(U256::from(0)),
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -491,6 +515,7 @@ pub mod contract {
                 dummy_id,
                 dummy_id,
                 dummy_id,
+                WrappedU256::from(U256::from(0)),
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -509,6 +534,7 @@ pub mod contract {
                 dummy_id,
                 dummy_id,
                 dummy_id,
+                WrappedU256::from(U256::from(0)),
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -532,6 +558,7 @@ pub mod contract {
                 dummy_id,
                 dummy_id,
                 dummy_id,
+                WrappedU256::from(U256::from(0)),
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -553,6 +580,7 @@ pub mod contract {
                 dummy_id,
                 dummy_id,
                 dummy_id,
+                WrappedU256::from(U256::from(0)),
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -571,6 +599,7 @@ pub mod contract {
                 dummy_id,
                 dummy_id,
                 dummy_id,
+                WrappedU256::from(U256::from(0)),
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -591,6 +620,7 @@ pub mod contract {
                 dummy_id,
                 dummy_id,
                 dummy_id,
+                WrappedU256::from(U256::from(0)),
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -623,6 +653,7 @@ pub mod contract {
                 dummy_id,
                 dummy_id,
                 dummy_id,
+                WrappedU256::from(U256::from(0)),
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
