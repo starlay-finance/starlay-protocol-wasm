@@ -24,6 +24,7 @@ use ink::prelude::vec::Vec;
 use openbrush::{
     contracts::psp22::{
         self,
+        extensions::metadata::PSP22Metadata,
         Data as PSP22Data,
         Internal as PSP22Internal,
         PSP22Error,
@@ -244,7 +245,9 @@ pub trait Internal {
     fn _emit_new_reserve_factor_event(&self, old: WrappedU256, new: WrappedU256);
 }
 
-impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
+impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metadata::Data>> Pool
+    for T
+{
     default fn accrue_interest(&mut self) -> Result<()> {
         self._accrue_interest()
     }
@@ -432,7 +435,9 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
     }
 }
 
-impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
+impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metadata::Data>> Internal
+    for T
+{
     default fn _accrue_interest(&mut self) -> Result<()> {
         self._accure_interest_at(Self::env().block_timestamp())
     }
@@ -556,6 +561,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             self.get_account_snapshot(redeemer);
         let pool_attribute = PoolAttributes {
             underlying: self._underlying(),
+            decimals: self.token_decimals(),
             account_balance,
             account_borrow_balance,
             exchange_rate,
@@ -593,6 +599,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             self.get_account_snapshot(borrower);
         let pool_attribute = PoolAttributes {
             underlying: self._underlying(),
+            decimals: self.token_decimals(),
             account_balance,
             account_borrow_balance,
             exchange_rate,
@@ -709,6 +716,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             self.get_account_snapshot(borrower);
         let pool_attribute = PoolAttributes {
             underlying: self._underlying(),
+            decimals: self.token_decimals(),
             account_balance,
             account_borrow_balance,
             exchange_rate,

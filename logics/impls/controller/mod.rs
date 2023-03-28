@@ -71,6 +71,7 @@ impl Default for PoolAttributes {
     fn default() -> Self {
         PoolAttributes {
             underlying: ZERO_ADDRESS.into(),
+            decimals: Default::default(),
             account_balance: Default::default(),
             account_borrow_balance: Default::default(),
             exchange_rate: Default::default(),
@@ -1059,6 +1060,7 @@ impl<T: Storage<Data>> Internal for T {
 
             asset_params.push(HypotheticalAccountLiquidityCalculationParam {
                 asset: caller_pool_id,
+                decimals: attrs.decimals,
                 token_balance: attrs.account_balance,
                 borrow_balance: attrs.account_borrow_balance,
                 exchange_rate_mantissa: Exp {
@@ -1076,6 +1078,7 @@ impl<T: Storage<Data>> Internal for T {
             // Read the balances and exchange rate from the pool
             let (token_balance, borrow_balance, exchange_rate_mantissa) =
                 PoolRef::get_account_snapshot(asset, account);
+            let decimals = PoolRef::token_decimals(asset);
 
             // Get the normalized price of the asset
             let oracle_price = PriceOracleRef::get_underlying_price(&self._oracle(), *asset);
@@ -1088,6 +1091,7 @@ impl<T: Storage<Data>> Internal for T {
 
             asset_params.push(HypotheticalAccountLiquidityCalculationParam {
                 asset: *asset,
+                decimals,
                 token_balance,
                 borrow_balance,
                 exchange_rate_mantissa: Exp {

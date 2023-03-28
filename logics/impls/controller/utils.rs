@@ -59,6 +59,7 @@ pub struct GetHypotheticalAccountLiquidityInput {
 #[derive(Clone, Debug)]
 pub struct HypotheticalAccountLiquidityCalculationParam {
     pub asset: AccountId,
+    pub decimals: u8,
     pub token_balance: Balance,
     pub borrow_balance: Balance,
     pub exchange_rate_mantissa: Exp,
@@ -83,6 +84,7 @@ pub fn get_hypothetical_account_liquidity(
             get_hypothetical_account_liquidity_per_asset(
                 param.token_balance,
                 param.borrow_balance,
+                param.decimals,
                 param.exchange_rate_mantissa.clone(),
                 param.collateral_factor_mantissa.clone(),
                 param.oracle_price_mantissa.clone(),
@@ -93,18 +95,27 @@ pub fn get_hypothetical_account_liquidity(
 
         // Calculate effects of interacting with cTokenModify
         if param.asset == token_modify {
+            let to_flatten = |volume: U256| {
+                volume
+                    .mul(exp_scale())
+                    .div(U256::from(10_u128.pow(param.decimals.into())))
+            };
             // redeem effect
             // sumBorrowPlusEffects += tokensToDenom * redeemTokens
-            sum_borrow_plus_effect = token_to_denom
-                .clone()
-                .mul_scalar_truncate_add_uint(U256::from(redeem_tokens), sum_borrow_plus_effect);
+            sum_borrow_plus_effect = token_to_denom.clone().mul_scalar_truncate_add_uint(
+                to_flatten(U256::from(redeem_tokens)),
+                sum_borrow_plus_effect,
+            );
 
             // borrow effect
             // sumBorrowPlusEffects += oraclePrice * borrowAmount
             sum_borrow_plus_effect = param
                 .oracle_price_mantissa
                 .clone()
-                .mul_scalar_truncate_add_uint(U256::from(borrow_amount), sum_borrow_plus_effect);
+                .mul_scalar_truncate_add_uint(
+                    to_flatten(U256::from(borrow_amount)),
+                    sum_borrow_plus_effect,
+                );
         }
     }
 
@@ -114,6 +125,7 @@ pub fn get_hypothetical_account_liquidity(
 pub fn get_hypothetical_account_liquidity_per_asset(
     token_balance: Balance,
     borrow_balance: Balance,
+    decimals: u8,
     exchange_rate_mantissa: Exp,
     collateral_factor_mantissa: Exp,
     oracle_price_mantissa: Exp,
@@ -122,16 +134,28 @@ pub fn get_hypothetical_account_liquidity_per_asset(
     let token_to_denom = collateral_factor_mantissa
         .mul(exchange_rate_mantissa)
         .mul(oracle_price_mantissa.clone());
+
+    let to_flatten = |volume: U256| {
+        volume
+            .mul(exp_scale())
+            .div(U256::from(10_u128.pow(decimals.into())))
+    };
     // sumCollateral += tokensToDenom * cTokenBalance
     let collateral = token_to_denom
         .clone()
         .mul_scalar_truncate(U256::from(token_balance));
+    let flatten_collateral = to_flatten(collateral);
     // sumBorrowPlusEffects += oraclePrice * borrowBalance
     let borrow_plus_effect = oracle_price_mantissa
         .clone()
         .mul_scalar_truncate(U256::from(borrow_balance));
+    let flatten_borrow_plus_effect = to_flatten(borrow_plus_effect);
 
-    return (token_to_denom, collateral, borrow_plus_effect)
+    return (
+        token_to_denom,
+        flatten_collateral,
+        flatten_borrow_plus_effect,
+    )
 }
 
 #[cfg(test)]
@@ -295,6 +319,7 @@ mod tests {
             let (_, collateral, borrow_plus_effect) = get_hypothetical_account_liquidity_per_asset(
                 case.input.token_balance,
                 case.input.borrow_balance,
+                18, // temp
                 Exp {
                     mantissa: WrappedU256::from(U256::from(case.input.exchange_rate_mantissa)),
                 },
