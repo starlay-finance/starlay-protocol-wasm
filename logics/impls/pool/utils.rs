@@ -58,7 +58,7 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
     let simple_interest_factor = Exp {
         mantissa: WrappedU256::from(input.borrow_rate),
     }
-    .mul_mantissa(U256::from(delta));
+    .mul_scalar(U256::from(delta));
 
     let interest_accumulated =
         simple_interest_factor.mul_scalar_truncate(U256::from(input.total_borrows));
