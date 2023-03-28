@@ -234,6 +234,8 @@ describe('Lens', () => {
       expect(new ReturnNumber(res.borrowCap).toHuman()).toBe(
         borrowCap.toString(),
       )
+      expect(res.mintGuardianPaused).toBeFalsy()
+      expect(res.borrowGuardianPaused).toBeFalsy()
     })
 
     it('Pool Balances', async () => {
@@ -473,6 +475,21 @@ describe('Lens', () => {
       expect(balances.tokenBalance.toNumber()).toBe(
         balance - depositAmount + borrowAmount - repayAmount,
       )
+    it('on paused', async () => {
+      const pool = pools[0]
+      await shouldNotRevert(controller, 'setMintGuardianPaused', [
+        pool.address,
+        true,
+      ])
+      await shouldNotRevert(controller, 'setBorrowGuardianPaused', [
+        pool.address,
+        true,
+      ])
+      const {
+        value: { ok: metadata },
+      } = await lens.query.poolMetadata(pool.address)
+      expect(metadata.mintGuardianPaused).toBeTruthy()
+      expect(metadata.borrowGuardianPaused).toBeTruthy()
     })
   })
 })

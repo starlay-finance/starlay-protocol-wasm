@@ -44,6 +44,8 @@ pub mod contract {
         collateral_factor_mantissa: WrappedU256,
         reserve_factor_mantissa: WrappedU256,
         borrow_cap: Option<u128>,
+        mint_guardian_paused: bool,
+        borrow_guardian_paused: bool,
     }
 
     #[derive(Decode, Encode)]
@@ -200,6 +202,10 @@ pub mod contract {
                 .unwrap_or_default(),
                 reserve_factor_mantissa: PoolRef::reserve_factor_mantissa(&pool),
                 borrow_cap: ControllerRef::borrow_cap(&controller, pool),
+                mint_guardian_paused: ControllerRef::mint_guardian_paused(&controller, pool)
+                    .unwrap_or_default(),
+                borrow_guardian_paused: ControllerRef::borrow_guardian_paused(&controller, pool)
+                    .unwrap_or_default(),
             }
         }
 
