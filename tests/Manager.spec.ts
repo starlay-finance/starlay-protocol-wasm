@@ -57,7 +57,7 @@ describe('Manager spec', () => {
       const { value: value2 } = await controller.query.oracle()
       expect(value2.ok).toEqual(oracleAddr)
     })
-    it.todo('.support_market_with_collateral_factor_mantissa', async () => {
+    it.skip('.support_market_with_collateral_factor_mantissa', async () => {
       const { deployer, manager, controller } = await setup()
       const collateralFactor = ONE_ETHER
 

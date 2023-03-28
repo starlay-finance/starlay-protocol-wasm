@@ -1,3 +1,4 @@
+import { ReturnNumber } from '@727-ventures/typechain-types'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
 import {
@@ -21,11 +22,15 @@ const setup = async (
   args: Partial<{
     price: string | number | BN
     collateralFactor: string | number | BN
+    reserveFactor: string | number | BN
+    borrowCap: string | number | BN
   }> = {},
 ) => {
   const {
     price = 1,
     collateralFactor = ONE_ETHER.mul(new BN(90)).div(new BN(100)),
+    reserveFactor = ONE_ETHER.mul(new BN(10)).div(new BN(100)),
+    borrowCap = ONE_ETHER,
   } = args
   const { api, alice: deployer, bob, charlie } = globalThis.setup
 
@@ -108,7 +113,8 @@ const setup = async (
     'supportMarketWithCollateralFactorMantissa',
     [pool2.address, [collateralFactor]],
   )
-
+  await shouldNotRevert(pool1, 'setReserveFactorMantissa', [[reserveFactor]])
+  await shouldNotRevert(controller, 'setBorrowCap', [pool1.address, borrowCap])
   const lens = await deployLens({ api, signer: deployer, args: [] })
   const faucet = await deployFaucet({ api, signer: deployer, args: [] })
 
@@ -147,6 +153,8 @@ describe('Lens', () => {
   describe('returns value', () => {
     const price = 1
     const collateralFactor = ONE_ETHER.mul(new BN(90)).div(new BN(100))
+    const reserveFactor = ONE_ETHER.mul(new BN(10)).div(new BN(100))
+    const borrowCap = ONE_ETHER.mul(new BN(100))
     beforeAll(async () => {
       ;({
         lens,
@@ -154,7 +162,7 @@ describe('Lens', () => {
         pools,
         controller,
         users: [signer],
-      } = await setup({ price, collateralFactor }))
+      } = await setup({ price, collateralFactor, reserveFactor, borrowCap }))
     })
 
     it('Pools', async () => {
@@ -194,8 +202,14 @@ describe('Lens', () => {
       expect(res.collateralFactorMantissa.toHuman()).toEqual(
         collateralFactor.toString(),
       )
-      expect(res.reserveFactorMantissa.toHuman()).toEqual('0')
-      expect(res.borrowCap).toBe(0)
+      expect(res.reserveFactorMantissa.toHuman()).toEqual(
+        reserveFactor.toString(),
+      )
+      // TODO fix typechain-polkadot to be able to handle optional result
+      // @ts-ignore
+      expect(new ReturnNumber(res.borrowCap).toHuman()).toBe(
+        borrowCap.toString(),
+      )
     })
 
     it('Pool Balances', async () => {
