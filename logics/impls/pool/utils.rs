@@ -35,7 +35,7 @@ pub struct CalculateInterestInput {
     pub total_borrows: Balance,
     pub total_reserves: Balance,
     pub borrow_index: Balance,
-    pub borrow_rate: U256,
+    pub borrow_rate_mantissa: U256,
     pub old_block_timestamp: Timestamp,
     pub new_block_timestamp: Timestamp,
     pub reserve_factor_mantissa: U256,
@@ -49,14 +49,14 @@ pub struct CalculateInterestOutput {
 }
 
 pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInterestOutput> {
-    if input.borrow_rate.gt(&borrow_rate_max_mantissa()) {
+    if input.borrow_rate_mantissa.gt(&borrow_rate_max_mantissa()) {
         return Err(Error::BorrowRateIsAbsurdlyHigh)
     }
     let delta = input
         .new_block_timestamp
         .abs_diff(input.old_block_timestamp);
     let simple_interest_factor = Exp {
-        mantissa: WrappedU256::from(input.borrow_rate),
+        mantissa: WrappedU256::from(input.borrow_rate_mantissa),
     }
     .mul_scalar(U256::from(delta));
 
@@ -75,7 +75,7 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
         borrow_index: borrow_index_new,
         interest_accumulated: interest_accumulated.as_u128(),
         total_borrows: total_borrows_new,
-        total_reserves: total_reserves_new.as_u128(), // TODO
+        total_reserves: total_reserves_new.as_u128(),
     })
 }
 
@@ -166,7 +166,7 @@ mod tests {
     fn test_calculate_interest_panic_if_over_borrow_rate_max() {
         let input = CalculateInterestInput {
             borrow_index: 0,
-            borrow_rate: U256::one().mul(U256::from(10)).pow(U256::from(18)),
+            borrow_rate_mantissa: U256::one().mul(U256::from(10)).pow(U256::from(18)),
             new_block_timestamp: Timestamp::default(),
             old_block_timestamp: Timestamp::default(),
             reserve_factor_mantissa: U256::zero(),
@@ -185,7 +185,7 @@ mod tests {
                 old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + mantissa().as_u64(),
                 borrow_index: 0,
-                borrow_rate: mantissa().div(100000), // 0.001 %
+                borrow_rate_mantissa: mantissa().div(100000), // 0.001 %
                 reserve_factor_mantissa: mantissa().div(100), // 1 %
                 total_borrows: 10_000 * (10_u128.pow(18)),
                 total_reserves: 10_000 * (10_u128.pow(18)),
@@ -194,7 +194,7 @@ mod tests {
                 old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + 1000 * 60 * 60, // 1 hour
                 borrow_index: 0,
-                borrow_rate: mantissa().div(1000000),
+                borrow_rate_mantissa: mantissa().div(1000000),
                 reserve_factor_mantissa: mantissa().div(10),
                 total_borrows: 100_000 * (10_u128.pow(18)),
                 total_reserves: 1_000_000 * (10_u128.pow(18)),
@@ -203,7 +203,7 @@ mod tests {
                 old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + 1,
                 borrow_index: 123123123,
-                borrow_rate: mantissa().div(123127),
+                borrow_rate_mantissa: mantissa().div(123127),
                 reserve_factor_mantissa: mantissa().div(10).mul(2),
                 total_borrows: 123 * (10_u128.pow(18)),
                 total_reserves: 222 * (10_u128.pow(18)),
@@ -212,7 +212,7 @@ mod tests {
                 old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + 999 * 60 * 60 * 2345 * 123,
                 borrow_index: 123123123,
-                borrow_rate: mantissa().div(123123),
+                borrow_rate_mantissa: mantissa().div(123123),
                 reserve_factor_mantissa: mantissa().div(10).mul(2),
                 total_borrows: 123_456 * (10_u128.pow(18)),
                 total_reserves: 789_012 * (10_u128.pow(18)),
@@ -225,7 +225,7 @@ mod tests {
                 .abs_diff(input.old_block_timestamp);
             // interest accumulated should be (borrow rate * delta * total borrows)
             let interest_want = input
-                .borrow_rate
+                .borrow_rate_mantissa
                 .mul(U256::from(
                     input.new_block_timestamp - input.old_block_timestamp,
                 ))
@@ -240,7 +240,7 @@ mod tests {
             assert_eq!(got.total_borrows, interest_want + (input.total_borrows));
             assert_eq!(got.total_reserves, reserves_want.as_u128());
             let borrow_idx_want = input
-                .borrow_rate
+                .borrow_rate_mantissa
                 .mul(U256::from(delta))
                 .mul(U256::from(input.borrow_index))
                 .div(U256::from(10_u128.pow(18)))

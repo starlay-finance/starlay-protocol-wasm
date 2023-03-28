@@ -393,7 +393,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Pool for T {
 
     default fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256) {
         (
-            Internal::_balance_of(self, &account),
+            psp22::Internal::_balance_of(self, &account),
             self._borrow_balance_stored(account),
             self._exchange_rate_stored(),
         )
@@ -467,7 +467,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
             total_borrows: borrows,
             total_reserves: reserves,
             borrow_index: idx,
-            borrow_rate: borrow_rate.into(),
+            borrow_rate_mantissa: borrow_rate.into(),
             old_block_timestamp: self._accural_block_timestamp(),
             new_block_timestamp: at,
             reserve_factor_mantissa: self._reserve_factor_mantissa().into(),
@@ -1001,6 +1001,7 @@ impl<T: Storage<Data> + Storage<psp22::Data>> Internal for T {
         if snapshot.principal == 0 {
             return 0
         }
+
         let borrow_index = self._borrow_index();
         let prinicipal_times_index = U256::from(snapshot.principal).mul(U256::from(borrow_index));
         prinicipal_times_index
