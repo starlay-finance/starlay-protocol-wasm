@@ -353,5 +353,92 @@ describe('Controller spec', () => {
         expect(shortfall.toString()).toEqual(new BN(0).toString())
       })
     })
+    describe('with borrows', () => {
+      it('multi asset', async () => {
+        const { api, deployer, controller, rateModel, priceOracle, users } =
+          await setup()
+        const { dai, usdc, usdt } = await preparePoolsWithPreparedTokens({
+          api,
+          controller,
+          rateModel,
+          manager: deployer,
+        })
+        const user = users[0]
+
+        // prerequisite
+        //// initialize
+        const toParam = (m: BN) => [m.toString()]
+        for (const sym of [dai, usdc, usdt]) {
+          await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+          await controller.tx.supportMarketWithCollateralFactorMantissa(
+            sym.pool.address,
+            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+          )
+        }
+
+        //// use protocol
+        ////// add liquidity
+        for await (const { sym, liquidity } of [
+          {
+            sym: dai,
+            liquidity: to_dec18(500_000),
+          },
+          {
+            sym: usdc,
+            liquidity: to_dec6(500_000),
+          },
+          {
+            sym: usdt,
+            liquidity: to_dec6(500_000),
+          },
+        ]) {
+          const { pool, token } = sym
+          await token.withSigner(deployer).tx.mint(deployer.address, liquidity)
+          await token.withSigner(deployer).tx.approve(pool.address, liquidity)
+          await pool.withSigner(deployer).tx.mint(liquidity)
+        }
+        ////// mint, borrow from user
+        for await (const { sym, mintValue, borrowValue } of [
+          {
+            sym: dai,
+            mintValue: to_dec18(250_000),
+            borrowValue: to_dec18(50_000),
+          },
+          {
+            sym: usdc,
+            borrowValue: to_dec6(150_000),
+          },
+          {
+            sym: usdt,
+            mintValue: to_dec6(300_000),
+          },
+        ]) {
+          const { pool, token } = sym
+          if (mintValue) {
+            await token.withSigner(deployer).tx.mint(user.address, mintValue)
+            await token.withSigner(user).tx.approve(pool.address, mintValue)
+            await pool.withSigner(user).tx.mint(mintValue)
+          }
+          if (borrowValue) {
+            await pool.withSigner(user).tx.borrow(borrowValue)
+          }
+        }
+        const expectedCollateral = ((250_000 + 300_000) * 90) / 100
+        const expectedShortfall = 50_000 + 150_000
+
+        // execute
+        const res = (await controller.query.getAccountLiquidity(user.address))
+          .value.ok.ok
+        const collateral = new BN(trimPrefix(res[0].toString()), 16)
+        const shortfall = new BN(trimPrefix(res[1].toString()), 16)
+
+        expect(collateral.toString()).toBe(
+          new BN(expectedCollateral - expectedShortfall)
+            .mul(mantissa())
+            .toString(),
+        )
+        expect(shortfall.toString()).toBe('0')
+      })
+    })
   })
 })
