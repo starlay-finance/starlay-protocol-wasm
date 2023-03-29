@@ -8,8 +8,8 @@ import { defaultOption, sendTxWithPreview } from '../helper/utils'
 import { DummyToken, TokenConfig } from '../tokens'
 import {
   deployDefaultInterestRateModel,
-  deployPSP22Token,
   deployPool,
+  deployPSP22Token,
 } from './../helper/deploy_helper'
 
 type DeployPoolArgs = {
