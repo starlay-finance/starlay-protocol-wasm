@@ -2,14 +2,6 @@ export interface EnvironmentParameter {
   rpc: string
 }
 
-const testnetParam: EnvironmentParameter = {
-  rpc: 'wss://shibuya-rpc.dwellir.com',
-}
-
-const testParam: EnvironmentParameter = {
-  rpc: 'ws://127.0.0.1:9944',
-}
-
 export const ENV = {
   testnet: 0,
   test: 1,
@@ -17,13 +9,14 @@ export const ENV = {
 
 export type Env = (typeof ENV)[keyof typeof ENV]
 
-export const valueOf = (env: Env): EnvironmentParameter => {
-  switch (env) {
-    case ENV.testnet:
-      return testnetParam
-    case ENV.test:
-      return testParam
-    default:
-      return testParam
-  }
+export const valueOf = (env: Env): EnvironmentParameter =>
+  ENV_PARAMS[env] || ENV_PARAMS[ENV.test]
+
+const ENV_PARAMS: Record<Env, EnvironmentParameter> = {
+  [ENV.testnet]: {
+    rpc: 'wss://shibuya-rpc.dwellir.com',
+  },
+  [ENV.test]: {
+    rpc: 'ws://127.0.0.1:9944',
+  },
 }
