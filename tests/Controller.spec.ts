@@ -1,3 +1,4 @@
+import { ReturnNumber } from '@727-ventures/typechain-types'
 import { encodeAddress } from '@polkadot/keyring'
 import BN from 'bn.js'
 import {
@@ -226,12 +227,26 @@ describe('Controller spec', () => {
     ])
   })
 
-  describe('.get_account_liquidity', () => {
+  describe('.get_account_liquidity / .get_hypothetical_account_liquidity', () => {
     const pow10 = (exponent: number) => new BN(10).pow(new BN(exponent))
     const mantissa = () => pow10(18)
     const to_dec6 = (val: number | string) => new BN(val).mul(pow10(6))
     const to_dec18 = (val: number | string) => new BN(val).mul(pow10(18))
     const trimPrefix = (hex: string) => hex.replace(/^0x/, '')
+
+    const assertAccountLiqudity = (
+      actual: [ReturnNumber, ReturnNumber],
+      expected: { collateral: number; shortfall: number },
+    ) => {
+      const collateral = BigInt(actual[0].toString()).toString()
+      const shortfall = BigInt(actual[1].toString()).toString()
+      expect(collateral.toString()).toEqual(
+        new BN(expected.collateral).mul(mantissa()).toString(),
+      )
+      expect(shortfall.toString()).toEqual(
+        new BN(expected.shortfall).mul(mantissa()).toString(),
+      )
+    }
 
     describe('only mint', () => {
       it('single asset', async () => {
@@ -275,28 +290,22 @@ describe('Controller spec', () => {
         }
 
         // execute
-        const resDaiUser = (
-          await controller.query.getAccountLiquidity(daiUser.address)
-        ).value.ok.ok
-        const collateral1 = BigInt(resDaiUser[0].toString()).toString()
-        const shortfall1 = BigInt(resDaiUser[1].toString()).toString()
-        expect(collateral1.toString()).toEqual(
-          new BN(90).mul(mantissa()).toString(),
+        //// .get_account_liquidity
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(daiUser.address)).value.ok
+            .ok,
+          {
+            collateral: 90,
+            shortfall: 0,
+          },
         )
-        expect(shortfall1.toString()).toEqual(
-          new BN(0).mul(mantissa()).toString(),
-        )
-
-        const resUsdcUser = (
-          await controller.query.getAccountLiquidity(usdcUser.address)
-        ).value.ok.ok
-        const collateral2 = BigInt(resUsdcUser[0].toString()).toString()
-        const shortfall2 = BigInt(resUsdcUser[1].toString()).toString()
-        expect(collateral2.toString()).toEqual(
-          new BN(450).mul(mantissa()).toString(),
-        )
-        expect(shortfall2.toString()).toEqual(
-          new BN(0).mul(mantissa()).toString(),
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(usdcUser.address)).value
+            .ok.ok,
+          {
+            collateral: 450,
+            shortfall: 0,
+          },
         )
       })
       it('multi asset', async () => {
@@ -343,14 +352,14 @@ describe('Controller spec', () => {
         }
 
         // execute
-        const res = (await controller.query.getAccountLiquidity(user.address))
-          .value.ok.ok
-        const collateral = new BN(trimPrefix(res[0].toString()), 16)
-        const shortfall = new BN(trimPrefix(res[1].toString()), 16)
-        expect(collateral.toString()).toEqual(
-          new BN(5_400).mul(mantissa()).toString(),
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(user.address)).value.ok
+            .ok,
+          {
+            collateral: 5_400,
+            shortfall: 0,
+          },
         )
-        expect(shortfall.toString()).toEqual(new BN(0).toString())
       })
     })
     describe('with borrows', () => {
@@ -427,17 +436,14 @@ describe('Controller spec', () => {
         const expectedShortfall = 50_000 + 150_000
 
         // execute
-        const res = (await controller.query.getAccountLiquidity(user.address))
-          .value.ok.ok
-        const collateral = new BN(trimPrefix(res[0].toString()), 16)
-        const shortfall = new BN(trimPrefix(res[1].toString()), 16)
-
-        expect(collateral.toString()).toBe(
-          new BN(expectedCollateral - expectedShortfall)
-            .mul(mantissa())
-            .toString(),
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(user.address)).value.ok
+            .ok,
+          {
+            collateral: expectedCollateral - expectedShortfall,
+            shortfall: 0,
+          },
         )
-        expect(shortfall.toString()).toBe('0')
       })
     })
   })
