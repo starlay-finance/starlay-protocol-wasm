@@ -99,13 +99,13 @@ const deployAndSetupPool = async (
     config.price,
     option,
   ])
+
   await sendTxWithPreview(
     controller,
     'supportMarketWithCollateralFactorMantissa',
-    [pool.address, [config.collateralFactor], option],
+    [pool.address, [config.collateralFactor]],
   )
   await sendTxWithPreview(pool, 'setReserveFactorMantissa', [
     [config.reserveFactor],
-    option,
   ])
 }
