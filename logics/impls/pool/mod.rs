@@ -94,7 +94,7 @@ impl Default for Data {
             total_reserves: Default::default(),
             account_borrows: Default::default(),
             accural_block_timestamp: 0,
-            borrow_index: WrappedU256::from(U256::zero()),
+            borrow_index: WrappedU256::from(U256::one()),
             initial_exchange_rate_mantissa: WrappedU256::from(U256::zero()),
             reserve_factor_mantissa: WrappedU256::from(U256::zero()),
         }
@@ -1012,12 +1012,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return 0
         }
         let borrow_index = self._borrow_index();
-        // temp / TODO: check calculation interest_rate
-        if U256::from(borrow_index.mantissa).is_zero()
-            && U256::from(snapshot.interest_index).is_zero()
-        {
-            return snapshot.principal
-        }
         let prinicipal_times_index =
             U256::from(snapshot.principal).mul(U256::from(borrow_index.mantissa));
         prinicipal_times_index
