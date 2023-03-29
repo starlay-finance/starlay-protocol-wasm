@@ -374,6 +374,10 @@ mod tests {
             collateral_factor_mantissa: to_exp(mantissa * 90 / 100), // 90%
             oracle_price_mantissa: to_exp(mantissa * 1),
         };
+        let token1_dec6_param_with_borrow = HypotheticalAccountLiquidityCalculationParam {
+            borrow_balance: 5_000 * pow10_6,
+            ..token1_dec6_param.clone()
+        };
         // decimal 6 token with 50% collateral factor
         let token2_dec6_param = HypotheticalAccountLiquidityCalculationParam {
             asset: AccountId::from([2; 32]),
@@ -383,6 +387,10 @@ mod tests {
             exchange_rate_mantissa: to_exp(mantissa * 1),
             collateral_factor_mantissa: to_exp(mantissa * 50 / 100), // 50%
             oracle_price_mantissa: to_exp(mantissa * 1),
+        };
+        let token2_dec6_param_with_borrow = HypotheticalAccountLiquidityCalculationParam {
+            borrow_balance: 20_000 * pow10_6,
+            ..token2_dec6_param.clone()
         };
         // decimal 18 token with 90% collateral factor
         let token3_dec18_param = HypotheticalAccountLiquidityCalculationParam {
@@ -394,12 +402,23 @@ mod tests {
             collateral_factor_mantissa: to_exp(mantissa * 90 / 100), // 90%
             oracle_price_mantissa: to_exp(mantissa * 1),
         };
+        let token3_dec18_param_with_borrow = HypotheticalAccountLiquidityCalculationParam {
+            borrow_balance: 15_000 * pow10_18,
+            ..token3_dec18_param.clone()
+        };
 
-        let asset_params = vec![token1_dec6_param, token2_dec6_param, token3_dec18_param];
+        let asset_params_without_borrows =
+            vec![token1_dec6_param, token2_dec6_param, token3_dec18_param];
+        let asset_params_with_borrows = vec![
+            token1_dec6_param_with_borrow,
+            token2_dec6_param_with_borrow,
+            token3_dec18_param_with_borrow,
+        ];
         let cases = vec![
+            // no redeem & borrow
             Case {
                 input: GetHypotheticalAccountLiquidityInput {
-                    asset_params: asset_params.clone(),
+                    asset_params: asset_params_without_borrows.clone(),
                     token_modify: ZERO_ADDRESS.into(),
                     redeem_tokens: 0,
                     borrow_amount: 0,
@@ -411,10 +430,11 @@ mod tests {
                         * mantissa,
                     sum_borrow_plus_effect: 0,
                 },
-            }, // no redeem & borrow
+            },
+            // some redeem with decimal 6 token with 90% collateral factor
             Case {
                 input: GetHypotheticalAccountLiquidityInput {
-                    asset_params: asset_params.clone(),
+                    asset_params: asset_params_without_borrows.clone(),
                     token_modify: AccountId::from([1; 32]),
                     redeem_tokens: 7_500 * pow10_6,
                     borrow_amount: 0,
@@ -426,10 +446,11 @@ mod tests {
                         * mantissa,
                     sum_borrow_plus_effect: (7_500 * 90 / 100) * mantissa,
                 },
-            }, // some redeem with decimal 6 token with 90% collateral factor
+            },
+            // some redeem with decimal 6 token with 50% collateral factor
             Case {
                 input: GetHypotheticalAccountLiquidityInput {
-                    asset_params: asset_params.clone(),
+                    asset_params: asset_params_without_borrows.clone(),
                     token_modify: AccountId::from([2; 32]),
                     redeem_tokens: 35_000 * pow10_6,
                     borrow_amount: 0,
@@ -441,10 +462,11 @@ mod tests {
                         * mantissa,
                     sum_borrow_plus_effect: (35_000 * 50 / 100) * mantissa,
                 },
-            }, // some redeem with decimal 6 token with 50% collateral factor
+            },
+            // some borrow with decimal 6 token with 90% collateral factor
             Case {
                 input: GetHypotheticalAccountLiquidityInput {
-                    asset_params: asset_params.clone(),
+                    asset_params: asset_params_without_borrows.clone(),
                     token_modify: AccountId::from([1; 32]),
                     redeem_tokens: 0,
                     borrow_amount: 7_500 * pow10_6,
@@ -456,10 +478,11 @@ mod tests {
                         * mantissa,
                     sum_borrow_plus_effect: 7_500 * mantissa,
                 },
-            }, // some borrow with decimal 6 token with 90% collateral factor
+            },
+            // some borrow with decimal 18 token with 90% collateral factor
             Case {
                 input: GetHypotheticalAccountLiquidityInput {
-                    asset_params: asset_params.clone(),
+                    asset_params: asset_params_without_borrows.clone(),
                     token_modify: AccountId::from([3; 32]),
                     redeem_tokens: 0,
                     borrow_amount: 15_000 * pow10_18,
@@ -471,7 +494,55 @@ mod tests {
                         * mantissa,
                     sum_borrow_plus_effect: 15_000 * mantissa,
                 },
-            }, // some borrow with decimal 18 token with 90% collateral factor
+            },
+            // (existing some borrows) no redeem/borrow
+            Case {
+                input: GetHypotheticalAccountLiquidityInput {
+                    asset_params: asset_params_with_borrows.clone(),
+                    token_modify: ZERO_ADDRESS.into(),
+                    redeem_tokens: 0,
+                    borrow_amount: 0,
+                },
+                expected: Expected {
+                    sum_collateral: ((10_000 * 90 / 100)
+                        + (50_000 * 50 / 100)
+                        + (25_000 * 90 / 100))
+                        * mantissa,
+                    sum_borrow_plus_effect: (5_000 + 20_000 + 15_000) * mantissa,
+                },
+            },
+            // (existing some borrows) some redeem
+            Case {
+                input: GetHypotheticalAccountLiquidityInput {
+                    asset_params: asset_params_with_borrows.clone(),
+                    token_modify: AccountId::from([1; 32]),
+                    redeem_tokens: 7_500 * pow10_6,
+                    borrow_amount: 0,
+                },
+                expected: Expected {
+                    sum_collateral: ((10_000 * 90 / 100)
+                        + (50_000 * 50 / 100)
+                        + (25_000 * 90 / 100))
+                        * mantissa,
+                    sum_borrow_plus_effect: (5_000 + 20_000 + 15_000 + 7_500 * 90 / 100) * mantissa,
+                },
+            },
+            // (existing some borrows) some borrow
+            Case {
+                input: GetHypotheticalAccountLiquidityInput {
+                    asset_params: asset_params_with_borrows.clone(),
+                    token_modify: AccountId::from([3; 32]),
+                    redeem_tokens: 0,
+                    borrow_amount: 7_500 * pow10_18,
+                },
+                expected: Expected {
+                    sum_collateral: ((10_000 * 90 / 100)
+                        + (50_000 * 50 / 100)
+                        + (25_000 * 90 / 100))
+                        * mantissa,
+                    sum_borrow_plus_effect: (5_000 + 20_000 + 15_000 + 7_500) * mantissa,
+                },
+            },
         ];
 
         for case in cases {
