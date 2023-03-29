@@ -1,3 +1,4 @@
+import { ReturnNumber } from '@727-ventures/typechain-types'
 import { encodeAddress } from '@polkadot/keyring'
 import BN from 'bn.js'
 import {
@@ -5,6 +6,7 @@ import {
   deployDefaultInterestRateModel,
   deployPriceOracle,
 } from '../scripts/helper/deploy_helper'
+import { ZERO_ADDRESS } from '../scripts/helper/utils'
 import { ONE_ETHER } from '../scripts/tokens'
 import {
   preparePoolsWithPreparedTokens,
@@ -226,12 +228,26 @@ describe('Controller spec', () => {
     ])
   })
 
-  describe('.get_account_liquidity', () => {
+  describe('.get_account_liquidity / .get_hypothetical_account_liquidity', () => {
     const pow10 = (exponent: number) => new BN(10).pow(new BN(exponent))
     const mantissa = () => pow10(18)
     const to_dec6 = (val: number | string) => new BN(val).mul(pow10(6))
     const to_dec18 = (val: number | string) => new BN(val).mul(pow10(18))
     const trimPrefix = (hex: string) => hex.replace(/^0x/, '')
+
+    const assertAccountLiqudity = (
+      actual: [ReturnNumber, ReturnNumber],
+      expected: { collateral: number; shortfall: number },
+    ) => {
+      const collateral = BigInt(actual[0].toString()).toString()
+      const shortfall = BigInt(actual[1].toString()).toString()
+      expect(collateral.toString()).toEqual(
+        new BN(expected.collateral).mul(mantissa()).toString(),
+      )
+      expect(shortfall.toString()).toEqual(
+        new BN(expected.shortfall).mul(mantissa()).toString(),
+      )
+    }
 
     describe('only mint', () => {
       it('single asset', async () => {
@@ -275,28 +291,53 @@ describe('Controller spec', () => {
         }
 
         // execute
-        const resDaiUser = (
-          await controller.query.getAccountLiquidity(daiUser.address)
-        ).value.ok.ok
-        const collateral1 = BigInt(resDaiUser[0].toString()).toString()
-        const shortfall1 = BigInt(resDaiUser[1].toString()).toString()
-        expect(collateral1.toString()).toEqual(
-          new BN(90).mul(mantissa()).toString(),
+        //// .get_account_liquidity
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(daiUser.address)).value.ok
+            .ok,
+          {
+            collateral: 90,
+            shortfall: 0,
+          },
         )
-        expect(shortfall1.toString()).toEqual(
-          new BN(0).mul(mantissa()).toString(),
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(usdcUser.address)).value
+            .ok.ok,
+          {
+            collateral: 450,
+            shortfall: 0,
+          },
         )
-
-        const resUsdcUser = (
-          await controller.query.getAccountLiquidity(usdcUser.address)
-        ).value.ok.ok
-        const collateral2 = BigInt(resUsdcUser[0].toString()).toString()
-        const shortfall2 = BigInt(resUsdcUser[1].toString()).toString()
-        expect(collateral2.toString()).toEqual(
-          new BN(450).mul(mantissa()).toString(),
+        //// .get_hypothetical_account_liquidity
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              daiUser.address,
+              usdc.pool.address,
+              to_dec6(50),
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 90 - (50 * 90) / 100,
+            shortfall: 0,
+          },
         )
-        expect(shortfall2.toString()).toEqual(
-          new BN(0).mul(mantissa()).toString(),
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              usdcUser.address,
+              dai.pool.address,
+              new BN(0),
+              to_dec18(500),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 0,
+            shortfall: 500 - 450,
+          },
         )
       })
       it('multi asset', async () => {
@@ -343,14 +384,193 @@ describe('Controller spec', () => {
         }
 
         // execute
-        const res = (await controller.query.getAccountLiquidity(user.address))
-          .value.ok.ok
-        const collateral = new BN(trimPrefix(res[0].toString()), 16)
-        const shortfall = new BN(trimPrefix(res[1].toString()), 16)
-        expect(collateral.toString()).toEqual(
-          new BN(5_400).mul(mantissa()).toString(),
+        //// .get_account_liquidity
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(user.address)).value.ok
+            .ok,
+          {
+            collateral: 5_400,
+            shortfall: 0,
+          },
         )
-        expect(shortfall.toString()).toEqual(new BN(0).toString())
+        //// .get_hypothetical_account_liquidity
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              ZERO_ADDRESS,
+              new BN(0),
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 5_400,
+            shortfall: 0,
+          },
+        )
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              dai.pool.address,
+              to_dec18(10_000), // some redeem
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 0,
+            shortfall: (10_000 * 90) / 100 - 5_400,
+          },
+        )
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              usdc.pool.address,
+              new BN(0),
+              to_dec6(5_399), // some borrow
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 1,
+            shortfall: 0,
+          },
+        )
+      })
+    })
+    describe('with borrows', () => {
+      it('multi asset', async () => {
+        const { api, deployer, controller, rateModel, priceOracle, users } =
+          await setup()
+        const { dai, usdc, usdt } = await preparePoolsWithPreparedTokens({
+          api,
+          controller,
+          rateModel,
+          manager: deployer,
+        })
+        const user = users[0]
+
+        // prerequisite
+        //// initialize
+        const toParam = (m: BN) => [m.toString()]
+        for (const sym of [dai, usdc, usdt]) {
+          await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+          await controller.tx.supportMarketWithCollateralFactorMantissa(
+            sym.pool.address,
+            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+          )
+        }
+
+        //// use protocol
+        ////// add liquidity
+        for await (const { sym, liquidity } of [
+          {
+            sym: dai,
+            liquidity: to_dec18(500_000),
+          },
+          {
+            sym: usdc,
+            liquidity: to_dec6(500_000),
+          },
+          {
+            sym: usdt,
+            liquidity: to_dec6(500_000),
+          },
+        ]) {
+          const { pool, token } = sym
+          await token.withSigner(deployer).tx.mint(deployer.address, liquidity)
+          await token.withSigner(deployer).tx.approve(pool.address, liquidity)
+          await pool.withSigner(deployer).tx.mint(liquidity)
+        }
+        ////// mint, borrow from user
+        for await (const { sym, mintValue, borrowValue } of [
+          {
+            sym: dai,
+            mintValue: to_dec18(250_000),
+            borrowValue: to_dec18(50_000),
+          },
+          {
+            sym: usdc,
+            borrowValue: to_dec6(150_000),
+          },
+          {
+            sym: usdt,
+            mintValue: to_dec6(300_000),
+          },
+        ]) {
+          const { pool, token } = sym
+          if (mintValue) {
+            await token.withSigner(deployer).tx.mint(user.address, mintValue)
+            await token.withSigner(user).tx.approve(pool.address, mintValue)
+            await pool.withSigner(user).tx.mint(mintValue)
+          }
+          if (borrowValue) {
+            await pool.withSigner(user).tx.borrow(borrowValue)
+          }
+        }
+        const expectedCollateral = ((250_000 + 300_000) * 90) / 100
+        const expectedShortfall = 50_000 + 150_000
+
+        // execute
+        //// .get_account_liquidity
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(user.address)).value.ok
+            .ok,
+          {
+            collateral: expectedCollateral - expectedShortfall,
+            shortfall: 0,
+          },
+        )
+        //// .get_hypothetical_account_liquidity
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              ZERO_ADDRESS,
+              new BN(0),
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: expectedCollateral - expectedShortfall,
+            shortfall: 0,
+          },
+        )
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              dai.pool.address,
+              to_dec18(10_000), // some redeem
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral:
+              expectedCollateral - expectedShortfall - (10_000 * 90) / 100,
+            shortfall: 0,
+          },
+        )
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              dai.pool.address,
+              new BN(0),
+              to_dec18(10_000), // some borrow
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: expectedCollateral - expectedShortfall - 10_000,
+            shortfall: 0,
+          },
+        )
       })
     })
   })
