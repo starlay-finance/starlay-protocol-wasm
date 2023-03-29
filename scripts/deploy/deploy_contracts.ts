@@ -66,6 +66,14 @@ const deployContracts = async (env: Env) => {
     priceOracle.address,
     option,
   ])
+  await sendTxWithPreview(controller, 'setCloseFactorMantissa', [
+    [CONFIG.closeFactor],
+    option,
+  ])
+  await sendTxWithPreview(controller, 'setLiquidationIncentiveMantissa', [
+    [CONFIG.liquidationIncentive],
+    option,
+  ])
   console.log(`PriceOracle ${priceOracle.address} has been set`)
 
   const initialExchangeRateMantissa = ONE_ETHER
@@ -121,6 +129,10 @@ const deployContracts = async (env: Env) => {
         token.token.name
       } has added to market with collateral factor = ${token.token.collateralFator.toString()}`,
     )
+    await sendTxWithPreview(pool, 'setReserveFactorMantissa', [
+      [token.token.reserveFactor],
+      option,
+    ])
   }
   await deployLens({ api, signer, args: [] })
   await deployFaucet({ api, signer, args: [] })
