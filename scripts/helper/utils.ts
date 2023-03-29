@@ -32,8 +32,8 @@ export const sendTxWithPreview = async <
   const calldata = `${contract.name}.${fn as string}(${JSON.stringify(args)})`
   try {
     const preview = await contract.query[fn](...args)
-    if (preview.value.ok.err && Object.keys(preview.value.ok.err).length)
-      throw new Error(preview.value.ok.err)
+    if (preview.value.err) throw preview.value.err
+    if (preview.value.ok.err) throw preview.value.ok.err
   } catch (e) {
     throw new Error(`Failed to preview ${calldata}: ${JSON.stringify(e)}`)
   }
