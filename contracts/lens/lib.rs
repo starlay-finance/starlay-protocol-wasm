@@ -44,6 +44,8 @@ pub mod contract {
         collateral_factor_mantissa: WrappedU256,
         reserve_factor_mantissa: WrappedU256,
         borrow_cap: Option<u128>,
+        mint_guardian_paused: bool,
+        borrow_guardian_paused: bool,
     }
 
     #[derive(Decode, Encode)]
@@ -69,6 +71,17 @@ pub mod contract {
         pools: Vec<AccountId>,
         liquidity: Balance,
         shortfall: Balance,
+    }
+
+    #[derive(Decode, Encode)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub struct Configuration {
+        manager: AccountId,
+        oracle: AccountId,
+        seize_guardian_paused: bool,
+        transfer_guardian_paused: bool,
+        liquidation_incentive_mantissa: WrappedU256,
+        close_factor_mantissa: WrappedU256,
     }
 
     #[ink(storage)]
@@ -146,6 +159,20 @@ pub mod contract {
                 .collect()
         }
 
+        #[ink(message)]
+        pub fn configuration(&self, controller: AccountId) -> Configuration {
+            Configuration {
+                manager: ControllerRef::manager(&controller),
+                oracle: ControllerRef::oracle(&controller),
+                seize_guardian_paused: ControllerRef::seize_guardian_paused(&controller),
+                transfer_guardian_paused: ControllerRef::transfer_guardian_paused(&controller),
+                liquidation_incentive_mantissa: ControllerRef::liquidation_incentive_mantissa(
+                    &controller,
+                ),
+                close_factor_mantissa: ControllerRef::close_factor_mantissa(&controller),
+            }
+        }
+
         fn _pools(&self, controller: AccountId) -> Vec<AccountId> {
             ControllerRef::markets(&controller)
         }
@@ -175,6 +202,10 @@ pub mod contract {
                 .unwrap_or_default(),
                 reserve_factor_mantissa: PoolRef::reserve_factor_mantissa(&pool),
                 borrow_cap: ControllerRef::borrow_cap(&controller, pool),
+                mint_guardian_paused: ControllerRef::mint_guardian_paused(&controller, pool)
+                    .unwrap_or_default(),
+                borrow_guardian_paused: ControllerRef::borrow_guardian_paused(&controller, pool)
+                    .unwrap_or_default(),
             }
         }
 
