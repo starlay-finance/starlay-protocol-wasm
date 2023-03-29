@@ -53,7 +53,7 @@ impl Exp {
         self._op(another, |o, v| o.mul(v).div(exp_scale()))
     }
 
-    pub fn mul_mantissa(&self, mantissa: U256) -> Exp {
+    pub fn mul_scalar(&self, mantissa: U256) -> Exp {
         Exp {
             mantissa: WrappedU256::from(U256::from(self.mantissa).mul(mantissa)),
         }
@@ -63,7 +63,7 @@ impl Exp {
         self._op(another, |o, v| o.mul(exp_scale()).div(v))
     }
     pub fn mul_scalar_truncate(&self, scalar: U256) -> U256 {
-        let product = self.mul_mantissa(scalar);
+        let product = self.mul_scalar(scalar);
         product._trunc()
     }
     pub fn mul_scalar_truncate_add_uint(&self, scalar: U256, addend: U256) -> U256 {
@@ -124,5 +124,74 @@ impl Double {
         Double {
             mantissa: WrappedU256::from(op(U256::from(self.mantissa), U256::from(a.mantissa))),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use primitive_types::U256;
+    fn wr(val: u128) -> WrappedU256 {
+        WrappedU256::from(U256::from(val))
+    }
+    #[test]
+    fn test_add() {
+        let a = Exp { mantissa: wr(1) };
+        let b = Exp { mantissa: wr(1) };
+        assert_eq!(U256::from(2), a.add(b).mantissa.into())
+    }
+    #[test]
+    fn test_sub() {
+        let a = Exp { mantissa: wr(2) };
+        let b = Exp { mantissa: wr(1) };
+        assert_eq!(U256::one(), a.sub(b).mantissa.into())
+    }
+    #[test]
+    fn test_mul() {
+        let a = Exp { mantissa: wr(2) };
+        let b = Exp {
+            mantissa: WrappedU256::from(U256::from(2).mul(exp_scale())),
+        };
+        assert_eq!(U256::from(4), a.mul(b).mantissa.into())
+    }
+    #[test]
+    fn test_mul_scalar() {
+        let a = Exp { mantissa: wr(2) };
+        let b = U256::from(2);
+        assert_eq!(U256::from(4), a.mul_scalar(b).mantissa.into())
+    }
+    #[test]
+    fn test_div() {
+        let out: i128 = 1666666666666666666;
+        let a = Exp { mantissa: wr(5) };
+        let b = Exp { mantissa: wr(3) };
+        assert_eq!(U256::from(out), a.div(b).mantissa.into())
+    }
+    #[test]
+    fn test_mul_scalar_truncate() {
+        let a = Exp {
+            mantissa: WrappedU256::from(U256::from(10).mul(exp_scale())),
+        };
+        let b = U256::from(5);
+        assert_eq!(U256::from(50), a.mul_scalar_truncate(b))
+    }
+    #[test]
+    fn test_mul_scalar_truncate_add_uint() {
+        let a = Exp {
+            mantissa: WrappedU256::from(U256::from(10).mul(exp_scale())),
+        };
+        let b = U256::from(5);
+        let c = U256::from(10);
+
+        assert_eq!(U256::from(60), a.mul_scalar_truncate_add_uint(b, c))
+    }
+    #[test]
+    fn test_truncate() {
+        let val: i128 = 1_111_111_111_111_111_111;
+        let a = Exp {
+            mantissa: WrappedU256::from(U256::from(val)),
+        };
+        assert_eq!(U256::one(), a.truncate())
     }
 }
