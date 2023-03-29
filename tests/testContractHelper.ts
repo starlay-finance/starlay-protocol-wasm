@@ -1,10 +1,10 @@
 import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
+import { ONE_ETHER } from '../scripts/helper/constants'
 import {
   deployPoolFromAsset,
   deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
-import { ONE_ETHER } from '../scripts/tokens'
 import Controller from '../types/contracts/controller'
 import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
 import Pool from '../types/contracts/pool'

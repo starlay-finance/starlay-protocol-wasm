@@ -1,22 +1,19 @@
 import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
 import { ApiPromise } from '@polkadot/api'
-import { encodeAddress } from '@polkadot/keyring'
 import { WeightV2 } from '@polkadot/types/interfaces'
 import { BN, BN_ONE } from '@polkadot/util'
+import { ENV, getCurrentEnv } from '../env'
 
-export const ZERO_ADDRESS = encodeAddress(
-  '0x0000000000000000000000000000000000000000000000000000000000000000',
-)
 const WAIT_FINALIZED_SECONDS = 10000
-const MAX_CALL_WEIGHT = new BN(900_000_000).isub(BN_ONE).mul(new BN(10))
-const PROOFSIZE = new BN(1_000_000)
+const MAX_CALL_WEIGHT = new BN(990_000_000).isub(BN_ONE).mul(new BN(10))
+const PROOFSIZE = new BN(1_100_000)
 
 export const isTest = (): boolean => process.env.NODE_ENV === 'test'
 
 export const waitForTx = async (
   result: SignAndSendSuccessResponse,
 ): Promise<void> => {
-  if (isTest()) return
+  if (isTest() || getCurrentEnv() === ENV.test) return
 
   while (!result.result.isFinalized) {
     await new Promise((resolve) => setTimeout(resolve, WAIT_FINALIZED_SECONDS))
@@ -32,19 +29,17 @@ export const sendTxWithPreview = async <
   fn: F,
   args: Parameters<C['tx'][F]>,
 ): Promise<R> => {
+  const calldata = `${contract.name}.${fn as string}(${JSON.stringify(args)})`
   try {
     const preview = await contract.query[fn](...args)
-    if (preview.value.ok.err && Object.keys(preview.value.ok.err).length)
-      throw new Error(preview.value.ok.err)
+    if (preview.value.err) throw preview.value.err
+    if (preview.value.ok.err) throw preview.value.ok.err
   } catch (e) {
-    throw new Error(
-      `failed to preview ${contract.name}.${fn as string}(${JSON.stringify(
-        args,
-      )}): ${JSON.stringify(e)}`,
-    )
+    throw new Error(`Failed to preview ${calldata}: ${JSON.stringify(e)}`)
   }
   const res = await contract.tx[fn](...args)
   await waitForTx(res)
+  console.log(`Transaction succeeded: ${calldata}`)
   return res
 }
 

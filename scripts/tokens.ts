@@ -1,16 +1,18 @@
 import { BN } from '@polkadot/util'
+import { ONE_ETHER } from './helper/constants'
 
-export interface Token {
+export interface TokenConfig {
   symbol: string
-  decimal: number
+  decimals: number
   name: string
   rateModel: InterestRateModel
-  collateralFator: BN
+  collateralFactor: BN
+  reserveFactor: BN
+  initialExchangeRateMantissa: BN
   price: BN
 }
-export type DummyToken = Token & DummyTokenProp
 
-export const ONE_ETHER = new BN(10).pow(new BN(18))
+export type DummyToken = TokenConfig & DummyTokenProp
 
 interface DummyTokenProp {
   totalSupply: BN
@@ -23,19 +25,21 @@ interface InterestRateModel {
   kink: BN
 }
 
-const TOKEN_BASE: Omit<Token, 'symbol' | 'name'> = {
-  decimal: 18,
+const TOKEN_BASE: Omit<TokenConfig, 'symbol' | 'name'> = {
+  decimals: 18,
   rateModel: {
     baseRatePerYear: new BN(100).mul(ONE_ETHER),
     multiplierPerYearSlope1: new BN(100).mul(ONE_ETHER),
     multiplierPerYearSlope2: new BN(100).mul(ONE_ETHER),
     kink: new BN(100).mul(ONE_ETHER),
   },
-  collateralFator: ONE_ETHER.mul(new BN(90)).div(new BN(100)),
+  collateralFactor: ONE_ETHER.mul(new BN(90)).div(new BN(100)),
+  reserveFactor: ONE_ETHER.mul(new BN(10)).div(new BN(100)),
+  initialExchangeRateMantissa: ONE_ETHER,
   price: ONE_ETHER,
 }
 
-export const SUPPORTED_TOKENS: Token[] = [
+export const SUPPORTED_TOKENS: TokenConfig[] = [
   { symbol: 'WETH', name: 'Wrapped Ether', ...TOKEN_BASE },
   // { symbol: 'WBTC', name: 'Wrapped Bitcoin', ...TOKEN_BASE },
   // { symbol: 'DAI', name: 'Dai Stablecoin', ...TOKEN_BASE },

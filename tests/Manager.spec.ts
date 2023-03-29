@@ -1,11 +1,9 @@
 import { encodeAddress } from '@polkadot/keyring'
+import { ONE_ETHER, ROLE, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
   deployManager,
-  ROLE,
 } from '../scripts/helper/deploy_helper'
-import { ZERO_ADDRESS } from '../scripts/helper/utils'
-import { ONE_ETHER } from '../scripts/tokens'
 import { shouldNotRevert } from './testHelpers'
 
 describe('Manager spec', () => {
