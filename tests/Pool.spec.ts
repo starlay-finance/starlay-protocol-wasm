@@ -916,6 +916,73 @@ describe('Pool spec', () => {
         )
       }
     })
+
+    it('failure', async () => {
+      const { api, deployer, controller, rateModel, priceOracle, users } =
+        await setup()
+      const { dai, usdc } = await preparePoolsWithPreparedTokens({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+      })
+      const [userA, userB] = users
+
+      // prerequisite
+      //// initialize
+      const toParam = (m: BN) => [m.toString()]
+      for (const sym of [dai, usdc]) {
+        await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+        await controller.tx.supportMarketWithCollateralFactorMantissa(
+          sym.pool.address,
+          toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+        )
+      }
+      //// use protocol
+      for await (const { user, sym, amount } of [
+        {
+          user: userA,
+          sym: dai,
+          amount: to_dec18(500_000),
+        },
+        {
+          user: userB,
+          sym: usdc,
+          amount: to_dec6(500_000),
+        },
+      ]) {
+        const { pool, token } = sym
+        await token.withSigner(deployer).tx.mint(user.address, amount)
+        await token.withSigner(user).tx.approve(pool.address, amount)
+        await pool.withSigner(user).tx.mint(amount)
+      }
+
+      // case: src == dst
+      {
+        const res = await dai.pool
+          .withSigner(userA)
+          .query.transfer(userA.address, new BN(1), [])
+        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferNotAllowed')
+      }
+      // case: shortfall of account_liquidity
+      {
+        await usdc.pool.withSigner(userA).tx.borrow(to_dec6(450_000))
+        const res = await dai.pool
+          .withSigner(userA)
+          .query.transfer(userB.address, new BN(1), [])
+        expect(hexToUtf8(res.value.ok.err['custom'])).toBe(
+          'InsufficientLiquidity',
+        )
+      }
+      // case: paused
+      await controller.tx.setTransferGuardianPaused(true)
+      {
+        const res = await dai.pool
+          .withSigner(userA)
+          .query.transfer(userB.address, new BN(1), [])
+        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferIsPaused')
+      }
+    })
   })
 
   it.todo('.reduceReserves')
