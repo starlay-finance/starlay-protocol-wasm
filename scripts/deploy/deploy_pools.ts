@@ -8,8 +8,8 @@ import { defaultOption, sendTxWithPreview } from '../helper/utils'
 import { DummyToken, TokenConfig } from '../tokens'
 import {
   deployDefaultInterestRateModel,
-  deployPool,
   deployPSP22Token,
+  deployPool,
 } from './../helper/deploy_helper'
 
 type DeployPoolArgs = {
@@ -103,9 +103,10 @@ const deployAndSetupPool = async (
   await sendTxWithPreview(
     controller,
     'supportMarketWithCollateralFactorMantissa',
-    [pool.address, [config.collateralFactor]],
+    [pool.address, [config.collateralFactor], option],
   )
   await sendTxWithPreview(pool, 'setReserveFactorMantissa', [
     [config.reserveFactor],
+    option,
   ])
 }

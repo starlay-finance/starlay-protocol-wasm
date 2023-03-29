@@ -5,8 +5,8 @@ import { BN, BN_ONE } from '@polkadot/util'
 import { ENV, getCurrentEnv } from '../env'
 
 const WAIT_FINALIZED_SECONDS = 10000
-const MAX_CALL_WEIGHT = new BN(900_000_000).isub(BN_ONE).mul(new BN(10))
-const PROOFSIZE = new BN(1_000_000)
+const MAX_CALL_WEIGHT = new BN(990_000_000).isub(BN_ONE).mul(new BN(10))
+const PROOFSIZE = new BN(1_100_000)
 
 export const isTest = (): boolean => process.env.NODE_ENV === 'test'
 
