@@ -94,7 +94,7 @@ impl Default for Data {
             total_reserves: Default::default(),
             account_borrows: Default::default(),
             accural_block_timestamp: 0,
-            borrow_index: WrappedU256::from(U256::zero()),
+            borrow_index: WrappedU256::from(U256::one()),
             initial_exchange_rate_mantissa: WrappedU256::from(U256::zero()),
             reserve_factor_mantissa: WrappedU256::from(U256::zero()),
         }
