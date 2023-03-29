@@ -1,8 +1,8 @@
 import { encodeAddress } from '@polkadot/keyring'
 import {
-  ROLE,
   deployController,
   deployManager,
+  ROLE,
 } from '../scripts/helper/deploy_helper'
 import { ZERO_ADDRESS } from '../scripts/helper/utils'
 import { ONE_ETHER } from '../scripts/tokens'

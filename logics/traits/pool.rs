@@ -2,7 +2,10 @@ use ink::LangError;
 use openbrush::{
     contracts::{
         psp22::PSP22Error,
-        traits::psp22::*,
+        traits::psp22::{
+            extensions::metadata::*,
+            *,
+        },
     },
     traits::{
         AccountId,
@@ -18,10 +21,10 @@ use super::{
 };
 
 #[openbrush::wrapper]
-pub type PoolRef = dyn Pool + PSP22;
+pub type PoolRef = dyn Pool + PSP22 + PSP22Metadata;
 
 #[openbrush::trait_definition]
-pub trait Pool: PSP22 {
+pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn accrue_interest(&mut self) -> Result<()>;
 
