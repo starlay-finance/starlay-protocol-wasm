@@ -33,14 +33,15 @@ export const sendTxWithPreview = async <
     if (preview.value.ok.err && Object.keys(preview.value.ok.err).length)
       throw new Error(preview.value.ok.err)
   } catch (e) {
-    throw new Error(
-      `failed to preview ${contract.name}.${fn as string}(${JSON.stringify(
-        args,
-      )}): ${JSON.stringify(e)}`,
-    )
+    const calldata = `${contract.name}.${fn as string}(${JSON.stringify(args)})`
+    throw new Error(`Failed to preview ${calldata}: ${JSON.stringify(e)}`)
   }
   const res = await contract.tx[fn](...args)
   await waitForTx(res)
+  const calldata = `${contract.name}.${fn as string}(${JSON.stringify(
+    args.slice(0, -1),
+  )})`
+  console.log(`Transaction succeeded: ${calldata}`)
   return res
 }
 

@@ -49,7 +49,6 @@ export const deployManagerAndController: DeployManagerAndController = async ({
     if (role === ROLE.DEFAULT_ADMIN_ROLE) continue
     const grantee = (roleGrantees && roleGrantees[role]) || signer.address
     await sendTxWithPreview(manager, 'grantRole', [role, grantee, option])
-    console.log(`Role ${key} has been granted to ${grantee}`)
   }
 
   await sendTxWithPreview(controller, 'setPriceOracle', [
@@ -64,6 +63,5 @@ export const deployManagerAndController: DeployManagerAndController = async ({
     [liquidationIncentive],
     option,
   ])
-
   return { manager, controller }
 }
