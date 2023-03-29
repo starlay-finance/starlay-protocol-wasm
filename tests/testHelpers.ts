@@ -1,10 +1,6 @@
-import { Result, ReturnNumber } from '@727-ventures/typechain-types'
+import { ReturnNumber } from '@727-ventures/typechain-types'
 import { ReplacedType } from '../scripts/helper/utilityTypes'
 import { waitForTx } from '../scripts/helper/utils'
-
-export function parseUnits(amount: bigint | number, decimals = 18): bigint {
-  return BigInt(amount) * 10n ** BigInt(decimals)
-}
 
 export const expectToEmit = <T = unknown>(
   event: { name: string; args: T },
@@ -17,22 +13,6 @@ export const expectToEmit = <T = unknown>(
       expect(event.args[key].toNumber()).toBe(args[key])
     else expect(event.args[key]).toBe(args[key])
   })
-}
-
-export function revertedWith(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  result: { value: { err?: any } },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any,@typescript-eslint/explicit-module-boundary-types
-  errorTitle: any,
-): void {
-  if (result.value instanceof Result) {
-    result.value = result.value.ok
-  }
-  if (typeof errorTitle === 'object') {
-    expect(result.value).toHaveProperty('err', errorTitle)
-  } else {
-    expect(result.value.err).toHaveProperty(errorTitle)
-  }
 }
 
 export const shouldNotRevert = async <
