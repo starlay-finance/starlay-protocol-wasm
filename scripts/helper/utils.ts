@@ -1,12 +1,8 @@
 import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
 import { ApiPromise } from '@polkadot/api'
-import { encodeAddress } from '@polkadot/keyring'
 import { WeightV2 } from '@polkadot/types/interfaces'
 import { BN, BN_ONE } from '@polkadot/util'
 
-export const ZERO_ADDRESS = encodeAddress(
-  '0x0000000000000000000000000000000000000000000000000000000000000000',
-)
 const WAIT_FINALIZED_SECONDS = 10000
 const MAX_CALL_WEIGHT = new BN(900_000_000).isub(BN_ONE).mul(new BN(10))
 const PROOFSIZE = new BN(1_000_000)

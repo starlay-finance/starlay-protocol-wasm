@@ -1,15 +1,15 @@
 import { encodeAddress } from '@polkadot/keyring'
 import BN from 'bn.js'
+import { ONE_ETHER } from '../scripts/helper/constants'
 import {
   deployController,
   deployDefaultInterestRateModel,
   deployPriceOracle,
 } from '../scripts/helper/deploy_helper'
-import { ONE_ETHER } from '../scripts/tokens'
 import {
-  preparePoolsWithPreparedTokens,
-  preparePoolWithMockToken,
   TEST_METADATAS,
+  preparePoolWithMockToken,
+  preparePoolsWithPreparedTokens,
 } from './testContractHelper'
 import { shouldNotRevert } from './testHelpers'
 

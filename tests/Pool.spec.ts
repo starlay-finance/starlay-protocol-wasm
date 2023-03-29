@@ -1,6 +1,7 @@
 import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
+import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
   deployDefaultInterestRateModel,
@@ -8,8 +9,7 @@ import {
   deployPriceOracle,
   deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
-import { hexToUtf8, ZERO_ADDRESS } from '../scripts/helper/utils'
-import { ONE_ETHER } from '../scripts/tokens'
+import { hexToUtf8 } from '../scripts/helper/utils'
 import Controller from '../types/contracts/controller'
 import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
 import Pool from '../types/contracts/pool'

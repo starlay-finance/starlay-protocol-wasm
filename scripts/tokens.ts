@@ -1,4 +1,5 @@
 import { BN } from '@polkadot/util'
+import { ONE_ETHER } from './helper/constants'
 
 export interface Token {
   symbol: string
@@ -10,7 +11,6 @@ export interface Token {
 }
 export type DummyToken = Token & DummyTokenProp
 
-export const ONE_ETHER = new BN(10).pow(new BN(18))
 
 interface DummyTokenProp {
   totalSupply: BN
