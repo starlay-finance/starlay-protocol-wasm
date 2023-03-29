@@ -797,7 +797,8 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::MarketNotListed)
         }
 
-        // TODO: how to check controller in pool (comment out to avoid cross-contract call to caller)
+        // NOTE: cannot perform controller check on the pool here, as a cross-contract call to the caller occurs when the pool is the caller.
+        //   To avoid this, the pool itself needs to perform this check.
         // let p_collateral_ctrler = PoolRef::controller(&pool_collateral);
         // let p_borrowed_ctrler = PoolRef::controller(&pool_borrowed);
         // if p_collateral_ctrler != p_borrowed_ctrler {
