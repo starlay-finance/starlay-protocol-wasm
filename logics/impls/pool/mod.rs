@@ -1012,12 +1012,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return 0
         }
         let borrow_index = self._borrow_index();
-        // temp / TODO: check calculation interest_rate
-        if U256::from(borrow_index.mantissa).is_zero()
-            && U256::from(snapshot.interest_index).is_zero()
-        {
-            return snapshot.principal
-        }
         let prinicipal_times_index =
             U256::from(snapshot.principal).mul(U256::from(borrow_index.mantissa));
         prinicipal_times_index
