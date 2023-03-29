@@ -6,6 +6,7 @@ import {
   deployDefaultInterestRateModel,
   deployPriceOracle,
 } from '../scripts/helper/deploy_helper'
+import { ZERO_ADDRESS } from '../scripts/helper/utils'
 import { ONE_ETHER } from '../scripts/tokens'
 import {
   preparePoolsWithPreparedTokens,
@@ -307,6 +308,37 @@ describe('Controller spec', () => {
             shortfall: 0,
           },
         )
+        //// .get_hypothetical_account_liquidity
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              daiUser.address,
+              usdc.pool.address,
+              to_dec6(50),
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 90 - (50 * 90) / 100,
+            shortfall: 0,
+          },
+        )
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              usdcUser.address,
+              dai.pool.address,
+              new BN(0),
+              to_dec18(500),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 0,
+            shortfall: 500 - 450,
+          },
+        )
       })
       it('multi asset', async () => {
         const { api, deployer, controller, rateModel, priceOracle, users } =
@@ -352,11 +384,58 @@ describe('Controller spec', () => {
         }
 
         // execute
+        //// .get_account_liquidity
         assertAccountLiqudity(
           (await controller.query.getAccountLiquidity(user.address)).value.ok
             .ok,
           {
             collateral: 5_400,
+            shortfall: 0,
+          },
+        )
+        //// .get_hypothetical_account_liquidity
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              ZERO_ADDRESS,
+              new BN(0),
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 5_400,
+            shortfall: 0,
+          },
+        )
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              dai.pool.address,
+              to_dec18(10_000), // some redeem
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 0,
+            shortfall: (10_000 * 90) / 100 - 5_400,
+          },
+        )
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              usdc.pool.address,
+              new BN(0),
+              to_dec6(5_399), // some borrow
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 1,
             shortfall: 0,
           },
         )
@@ -436,11 +515,59 @@ describe('Controller spec', () => {
         const expectedShortfall = 50_000 + 150_000
 
         // execute
+        //// .get_account_liquidity
         assertAccountLiqudity(
           (await controller.query.getAccountLiquidity(user.address)).value.ok
             .ok,
           {
             collateral: expectedCollateral - expectedShortfall,
+            shortfall: 0,
+          },
+        )
+        //// .get_hypothetical_account_liquidity
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              ZERO_ADDRESS,
+              new BN(0),
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: expectedCollateral - expectedShortfall,
+            shortfall: 0,
+          },
+        )
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              dai.pool.address,
+              to_dec18(10_000), // some redeem
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral:
+              expectedCollateral - expectedShortfall - (10_000 * 90) / 100,
+            shortfall: 0,
+          },
+        )
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              dai.pool.address,
+              new BN(0),
+              to_dec18(10_000), // some borrow
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: expectedCollateral - expectedShortfall - 10_000,
             shortfall: 0,
           },
         )
