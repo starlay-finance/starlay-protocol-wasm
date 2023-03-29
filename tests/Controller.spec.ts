@@ -12,7 +12,7 @@ import {
   preparePoolWithMockToken,
   preparePoolsWithPreparedTokens,
 } from './testContractHelper'
-import { shouldNotRevert } from './testHelpers'
+import { shouldNotRevert, toDec18, toDec6 } from './testHelpers'
 
 describe('Controller spec', () => {
   const setup = async () => {
@@ -29,17 +29,11 @@ describe('Controller spec', () => {
       args: [],
     })
     // temp: declare params for rate_model
-    const toParam = (m: BN) => [m.toString()]
     const rateModelArg = new BN(100).mul(ONE_ETHER)
     const rateModel = await deployDefaultInterestRateModel({
       api,
       signer: deployer,
-      args: [
-        toParam(rateModelArg),
-        toParam(rateModelArg),
-        toParam(rateModelArg),
-        toParam(rateModelArg),
-      ],
+      args: [[rateModelArg], [rateModelArg], [rateModelArg], [rateModelArg]],
     })
 
     // initialize
@@ -104,8 +98,6 @@ describe('Controller spec', () => {
   })
 
   describe('.support_market_with_collateral_factor_mantissa', () => {
-    const toParam = (m: BN) => [m.toString()] // temp
-
     it('success', async () => {
       const { api, deployer, controller, rateModel, priceOracle } =
         await setup()
@@ -117,12 +109,11 @@ describe('Controller spec', () => {
       })
 
       // prepares
-      const toParam = (m: BN) => [m.toString()] // temp
       for (const sym of [pools.dai, pools.usdc, pools.usdt]) {
         await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
         await controller.tx.supportMarketWithCollateralFactorMantissa(
           sym.pool.address,
-          toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+          [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
         )
       }
 
@@ -152,7 +143,7 @@ describe('Controller spec', () => {
         const res =
           await controller.query.supportMarketWithCollateralFactorMantissa(
             pool.address,
-            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100)).add(new BN(1))),
+            [ONE_ETHER.mul(new BN(90)).div(new BN(100)).add(new BN(1))],
           )
         expect(res.value.ok.err).toStrictEqual('InvalidCollateralFactor')
       })
@@ -162,7 +153,7 @@ describe('Controller spec', () => {
         const res =
           await controller.query.supportMarketWithCollateralFactorMantissa(
             pool.address,
-            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+            [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
           )
         expect(res.value.ok.err).toStrictEqual('PriceError')
       })
@@ -182,12 +173,11 @@ describe('Controller spec', () => {
     const { dai, usdc, usdt } = pools
 
     // prepares
-    const toParam = (m: BN) => [m.toString()] // temp
     for (const sym of [dai, usdc, usdt]) {
       await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
       await controller.tx.supportMarketWithCollateralFactorMantissa(
         sym.pool.address,
-        toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+        [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
       )
     }
 
@@ -230,9 +220,6 @@ describe('Controller spec', () => {
   describe('.get_account_liquidity / .get_hypothetical_account_liquidity', () => {
     const pow10 = (exponent: number) => new BN(10).pow(new BN(exponent))
     const mantissa = () => pow10(18)
-    const to_dec6 = (val: number | string) => new BN(val).mul(pow10(6))
-    const to_dec18 = (val: number | string) => new BN(val).mul(pow10(18))
-    const trimPrefix = (hex: string) => hex.replace(/^0x/, '')
 
     const assertAccountLiqudity = (
       actual: [ReturnNumber, ReturnNumber],
@@ -262,24 +249,23 @@ describe('Controller spec', () => {
 
         // prerequisite
         //// initialize
-        const toParam = (m: BN) => [m.toString()]
         for (const sym of [dai, usdc]) {
           await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
           await controller.tx.supportMarketWithCollateralFactorMantissa(
             sym.pool.address,
-            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+            [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
           )
         }
         //// use protocol
         for await (const { sym, value, user } of [
           {
             sym: dai,
-            value: to_dec18(100),
+            value: toDec18(100),
             user: daiUser,
           },
           {
             sym: usdc,
-            value: to_dec6(500),
+            value: toDec6(500),
             user: usdcUser,
           },
         ]) {
@@ -313,7 +299,7 @@ describe('Controller spec', () => {
             await controller.query.getHypotheticalAccountLiquidity(
               daiUser.address,
               usdc.pool.address,
-              to_dec6(50),
+              toDec6(50),
               new BN(0),
               null,
             )
@@ -329,7 +315,7 @@ describe('Controller spec', () => {
               usdcUser.address,
               dai.pool.address,
               new BN(0),
-              to_dec18(500),
+              toDec18(500),
               null,
             )
           ).value.ok.ok,
@@ -352,12 +338,11 @@ describe('Controller spec', () => {
 
         // prerequisite
         //// initialize
-        const toParam = (m: BN) => [m.toString()]
         for (const sym of [dai, usdc, usdt]) {
           await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
           await controller.tx.supportMarketWithCollateralFactorMantissa(
             sym.pool.address,
-            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+            [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
           )
         }
 
@@ -365,15 +350,15 @@ describe('Controller spec', () => {
         for await (const { sym, value } of [
           {
             sym: dai,
-            value: to_dec18(1_000),
+            value: toDec18(1_000),
           },
           {
             sym: usdc,
-            value: to_dec6(2_000),
+            value: toDec6(2_000),
           },
           {
             sym: usdt,
-            value: to_dec6(3_000),
+            value: toDec6(3_000),
           },
         ]) {
           const { pool, token } = sym
@@ -413,7 +398,7 @@ describe('Controller spec', () => {
             await controller.query.getHypotheticalAccountLiquidity(
               user.address,
               dai.pool.address,
-              to_dec18(10_000), // some redeem
+              toDec18(10_000), // some redeem
               new BN(0),
               null,
             )
@@ -429,7 +414,7 @@ describe('Controller spec', () => {
               user.address,
               usdc.pool.address,
               new BN(0),
-              to_dec6(5_399), // some borrow
+              toDec6(5_399), // some borrow
               null,
             )
           ).value.ok.ok,
@@ -454,12 +439,11 @@ describe('Controller spec', () => {
 
         // prerequisite
         //// initialize
-        const toParam = (m: BN) => [m.toString()]
         for (const sym of [dai, usdc, usdt]) {
           await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
           await controller.tx.supportMarketWithCollateralFactorMantissa(
             sym.pool.address,
-            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+            [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
           )
         }
 
@@ -468,15 +452,15 @@ describe('Controller spec', () => {
         for await (const { sym, liquidity } of [
           {
             sym: dai,
-            liquidity: to_dec18(500_000),
+            liquidity: toDec18(500_000),
           },
           {
             sym: usdc,
-            liquidity: to_dec6(500_000),
+            liquidity: toDec6(500_000),
           },
           {
             sym: usdt,
-            liquidity: to_dec6(500_000),
+            liquidity: toDec6(500_000),
           },
         ]) {
           const { pool, token } = sym
@@ -488,16 +472,16 @@ describe('Controller spec', () => {
         for await (const { sym, mintValue, borrowValue } of [
           {
             sym: dai,
-            mintValue: to_dec18(250_000),
-            borrowValue: to_dec18(50_000),
+            mintValue: toDec18(250_000),
+            borrowValue: toDec18(50_000),
           },
           {
             sym: usdc,
-            borrowValue: to_dec6(150_000),
+            borrowValue: toDec6(150_000),
           },
           {
             sym: usdt,
-            mintValue: to_dec6(300_000),
+            mintValue: toDec6(300_000),
           },
         ]) {
           const { pool, token } = sym
@@ -544,7 +528,7 @@ describe('Controller spec', () => {
             await controller.query.getHypotheticalAccountLiquidity(
               user.address,
               dai.pool.address,
-              to_dec18(10_000), // some redeem
+              toDec18(10_000), // some redeem
               new BN(0),
               null,
             )
@@ -561,7 +545,7 @@ describe('Controller spec', () => {
               user.address,
               dai.pool.address,
               new BN(0),
-              to_dec18(10_000), // some borrow
+              toDec18(10_000), // some borrow
               null,
             )
           ).value.ok.ok,

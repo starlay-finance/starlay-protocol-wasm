@@ -75,7 +75,14 @@ module.exports = {
     '@typescript-eslint/ban-ts-comment': 'off',
     'jest/expect-expect': [
       'error',
-      { assertFunctionNames: ['expect', 'shouldNotRevert'] },
+      {
+        assertFunctionNames: [
+          'expect',
+          'expectToEmit',
+          'shouldNotRevert',
+          'assertAccountLiqudity',
+        ],
+      },
     ],
   },
 }
