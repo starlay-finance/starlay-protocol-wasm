@@ -1,3 +1,7 @@
+import dotenv from 'dotenv'
+
+dotenv.config()
+
 export interface EnvironmentParameter {
   rpc: string
 }
@@ -8,6 +12,8 @@ export const ENV = {
 } as const
 
 export type Env = (typeof ENV)[keyof typeof ENV]
+
+export const from = (name: string): Env => ENV[name] ?? ENV.test
 
 export const valueOf = (env: Env): EnvironmentParameter =>
   ENV_PARAMS[env] || ENV_PARAMS[ENV.test]
@@ -20,3 +26,5 @@ const ENV_PARAMS: Record<Env, EnvironmentParameter> = {
     rpc: 'ws://127.0.0.1:9944',
   },
 }
+
+export const mnemonic = (): string => process.env.MNEMONIC
