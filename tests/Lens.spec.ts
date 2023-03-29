@@ -475,6 +475,7 @@ describe('Lens', () => {
       expect(balances.tokenBalance.toNumber()).toBe(
         balance - depositAmount + borrowAmount - repayAmount,
       )
+    })
     it('on paused', async () => {
       const pool = pools[0]
       await shouldNotRevert(controller, 'setMintGuardianPaused', [
