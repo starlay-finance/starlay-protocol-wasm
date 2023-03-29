@@ -160,14 +160,13 @@ pub fn get_hypothetical_account_liquidity_per_asset(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::impls::exp_no_err::exp_scale;
     use core::ops::{
         Div,
         Mul,
     };
-
-    use crate::impls::exp_no_err::exp_scale;
-
-    use super::*;
+    use openbrush::traits::ZERO_ADDRESS;
     use primitive_types::U256;
     fn mts(val: u128) -> U256 {
         U256::from(val).mul(exp_scale())
@@ -258,6 +257,10 @@ mod tests {
 
     #[test]
     fn test_get_hypothetical_account_liquidity_per_asset() {
+        let mantissa = 10_u128.pow(18);
+        let pow10_6 = 10_u128.pow(6);
+        let pow10_18 = 10_u128.pow(18);
+
         struct Case {
             input: Input,
             expected: Expected,
@@ -265,6 +268,7 @@ mod tests {
         struct Input {
             token_balance: Balance,
             borrow_balance: Balance,
+            decimals: u8,
             exchange_rate_mantissa: u128,
             collateral_factor_mantissa: u128,
             oracle_price_mantissa: u128,
@@ -273,45 +277,47 @@ mod tests {
             collateral: u128,
             borrow_plus_effect: u128,
         }
-        let mantissa = 10_u128.pow(18);
         let cases = vec![
             Case {
                 input: Input {
-                    token_balance: 200,
-                    borrow_balance: 100,
+                    token_balance: 200 * pow10_6,
+                    borrow_balance: 100 * pow10_6,
+                    decimals: 6,
                     exchange_rate_mantissa: mantissa * 1,
                     collateral_factor_mantissa: mantissa * 50 / 100, // 50%
                     oracle_price_mantissa: mantissa * 1,
                 },
                 expected: Expected {
-                    collateral: 100,
-                    borrow_plus_effect: 100,
+                    collateral: 100 * mantissa,
+                    borrow_plus_effect: 100 * mantissa,
                 },
             }, // simple
             Case {
                 input: Input {
-                    token_balance: 111111,
-                    borrow_balance: 100000,
+                    token_balance: 111111 * pow10_6,
+                    borrow_balance: 100000 * pow10_6,
+                    decimals: 6,
                     exchange_rate_mantissa: mantissa * 1,
                     collateral_factor_mantissa: mantissa * 90 / 100, // 90%
                     oracle_price_mantissa: mantissa * 100,
                 },
                 expected: Expected {
-                    collateral: 9999990,
-                    borrow_plus_effect: 10000000,
+                    collateral: 9999990 * mantissa,
+                    borrow_plus_effect: 10000000 * mantissa,
                 },
             }, // HF = almost 100%
             Case {
                 input: Input {
-                    token_balance: 1000,
-                    borrow_balance: 1000,
+                    token_balance: 1000 * pow10_18,
+                    borrow_balance: 1000 * pow10_18,
+                    decimals: 18,
                     exchange_rate_mantissa: mantissa * 5 / 10, // 0.5
                     collateral_factor_mantissa: mantissa * 25 / 100, // 25%
                     oracle_price_mantissa: mantissa * 100,
                 },
                 expected: Expected {
-                    collateral: 12500,
-                    borrow_plus_effect: 100000,
+                    collateral: 12500 * mantissa,
+                    borrow_plus_effect: 100000 * mantissa,
                 },
             }, // low exchange_rate, collateral_factor (HF = 12.5%)
         ];
@@ -319,7 +325,7 @@ mod tests {
             let (_, collateral, borrow_plus_effect) = get_hypothetical_account_liquidity_per_asset(
                 case.input.token_balance,
                 case.input.borrow_balance,
-                18, // temp
+                case.input.decimals,
                 Exp {
                     mantissa: WrappedU256::from(U256::from(case.input.exchange_rate_mantissa)),
                 },
@@ -334,6 +340,147 @@ mod tests {
             assert_eq!(
                 borrow_plus_effect,
                 U256::from(case.expected.borrow_plus_effect)
+            );
+        }
+    }
+
+    #[test]
+    fn test_get_hypothetical_account_liquidity_without_borrows() {
+        let mantissa = 10_u128.pow(18);
+        let pow10_6 = 10_u128.pow(6);
+        let pow10_18 = 10_u128.pow(18);
+        let to_exp = |val: u128| {
+            Exp {
+                mantissa: WrappedU256::from(U256::from(val)),
+            }
+        };
+
+        struct Case {
+            input: GetHypotheticalAccountLiquidityInput,
+            expected: Expected,
+        }
+        struct Expected {
+            sum_collateral: u128,
+            sum_borrow_plus_effect: u128,
+        }
+
+        // decimal 6 token with 90% collateral factor
+        let token1_dec6_param = HypotheticalAccountLiquidityCalculationParam {
+            asset: AccountId::from([1; 32]),
+            decimals: 6,
+            token_balance: 10_000 * pow10_6,
+            borrow_balance: 0,
+            exchange_rate_mantissa: to_exp(mantissa * 1),
+            collateral_factor_mantissa: to_exp(mantissa * 90 / 100), // 90%
+            oracle_price_mantissa: to_exp(mantissa * 1),
+        };
+        // decimal 6 token with 50% collateral factor
+        let token2_dec6_param = HypotheticalAccountLiquidityCalculationParam {
+            asset: AccountId::from([2; 32]),
+            decimals: 6,
+            token_balance: 50_000 * pow10_6,
+            borrow_balance: 0,
+            exchange_rate_mantissa: to_exp(mantissa * 1),
+            collateral_factor_mantissa: to_exp(mantissa * 50 / 100), // 50%
+            oracle_price_mantissa: to_exp(mantissa * 1),
+        };
+        // decimal 18 token with 90% collateral factor
+        let token3_dec18_param = HypotheticalAccountLiquidityCalculationParam {
+            asset: AccountId::from([3; 32]),
+            decimals: 18,
+            token_balance: 25_000 * pow10_18,
+            borrow_balance: 0,
+            exchange_rate_mantissa: to_exp(mantissa * 1),
+            collateral_factor_mantissa: to_exp(mantissa * 90 / 100), // 90%
+            oracle_price_mantissa: to_exp(mantissa * 1),
+        };
+
+        let asset_params = vec![token1_dec6_param, token2_dec6_param, token3_dec18_param];
+        let cases = vec![
+            Case {
+                input: GetHypotheticalAccountLiquidityInput {
+                    asset_params: asset_params.clone(),
+                    token_modify: ZERO_ADDRESS.into(),
+                    redeem_tokens: 0,
+                    borrow_amount: 0,
+                },
+                expected: Expected {
+                    sum_collateral: ((10_000 * 90 / 100)
+                        + (50_000 * 50 / 100)
+                        + (25_000 * 90 / 100))
+                        * mantissa,
+                    sum_borrow_plus_effect: 0,
+                },
+            }, // no redeem & borrow
+            Case {
+                input: GetHypotheticalAccountLiquidityInput {
+                    asset_params: asset_params.clone(),
+                    token_modify: AccountId::from([1; 32]),
+                    redeem_tokens: 7_500 * pow10_6,
+                    borrow_amount: 0,
+                },
+                expected: Expected {
+                    sum_collateral: ((10_000 * 90 / 100)
+                        + (50_000 * 50 / 100)
+                        + (25_000 * 90 / 100))
+                        * mantissa,
+                    sum_borrow_plus_effect: (7_500 * 90 / 100) * mantissa,
+                },
+            }, // some redeem with decimal 6 token with 90% collateral factor
+            Case {
+                input: GetHypotheticalAccountLiquidityInput {
+                    asset_params: asset_params.clone(),
+                    token_modify: AccountId::from([2; 32]),
+                    redeem_tokens: 35_000 * pow10_6,
+                    borrow_amount: 0,
+                },
+                expected: Expected {
+                    sum_collateral: ((10_000 * 90 / 100)
+                        + (50_000 * 50 / 100)
+                        + (25_000 * 90 / 100))
+                        * mantissa,
+                    sum_borrow_plus_effect: (35_000 * 50 / 100) * mantissa,
+                },
+            }, // some redeem with decimal 6 token with 50% collateral factor
+            Case {
+                input: GetHypotheticalAccountLiquidityInput {
+                    asset_params: asset_params.clone(),
+                    token_modify: AccountId::from([1; 32]),
+                    redeem_tokens: 0,
+                    borrow_amount: 7_500 * pow10_6,
+                },
+                expected: Expected {
+                    sum_collateral: ((10_000 * 90 / 100)
+                        + (50_000 * 50 / 100)
+                        + (25_000 * 90 / 100))
+                        * mantissa,
+                    sum_borrow_plus_effect: 7_500 * mantissa,
+                },
+            }, // some borrow with decimal 6 token with 90% collateral factor
+            Case {
+                input: GetHypotheticalAccountLiquidityInput {
+                    asset_params: asset_params.clone(),
+                    token_modify: AccountId::from([3; 32]),
+                    redeem_tokens: 0,
+                    borrow_amount: 15_000 * pow10_18,
+                },
+                expected: Expected {
+                    sum_collateral: ((10_000 * 90 / 100)
+                        + (50_000 * 50 / 100)
+                        + (25_000 * 90 / 100))
+                        * mantissa,
+                    sum_borrow_plus_effect: 15_000 * mantissa,
+                },
+            }, // some borrow with decimal 18 token with 90% collateral factor
+        ];
+
+        for case in cases {
+            let (sum_collateral, sum_borrow_plus_effect) =
+                get_hypothetical_account_liquidity(case.input);
+            assert_eq!(sum_collateral, U256::from(case.expected.sum_collateral));
+            assert_eq!(
+                sum_borrow_plus_effect,
+                U256::from(case.expected.sum_borrow_plus_effect)
             );
         }
     }
