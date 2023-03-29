@@ -3,7 +3,7 @@ export interface EnvironmentParameter {
 }
 
 const testnetParam: EnvironmentParameter = {
-  rpc: 'wss://shibuya.public.blastapi.io',
+  rpc: 'wss://shibuya-rpc.dwellir.com',
 }
 
 const testParam: EnvironmentParameter = {
