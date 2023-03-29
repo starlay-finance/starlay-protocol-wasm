@@ -2,6 +2,8 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
+let currentEnv: Env
+
 export interface EnvironmentParameter {
   rpc: string
 }
@@ -13,7 +15,12 @@ export const ENV = {
 
 export type Env = (typeof ENV)[keyof typeof ENV]
 
-export const from = (name: string): Env => ENV[name] ?? ENV.test
+export const setEnv = (name: string): Env => {
+  currentEnv = ENV[name] ?? ENV.test
+  return currentEnv
+}
+
+export const getCurrentEnv = (): Env => currentEnv
 
 export const valueOf = (env: Env): EnvironmentParameter =>
   ENV_PARAMS[env] || ENV_PARAMS[ENV.test]
