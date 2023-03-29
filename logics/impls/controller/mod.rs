@@ -228,7 +228,7 @@ pub trait Internal {
     fn _borrow_cap(&self, pool: AccountId) -> Option<Balance>;
     fn _manager(&self) -> AccountId;
 
-    fn _account_assets(&self, account: AccountId) -> Vec<AccountId>;
+    fn _account_assets(&self, account: AccountId, token_modify: AccountId) -> Vec<AccountId>;
     fn _get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)>;
     fn _get_hypothetical_account_liquidity(
         &self,
@@ -578,7 +578,7 @@ impl<T: Storage<Data>> Controller for T {
         self._is_listed(pool)
     }
     default fn account_assets(&self, account: AccountId) -> Vec<AccountId> {
-        self._account_assets(account)
+        self._account_assets(account, ZERO_ADDRESS.into())
     }
     default fn get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)> {
         self._get_account_liquidity(account)
@@ -797,7 +797,8 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::MarketNotListed)
         }
 
-        // TODO: how to check controller in pool (comment out to avoid cross-contract call to caller)
+        // NOTE: cannot perform controller check on the pool here, as a cross-contract call to the caller occurs when the pool is the caller.
+        //   To avoid this, the pool itself needs to perform this check.
         // let p_collateral_ctrler = PoolRef::controller(&pool_collateral);
         // let p_borrowed_ctrler = PoolRef::controller(&pool_borrowed);
         // if p_collateral_ctrler != p_borrowed_ctrler {
@@ -1015,12 +1016,20 @@ impl<T: Storage<Data>> Internal for T {
         self.data().manager
     }
 
-    default fn _account_assets(&self, account: AccountId) -> Vec<AccountId> {
+    default fn _account_assets(
+        &self,
+        account: AccountId,
+        token_modify: AccountId,
+    ) -> Vec<AccountId> {
         let mut account_assets = Vec::<AccountId>::new();
         let markets = self._markets();
         for pool in markets {
             if pool == Self::env().caller() {
                 continue // NOTE: if caller is pool, need to check by the pool itself
+            }
+            if pool == token_modify {
+                account_assets.push(pool); // NOTE: add unconditionally even if balance, borrowed is not already there
+                continue
             }
             let (balance, borrowed, _) = PoolRef::get_account_snapshot(&pool, account);
 
@@ -1045,7 +1054,7 @@ impl<T: Storage<Data>> Internal for T {
         caller_pool: Option<(AccountId, PoolAttributes)>,
     ) -> Result<(U256, U256)> {
         // For each asset the account is in
-        let account_assets = self._account_assets(account);
+        let account_assets = self._account_assets(account, token_modify);
         let mut asset_params = Vec::<HypotheticalAccountLiquidityCalculationParam>::new();
 
         // if caller is a pool, get parameters for the pool without call the pool
