@@ -13,7 +13,7 @@ import {
   preparePoolWithMockToken,
   TEST_METADATAS,
 } from './testContractHelper'
-import { shouldNotRevert, toDec18, toDec6 } from './testHelpers'
+import { mantissa, shouldNotRevert, toDec18, toDec6 } from './testHelpers'
 
 describe('Controller spec', () => {
   const setup = async () => {
@@ -219,9 +219,6 @@ describe('Controller spec', () => {
   })
 
   describe('.get_account_liquidity / .get_hypothetical_account_liquidity', () => {
-    const pow10 = (exponent: number) => new BN(10).pow(new BN(exponent))
-    const mantissa = () => pow10(18)
-
     const assertAccountLiqudity = (
       actual: [ReturnNumber, ReturnNumber],
       expected: { collateral: number; shortfall: number },
@@ -560,11 +557,6 @@ describe('Controller spec', () => {
   })
 
   describe('.xxx_allowed', () => {
-    const pow10 = (exponent: number) => new BN(10).pow(new BN(exponent))
-    const mantissa = () => pow10(18)
-    const to_dec6 = (val: number | string) => new BN(val).mul(pow10(6))
-    const to_dec18 = (val: number | string) => new BN(val).mul(pow10(18))
-
     it('.transfer_allowed', async () => {
       const { api, deployer, controller, rateModel, priceOracle, users } =
         await setup()
@@ -590,7 +582,7 @@ describe('Controller spec', () => {
       for await (const { sym, value, user } of [
         {
           sym: usdc,
-          value: to_dec6(50_000),
+          value: toDec6(50_000),
           user: sender,
         },
       ]) {
@@ -605,7 +597,7 @@ describe('Controller spec', () => {
           usdc.pool.address,
           sender.address,
           ZERO_ADDRESS,
-          to_dec6(50_000),
+          toDec6(50_000),
           null,
         )
         expect(res.value.ok.ok).toBe(null)
@@ -615,7 +607,7 @@ describe('Controller spec', () => {
           usdc.pool.address,
           sender.address,
           ZERO_ADDRESS,
-          to_dec6(50_000).add(new BN(1)),
+          toDec6(50_000).add(new BN(1)),
           null,
         )
         expect(res.value.ok.err).toBe('InsufficientLiquidity')
@@ -623,7 +615,7 @@ describe('Controller spec', () => {
       {
         const res = await usdc.pool
           .withSigner(sender)
-          .query.transfer(receiver.address, to_dec6(50_000).add(new BN(1)), [])
+          .query.transfer(receiver.address, toDec6(50_000).add(new BN(1)), [])
         expect(hexToUtf8(res.value.ok.err['custom'])).toBe(
           'InsufficientLiquidity',
         )
