@@ -19,7 +19,7 @@ pub fn exp_scale() -> U256 {
 pub fn ray_scale() -> U256 {
     U256::from(10_u128.pow(27))
 }
-fn wad_ray_ratio() -> U256 {
+pub fn exp_ray_ratio() -> U256 {
     U256::from(10_u128.pow(9))
 }
 fn half_exp_scale() -> U256 {
@@ -53,16 +53,16 @@ impl Exp {
     }
     pub fn to_ray(&self) -> Ray {
         Ray {
-            mantissa: WrappedU256::from(U256::from(self.mantissa).mul(wad_ray_ratio())),
+            mantissa: WrappedU256::from(U256::from(self.mantissa).mul(exp_ray_ratio())),
         }
     }
     pub fn mul(&self, another: Exp) -> Exp {
         self._op(another, |o, v| o.mul(v).div(exp_scale()))
     }
 
-    pub fn mul_scalar(&self, mantissa: U256) -> Exp {
+    pub fn mul_scalar(&self, scalar: U256) -> Exp {
         Exp {
-            mantissa: WrappedU256::from(U256::from(self.mantissa).mul(mantissa)),
+            mantissa: WrappedU256::from(U256::from(self.mantissa).mul(scalar)),
         }
     }
 
@@ -122,17 +122,23 @@ impl Ray {
     }
 
     pub fn to_exp(&self) -> Exp {
-        let half_ratio = wad_ray_ratio().div(2);
+        let half_ratio = exp_ray_ratio().div(2);
         Exp {
             mantissa: WrappedU256::from(
                 half_ratio
                     .add(U256::from(self.mantissa))
-                    .div(wad_ray_ratio()),
+                    .div(exp_ray_ratio()),
             ),
         }
     }
 
     pub fn mul(&self, another: Ray) -> Ray {
+        if U256::from(self.mantissa).is_zero() || U256::from(another.mantissa).is_zero() {
+            return Ray {
+                mantissa: WrappedU256::from(U256::from(0)),
+            }
+        }
+
         self._op(another, |o, v| o.mul(v).div(ray_scale()))
     }
     fn div(&self, another: Ray) -> Ray {
