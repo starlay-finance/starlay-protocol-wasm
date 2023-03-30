@@ -33,10 +33,7 @@ interface DummyTokenProp {
   totalSupply: BN
 }
 
-const TOKEN_BASE: Omit<
-  TokenConfig,
-  'riskParameter' | 'rateModel' | 'symbol' | 'name' | 'price'
-> = {
+const TOKEN_BASE = {
   decimals: 18,
 }
 
