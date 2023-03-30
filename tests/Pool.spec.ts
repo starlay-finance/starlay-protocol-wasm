@@ -1,5 +1,4 @@
 import { ReturnNumber } from '@727-ventures/typechain-types'
-import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
 import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
@@ -12,12 +11,12 @@ import {
 } from '../scripts/helper/deploy_helper'
 import { hexToUtf8 } from '../scripts/helper/utils'
 import Controller from '../types/contracts/controller'
-import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
 import { Mint, Redeem } from '../types/event-types/pool'
 import { Transfer } from '../types/event-types/psp22_token'
 import { SUPPORTED_TOKENS } from './../scripts/tokens'
+import { Pools, preparePoolsWithPreparedTokens } from './testContractHelper'
 import {
   expectToEmit,
   mantissa,
@@ -25,117 +24,6 @@ import {
   toDec18,
   toDec6,
 } from './testHelpers'
-
-const TOKENS = ['dai', 'usdc', 'usdt'] as const
-const METADATAS: {
-  [key in (typeof TOKENS)[number]]: {
-    name: string
-    symbol: string
-    decimals: number
-  }
-} = {
-  dai: {
-    name: 'Dai Stablecoin',
-    symbol: 'DAI',
-    decimals: 18,
-  },
-  usdc: {
-    name: 'USD Coin',
-    symbol: 'USDC',
-    decimals: 6,
-  },
-  usdt: {
-    name: 'USD Tether',
-    symbol: 'USDT',
-    decimals: 6,
-  },
-} as const
-const preparePoolWithMockToken = async ({
-  api,
-  metadata,
-  controller,
-  rateModel,
-  manager,
-}: {
-  api: ApiPromise
-  metadata: {
-    name: string
-    symbol: string
-    decimals: number
-  }
-  controller: Controller
-  rateModel: DefaultInterestRateModel
-  manager: KeyringPair
-}): Promise<{
-  token: PSP22Token
-  pool: Pool
-}> => {
-  const token = await deployPSP22Token({
-    api,
-    signer: manager,
-    args: [
-      0,
-      metadata.name as unknown as string[],
-      metadata.symbol as unknown as string[],
-      metadata.decimals,
-    ],
-  })
-
-  const pool = await deployPoolFromAsset({
-    api,
-    signer: manager,
-    args: [
-      token.address,
-      controller.address,
-      rateModel.address,
-      [ONE_ETHER.toString()],
-    ],
-    token,
-  })
-
-  return { token, pool }
-}
-
-type Pools = {
-  [key in (typeof TOKENS)[number]]: {
-    token: PSP22Token
-    pool: Pool
-  }
-}
-const preparePoolsWithPreparedTokens = async ({
-  api,
-  controller,
-  rateModel,
-  manager,
-}: {
-  api: ApiPromise
-  controller: Controller
-  rateModel: DefaultInterestRateModel
-  manager: KeyringPair
-}): Promise<Pools> => {
-  const dai = await preparePoolWithMockToken({
-    api,
-    controller,
-    rateModel,
-    manager: manager,
-    metadata: METADATAS.dai,
-  })
-  const usdc = await preparePoolWithMockToken({
-    api,
-    controller,
-    rateModel,
-    manager: manager,
-    metadata: METADATAS.usdc,
-  })
-  const usdt = await preparePoolWithMockToken({
-    api,
-    controller,
-    rateModel,
-    manager: manager,
-    metadata: METADATAS.usdt,
-  })
-  return { dai, usdc, usdt }
-}
 
 describe('Pool spec', () => {
   const setup = async () => {
