@@ -29,10 +29,10 @@ class StarlayInterestRateModel implements InterestRateModel {
     return this.baseRate
   }
   multiplierPerYearSlope1: () => BN = () => {
-    return this.slope1.div(this.optimalUtilRate)
+    return this.slope1.div(this.optimalUtilRate).mul(ONE_ETHER)
   }
   multiplierPerYearSlope2: () => BN = () => {
-    return this.slope2.div(ONE_ETHER.sub(this.optimalUtilRate))
+    return this.slope2.div(ONE_ETHER.sub(this.optimalUtilRate)).mul(ONE_ETHER)
   }
   kink: () => BN = () => {
     return this.optimalUtilRate
