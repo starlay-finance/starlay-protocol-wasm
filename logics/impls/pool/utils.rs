@@ -245,6 +245,32 @@ mod tests {
     }
 
     #[test]
+    fn test_apy() {
+        // when USDC's utilization rate is 1%
+        let utilization_rate = mantissa().div(100); // 1%
+        let base_rate_per_milli_sec = U256::zero();
+        let multiplier_sloe_one = U256::from(4).mul(mantissa()).div(100); // 4%
+        let optimal_utilization_rate = U256::from(9).mul(mantissa()).div(10); // 90%
+        let multiplier_per_year_slope_one = multiplier_sloe_one
+            .mul(mantissa())
+            .div(optimal_utilization_rate);
+        let milliseconds_per_year = U256::from(1000_i128 * 60 * 60 * 24 * 365);
+        let multiplier_per_milliseconds_slope_one =
+            multiplier_per_year_slope_one.div(milliseconds_per_year);
+        let borrow_rate = utilization_rate
+            .mul(multiplier_per_milliseconds_slope_one)
+            .div(mantissa())
+            .add(base_rate_per_milli_sec);
+        let got = compound_interest(
+            &Exp {
+                mantissa: borrow_rate.into(),
+            },
+            milliseconds_per_year,
+        );
+        assert_eq!(U256::from(got.mantissa), U256::from(444436848000000_i128))
+    }
+
+    #[test]
     fn test_calculate_interest() {
         let old_timestamp = Timestamp::default();
         let inputs: &[CalculateInterestInput] = &[
@@ -282,6 +308,7 @@ mod tests {
                 total_reserves: 789_012 * (10_u128.pow(18)),
             },
         ];
+
         for input in inputs {
             let got = calculate_interest(&input).unwrap();
             let delta = input
