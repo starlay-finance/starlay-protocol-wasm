@@ -87,7 +87,7 @@ const deployAndSetupPool = async (
       token.address,
       controller.address,
       rateModelContract.address,
-      [config.initialExchangeRateMantissa],
+      [config.riskParameter.initialExchangeRateMantissa],
       [collateralNamePrefix + config.name],
       [collateralSymbolPrefix + config.symbol],
       config.decimals,
@@ -103,9 +103,9 @@ const deployAndSetupPool = async (
   await sendTxWithPreview(
     controller,
     'supportMarketWithCollateralFactorMantissa',
-    [pool.address, [config.collateralFactor]],
+    [pool.address, [config.riskParameter.collateralFactor]],
   )
   await sendTxWithPreview(pool, 'setReserveFactorMantissa', [
-    [config.reserveFactor],
+    [config.riskParameter.reserveFactor],
   ])
 }
