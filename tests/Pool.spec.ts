@@ -4,10 +4,9 @@ import { BN } from '@polkadot/util'
 import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
-  deployDefaultInterestRateModel,
-  deployPSP22Token,
   deployPoolFromAsset,
   deployPriceOracle,
+  deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
 import { hexToUtf8 } from '../scripts/helper/utils'
 import Controller from '../types/contracts/controller'
@@ -16,6 +15,8 @@ import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
 import { Mint, Redeem } from '../types/event-types/pool'
 import { Transfer } from '../types/event-types/psp22_token'
+import { deployDefaultInterestRateModel } from './../scripts/helper/deploy_helper'
+import { SUPPORTED_TOKENS } from './../scripts/tokens'
 import { expectToEmit, shouldNotRevert, toDec18, toDec6 } from './testHelpers'
 
 const TOKENS = ['dai', 'usdc', 'usdt'] as const
@@ -801,6 +802,93 @@ describe('Pool spec', () => {
           (await newPool.query.exchageRateStored()).value.ok.toString(),
         ).toBe(initialExchangeRate.toString())
       })
+    })
+  })
+
+  describe('.interest_rate_model', () => {
+    const setupExtended = async () => {
+      const { api, deployer, controller, users, priceOracle, pools } =
+        await setup()
+
+      const token = await deployPSP22Token({
+        api: api,
+        signer: deployer,
+        args: [
+          0,
+          'Dai Stablecoin' as unknown as string[],
+          'DAI' as unknown as string[],
+          8,
+        ],
+      })
+      await priceOracle.tx.setFixedPrice(token.address, ONE_ETHER)
+      const dai = SUPPORTED_TOKENS.dai
+      const rateModel = await deployDefaultInterestRateModel({
+        api,
+        signer: deployer,
+        args: [
+          [dai.rateModel.baseRatePerYear()],
+          [dai.rateModel.multiplierPerYearSlope1()],
+          [dai.rateModel.multiplierPerYearSlope2()],
+          [dai.rateModel.kink()],
+        ],
+      })
+
+      const pool = await deployPoolFromAsset({
+        api,
+        signer: deployer,
+        args: [
+          token.address,
+          controller.address,
+          rateModel.address,
+          [ONE_ETHER.toString()],
+        ],
+        token: token,
+      })
+      await controller.tx.supportMarketWithCollateralFactorMantissa(
+        pool.address,
+        [dai.riskParameter.collateralFactor],
+      )
+      return { users, api, pools, deployer, controller, pool, token }
+    }
+    it('if the utilization rate is 10% then the interest rate should be about 0.44%', async () => {
+      const { pool, users, token } = await setupExtended()
+      const [alice] = users
+      const deposit = 1000
+      const borrow = 100
+      await token.withSigner(alice).tx.mint(alice.address, deposit)
+      await token.withSigner(alice).tx.approve(pool.address, deposit)
+      await pool.withSigner(alice).tx.mint(deposit)
+      await pool.withSigner(alice).tx.borrow(borrow)
+      const borrowRate = new BN(
+        await (await pool.query.borrowRatePerMsec()).value.ok.toNumber(),
+      )
+      const msecPerYear = new BN(365 * 24 * 60 * 60 * 1000)
+
+      expect(borrowRate.mul(msecPerYear).toString()).toBe('4444431552000000')
+    })
+    it('if the utilization rate is 95% then the interest rate should be about 34%', async () => {
+      const { pool, users, pools, token } = await setupExtended()
+      const [alice, bob] = users
+      const otherPool = pools.usdt
+      const deposit = 1000
+      const borrow = 950
+      await token.withSigner(alice).tx.mint(alice.address, deposit)
+      await token.withSigner(alice).tx.approve(pool.address, deposit)
+      await pool.withSigner(alice).tx.mint(deposit)
+      await otherPool.token
+        .withSigner(bob)
+        .tx.mint(bob.address, ONE_ETHER.toString())
+      await otherPool.token
+        .withSigner(bob)
+        .tx.approve(otherPool.pool.address, ONE_ETHER.toString())
+      await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER.toString())
+      await pool.withSigner(bob).tx.borrow(borrow)
+      const borrowRate = new BN(
+        await (await pool.query.borrowRatePerMsec()).value.ok.toNumber(),
+      )
+      const msecPerYear = new BN(365 * 24 * 60 * 60 * 1000)
+
+      expect(borrowRate.mul(msecPerYear).toString()).toBe('339999959808000000')
     })
   })
 })
