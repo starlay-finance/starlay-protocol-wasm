@@ -1,21 +1,23 @@
-import { Keyring } from '@polkadot/api'
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-import { ApiPromise, WsProvider } from '@polkadot/api'
-import { Env, valueOf } from '../env'
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-require('dotenv').config()
+import { ApiPromise, Keyring, WsProvider } from '@polkadot/api'
+import type { KeyringPair } from '@polkadot/keyring/types'
+import { waitReady } from '@polkadot/wasm-crypto'
+import { ENV, Env, mnemonic, valueOf } from '../env'
 
-// eslint-disable-next-line @typescript-eslint/naming-convention, @typescript-eslint/no-unused-vars
-export const deployer = (env: Env) => {
-  return fromDotEnv()
+export const providerAndSigner = async (
+  env: Env,
+): Promise<{ api: ApiPromise; signer: KeyringPair }> => {
+  const [api, signer] = await Promise.all([provider(env), getSigner(env)])
+  return { api, signer }
 }
 
-const fromDotEnv = () => {
-  const mnemonic = process.env.MNEMONIC
-  return new Keyring({ type: 'sr25519' }).addFromMnemonic(mnemonic)
-}
-
-export const provider = async (env: Env): Promise<ApiPromise> => {
+const provider = (env: Env) => {
   const { rpc } = valueOf(env)
-  return await ApiPromise.create({ provider: new WsProvider(rpc) })
+  return ApiPromise.create({ provider: new WsProvider(rpc) })
+}
+
+const getSigner = async (env: Env) => {
+  await waitReady()
+  const keyring = new Keyring({ type: 'sr25519' })
+  if (env === ENV.test) return keyring.addFromUri('//Alice')
+  return keyring.addFromMnemonic(mnemonic())
 }

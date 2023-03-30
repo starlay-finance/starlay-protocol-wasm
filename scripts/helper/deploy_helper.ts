@@ -43,14 +43,6 @@ const afterDeployment = async (
   await waitForTx(contract.result)
 }
 
-export const ROLE = {
-  DEFAULT_ADMIN_ROLE: 0,
-  CONTROLLER_ADMIN: 2873677832,
-  TOKEN_ADMIN: 937842313,
-  BORROW_CAP_GUARDIAN: 181502825,
-  PAUSE_GUARDIAN: 1332676982,
-} as const
-
 export const deployController = async ({
   api,
   signer,

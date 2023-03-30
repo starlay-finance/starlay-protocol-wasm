@@ -2,6 +2,7 @@ import { ReturnNumber } from '@727-ventures/typechain-types'
 import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
+import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
   deployDefaultInterestRateModel,
@@ -9,15 +10,15 @@ import {
   deployPriceOracle,
   deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
-import { hexToUtf8, ZERO_ADDRESS } from '../scripts/helper/utils'
-import { ONE_ETHER } from '../scripts/tokens'
+import { hexToUtf8 } from '../scripts/helper/utils'
 import Controller from '../types/contracts/controller'
 import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
 import { Mint, Redeem } from '../types/event-types/pool'
 import { Transfer } from '../types/event-types/psp22_token'
-import { expectToEmit, shouldNotRevert } from './testHelpers'
+import { SUPPORTED_TOKENS } from './../scripts/tokens'
+import { expectToEmit, shouldNotRevert, toDec18, toDec6 } from './testHelpers'
 
 const TOKENS = ['dai', 'usdc', 'usdt'] as const
 const METADATAS: {
@@ -151,17 +152,11 @@ describe('Pool spec', () => {
     })
 
     // temp: declare params for rate_model
-    const toParam = (m: BN) => [m.toString()]
     const rateModelArg = new BN(100).mul(ONE_ETHER)
     const rateModel = await deployDefaultInterestRateModel({
       api,
       signer: deployer,
-      args: [
-        toParam(rateModelArg),
-        toParam(rateModelArg),
-        toParam(rateModelArg),
-        toParam(rateModelArg),
-      ],
+      args: [[rateModelArg], [rateModelArg], [rateModelArg], [rateModelArg]],
     })
 
     const pools = await preparePoolsWithPreparedTokens({
@@ -175,13 +170,13 @@ describe('Pool spec', () => {
 
     // initialize
     await controller.tx.setPriceOracle(priceOracle.address)
-    await controller.tx.setCloseFactorMantissa(toParam(ONE_ETHER))
+    await controller.tx.setCloseFactorMantissa([ONE_ETHER])
     //// for pool
     for (const sym of [pools.dai, pools.usdc, pools.usdt]) {
       await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
       await controller.tx.supportMarketWithCollateralFactorMantissa(
         sym.pool.address,
-        toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+        [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
       )
     }
 
@@ -384,12 +379,9 @@ describe('Pool spec', () => {
       } = await setup()
 
       for await (const { token, pool } of [usdc, usdt]) {
-        await shouldNotRevert(token, 'mint', [
-          deployer.address,
-          to_dec6(10_000),
-        ])
-        await shouldNotRevert(token, 'approve', [pool.address, to_dec6(10_000)])
-        await shouldNotRevert(pool, 'mint', [to_dec6(10_000)])
+        await shouldNotRevert(token, 'mint', [deployer.address, toDec6(10_000)])
+        await shouldNotRevert(token, 'approve', [pool.address, toDec6(10_000)])
+        await shouldNotRevert(pool, 'mint', [toDec6(10_000)])
       }
 
       const {
@@ -484,11 +476,11 @@ describe('Pool spec', () => {
         pools: { usdc, usdt },
       } = await setup()
 
-      await usdc.token.tx.mint(deployer.address, to_dec6(5_000))
-      await usdc.token.tx.approve(usdc.pool.address, to_dec6(5_000))
-      await usdc.pool.tx.mint(to_dec6(5_000))
+      await usdc.token.tx.mint(deployer.address, toDec6(5_000))
+      await usdc.token.tx.approve(usdc.pool.address, toDec6(5_000))
+      await usdc.pool.tx.mint(toDec6(5_000))
 
-      const { value } = await usdt.pool.query.borrow(to_dec6(1_000))
+      const { value } = await usdt.pool.query.borrow(toDec6(1_000))
       expect(value.ok.err).toStrictEqual({ borrowCashNotAvailable: null })
     })
   })
@@ -506,70 +498,70 @@ describe('Pool spec', () => {
       const { dai, usdc } = pools
 
       // add liquidity to usdc pool
-      await usdc.token.tx.mint(deployer.address, to_dec6(10_000))
-      await usdc.token.tx.approve(usdc.pool.address, to_dec6(10_000))
-      await usdc.pool.tx.mint(to_dec6(10_000))
+      await usdc.token.tx.mint(deployer.address, toDec6(10_000))
+      await usdc.token.tx.approve(usdc.pool.address, toDec6(10_000))
+      await usdc.pool.tx.mint(toDec6(10_000))
       expect(
         BigInt(
           (
             await usdc.pool.query.balanceOf(deployer.address)
           ).value.ok.toString(),
         ).toString(),
-      ).toEqual(to_dec6(10_000).toString())
+      ).toEqual(toDec6(10_000).toString())
 
       // mint to dai pool for collateral
       const [user1] = users
-      await dai.token.tx.mint(user1.address, to_dec18(20_000))
+      await dai.token.tx.mint(user1.address, toDec18(20_000))
       await dai.token
         .withSigner(user1)
-        .tx.approve(dai.pool.address, to_dec18(20_000))
-      await dai.pool.withSigner(user1).tx.mint(to_dec18(20_000))
+        .tx.approve(dai.pool.address, toDec18(20_000))
+      await dai.pool.withSigner(user1).tx.mint(toDec18(20_000))
       expect(
         BigInt(
           (await dai.pool.query.balanceOf(user1.address)).value.ok.toString(),
         ).toString(),
-      ).toEqual(to_dec18(20_000).toString())
+      ).toEqual(toDec18(20_000).toString())
 
       // borrow usdc
-      await usdc.pool.withSigner(user1).tx.borrow(to_dec6(10_000))
+      await usdc.pool.withSigner(user1).tx.borrow(toDec6(10_000))
       expect(
         BigInt(
           (await usdc.token.query.balanceOf(user1.address)).value.ok.toString(),
         ).toString(),
-      ).toEqual(to_dec6(10_000).toString())
+      ).toEqual(toDec6(10_000).toString())
     })
 
     it('execute', async () => {
       const { token, pool } = pools.usdc
       const [user1] = users
-      await token.withSigner(user1).tx.approve(pool.address, to_dec6(4_500))
+      await token.withSigner(user1).tx.approve(pool.address, toDec6(4_500))
       const { events } = await pool
         .withSigner(user1)
-        .tx.repayBorrow(to_dec6(4_500))
+        .tx.repayBorrow(toDec6(4_500))
 
       expect(
         BigInt(
           (await token.query.balanceOf(user1.address)).value.ok.toString(),
         ).toString(),
-      ).toEqual(to_dec6(5_500).toString())
+      ).toEqual(toDec6(5_500).toString())
       expect(
         BigInt(
           (await token.query.balanceOf(pool.address)).value.ok.toString(),
         ).toString(),
-      ).toEqual(to_dec6(4_500).toString())
+      ).toEqual(toDec6(4_500).toString())
 
       const event = events[0]
       expect(event.name).toEqual('RepayBorrow')
       expect(event.args.payer).toEqual(user1.address)
       expect(event.args.borrower).toEqual(user1.address)
       expect(event.args.repayAmount.toString()).toEqual(
-        to_dec6(4_500).toString(),
+        toDec6(4_500).toString(),
       )
       expect(event.args.accountBorrows.toString()).toEqual(
-        to_dec6(5_500).toString(),
+        toDec6(5_500).toString(),
       )
       expect(event.args.totalBorrows.toNumber()).toBeGreaterThanOrEqual(
-        to_dec6(5_500).toNumber(),
+        toDec6(5_500).toNumber(),
       )
     })
   })
@@ -601,42 +593,40 @@ describe('Pool spec', () => {
       const { dai, usdc } = pools
 
       // add liquidity to usdc pool
-      await usdc.token.tx.mint(deployer.address, to_dec6(10_000))
-      await usdc.token.tx.approve(usdc.pool.address, to_dec6(10_000))
-      await usdc.pool.tx.mint(to_dec6(10_000))
+      await usdc.token.tx.mint(deployer.address, toDec6(10_000))
+      await usdc.token.tx.approve(usdc.pool.address, toDec6(10_000))
+      await usdc.pool.tx.mint(toDec6(10_000))
       expect(
         (await usdc.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(to_dec6(10_000).toNumber())
+      ).toEqual(toDec6(10_000).toNumber())
 
       // mint to dai pool for collateral
       const [borrower] = users
-      await dai.token.tx.mint(borrower.address, to_dec18(20_000))
+      await dai.token.tx.mint(borrower.address, toDec18(20_000))
       await dai.token
         .withSigner(borrower)
-        .tx.approve(dai.pool.address, to_dec18(20_000))
-      await dai.pool.withSigner(borrower).tx.mint(to_dec18(20_000))
+        .tx.approve(dai.pool.address, toDec18(20_000))
+      await dai.pool.withSigner(borrower).tx.mint(toDec18(20_000))
       expect(
         BigInt(
           (
             await dai.pool.query.balanceOf(borrower.address)
           ).value.ok.toString(),
         ).toString(),
-      ).toEqual(to_dec18(20_000).toString())
+      ).toEqual(toDec18(20_000).toString())
 
       // borrow usdc
-      await usdc.pool.withSigner(borrower).tx.borrow(to_dec6(10_000))
+      await usdc.pool.withSigner(borrower).tx.borrow(toDec6(10_000))
       expect(
         (
           await usdc.token.query.balanceOf(borrower.address)
         ).value.ok.toNumber(),
-      ).toEqual(to_dec6(10_000).toNumber())
+      ).toEqual(toDec6(10_000).toNumber())
 
       // down collateral_factor for dai
-      const toParam = (m: BN) => [m.toString()]
-      await controller.tx.setCollateralFactorMantissa(
-        dai.pool.address,
-        toParam(new BN(1)),
-      )
+      await controller.tx.setCollateralFactorMantissa(dai.pool.address, [
+        new BN(1),
+      ])
       const [collateralValue, shortfallValue] = (
         await controller.query.getHypotheticalAccountLiquidity(
           borrower.address,
@@ -657,16 +647,16 @@ describe('Pool spec', () => {
       const [borrower, repayer] = users
       const collateral = pools.dai
       const borrowing = pools.usdc
-      await borrowing.token.tx.mint(repayer.address, to_dec6(5_000))
+      await borrowing.token.tx.mint(repayer.address, toDec6(5_000))
       await borrowing.token
         .withSigner(repayer)
-        .tx.approve(borrowing.pool.address, to_dec6(5_000))
+        .tx.approve(borrowing.pool.address, toDec6(5_000))
 
       const { events } = await borrowing.pool
         .withSigner(repayer)
         .tx.liquidateBorrow(
           borrower.address,
-          to_dec6(5_000),
+          toDec6(5_000),
           collateral.pool.address,
         )
 
@@ -679,12 +669,12 @@ describe('Pool spec', () => {
         (
           await borrowing.token.query.balanceOf(borrower.address)
         ).value.ok.toNumber(),
-      ).toEqual(to_dec6(10_000).toNumber())
+      ).toEqual(toDec6(10_000).toNumber())
       expect(
         (
           await borrowing.pool.query.borrowBalanceStored(borrower.address)
         ).value.ok.toNumber(),
-      ).toEqual(to_dec6(5_000).toNumber())
+      ).toEqual(toDec6(5_000).toNumber())
       // TODO: check seized
 
       expect(events[0].name).toEqual('RepayBorrow')
@@ -693,7 +683,7 @@ describe('Pool spec', () => {
       expect(event.args.liquidator).toEqual(repayer.address)
       expect(event.args.borrower).toEqual(borrower.address)
       expect(event.args.repayAmount.toNumber()).toEqual(
-        to_dec6(5_000).toNumber(),
+        toDec6(5_000).toNumber(),
       )
       expect(event.args.tokenCollateral).toEqual(collateral.pool.address)
       expect(event.args.seizeTokens.toNumber()).toEqual(0) // TODO: fix
@@ -730,11 +720,9 @@ describe('Pool spec', () => {
       // initialize for pool
       await args.controller.tx.supportMarket(secondPool.address)
       await args.priceOracle.tx.setFixedPrice(secondToken.address, ONE_ETHER)
-      const toParam = (m: BN) => [m.toString()]
-      await args.controller.tx.setCollateralFactorMantissa(
-        secondPool.address,
-        toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
-      )
+      await args.controller.tx.setCollateralFactorMantissa(secondPool.address, [
+        ONE_ETHER.mul(new BN(90)).div(new BN(100)),
+      ])
       return {
         ...args,
         secondToken,
@@ -1229,6 +1217,97 @@ describe('Pool spec', () => {
         expect(
           (await newPool.query.exchageRateStored()).value.ok.toString(),
         ).toBe(initialExchangeRate.toString())
+      })
+    })
+  })
+
+  describe('.interest_rate_model', () => {
+    const setupExtended = async () => {
+      const { api, deployer, controller, users, priceOracle, pools } =
+        await setup()
+
+      const token = await deployPSP22Token({
+        api: api,
+        signer: deployer,
+        args: [
+          0,
+          'Dai Stablecoin' as unknown as string[],
+          'DAI' as unknown as string[],
+          8,
+        ],
+      })
+      await priceOracle.tx.setFixedPrice(token.address, ONE_ETHER)
+      const dai = SUPPORTED_TOKENS.dai
+      const rateModel = await deployDefaultInterestRateModel({
+        api,
+        signer: deployer,
+        args: [
+          [dai.rateModel.baseRatePerYear()],
+          [dai.rateModel.multiplierPerYearSlope1()],
+          [dai.rateModel.multiplierPerYearSlope2()],
+          [dai.rateModel.kink()],
+        ],
+      })
+
+      const pool = await deployPoolFromAsset({
+        api,
+        signer: deployer,
+        args: [
+          token.address,
+          controller.address,
+          rateModel.address,
+          [ONE_ETHER.toString()],
+        ],
+        token: token,
+      })
+      await controller.tx.supportMarketWithCollateralFactorMantissa(
+        pool.address,
+        [dai.riskParameter.collateralFactor],
+      )
+      return { users, api, pools, deployer, controller, pool, token }
+    }
+    describe('on DAI Stablecoin', () => {
+      it('if the utilization rate is 10% then the borrowing interest rate should be about 0.44%', async () => {
+        const { pool, users, token } = await setupExtended()
+        const [alice] = users
+        const deposit = 1000
+        const borrow = 100
+        await token.withSigner(alice).tx.mint(alice.address, deposit)
+        await token.withSigner(alice).tx.approve(pool.address, deposit)
+        await pool.withSigner(alice).tx.mint(deposit)
+        await pool.withSigner(alice).tx.borrow(borrow)
+        const borrowRate = new BN(
+          await (await pool.query.borrowRatePerMsec()).value.ok.toNumber(),
+        )
+        const msecPerYear = new BN(365 * 24 * 60 * 60 * 1000)
+
+        expect(borrowRate.mul(msecPerYear).toString()).toBe('4444431552000000')
+      })
+      it('if the utilization rate is 95% then the borrowing interest rate should be about 34%', async () => {
+        const { pool, users, pools, token } = await setupExtended()
+        const [alice, bob] = users
+        const otherPool = pools.usdt
+        const deposit = 1000
+        const borrow = 950
+        await token.withSigner(alice).tx.mint(alice.address, deposit)
+        await token.withSigner(alice).tx.approve(pool.address, deposit)
+        await pool.withSigner(alice).tx.mint(deposit)
+        await otherPool.token
+          .withSigner(bob)
+          .tx.mint(bob.address, ONE_ETHER.toString())
+        await otherPool.token
+          .withSigner(bob)
+          .tx.approve(otherPool.pool.address, ONE_ETHER.toString())
+        await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER.toString())
+        await pool.withSigner(bob).tx.borrow(borrow)
+        const borrowRate = new BN(
+          await (await pool.query.borrowRatePerMsec()).value.ok.toNumber(),
+        )
+        const msecPerYear = new BN(365 * 24 * 60 * 60 * 1000)
+
+        expect(borrowRate.mul(msecPerYear).toString()).toBe(
+          '339999959808000000',
+        )
       })
     })
   })

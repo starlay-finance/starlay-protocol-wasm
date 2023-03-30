@@ -1,6 +1,7 @@
 import { ReturnNumber } from '@727-ventures/typechain-types'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
+import { ONE_ETHER } from '../scripts/helper/constants'
 import {
   deployController,
   deployDefaultInterestRateModel,
@@ -10,7 +11,6 @@ import {
   deployPriceOracle,
   deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
-import { ONE_ETHER } from '../scripts/tokens'
 import Controller from '../types/contracts/controller'
 import Faucet from '../types/contracts/faucet'
 import Lens from '../types/contracts/lens'
