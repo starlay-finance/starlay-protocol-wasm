@@ -9,7 +9,10 @@ use super::super::exp_no_err::{
     Exp,
 };
 pub use crate::traits::pool::*;
-use crate::traits::types::WrappedU256;
+use crate::{
+    impls::exp_no_err::ray_scale,
+    traits::types::WrappedU256,
+};
 use core::ops::{
     Add,
     Div,
@@ -48,26 +51,39 @@ pub struct CalculateInterestOutput {
     pub interest_accumulated: Balance,
 }
 
-fn compound_interest(borrow_rate_per_millisec: U256, delta: U256) -> U256 {
-    let delta_minus_one = delta - 1;
+fn compound_interest(borrow_rate_per_millisec: Exp, delta: U256) -> Exp {
+    if delta.is_zero() {
+        return Exp {
+            mantissa: U256::zero().into(),
+        }
+    };
+    let rate = borrow_rate_per_millisec.to_ray();
+
+    let delta_minus_one = delta.sub(U256::one());
     let delta_minus_two = if delta.gt(&U256::from(2)) {
         delta.sub(U256::from(2))
     } else {
         U256::zero()
     };
-    let base_power_two = borrow_rate_per_millisec.mul(borrow_rate_per_millisec);
-    let base_power_three = base_power_two.mul(borrow_rate_per_millisec);
+    let base_power_two = rate.mul(borrow_rate_per_millisec.to_ray());
+    let base_power_three = base_power_two.mul(borrow_rate_per_millisec.to_ray());
 
-    let second_term = delta.mul(delta_minus_one).mul(delta_minus_two).div(2);
+    let second_term = delta
+        .mul(delta_minus_one)
+        .mul(U256::from(base_power_two.mantissa))
+        .div(U256::from(2));
     let third_term = delta
         .mul(delta_minus_one)
         .mul(delta_minus_two)
-        .mul(base_power_three)
+        .mul(U256::from(base_power_three.mantissa))
         .div(U256::from(6));
-    borrow_rate_per_millisec
-        .mul(delta)
-        .add(second_term)
-        .add(third_term)
+    Exp {
+        mantissa: U256::from(borrow_rate_per_millisec.mantissa)
+            .mul(delta)
+            .add(second_term.div(ray_scale()))
+            .add(third_term.div(ray_scale()))
+            .into(),
+    }
 }
 
 pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInterestOutput> {
@@ -77,9 +93,12 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
     let delta = input
         .new_block_timestamp
         .abs_diff(input.old_block_timestamp);
-    let simple_interest_factor = Exp {
-        mantissa: WrappedU256::from(compound_interest(input.borrow_rate, U256::from(delta))),
-    };
+    let simple_interest_factor = compound_interest(
+        Exp {
+            mantissa: input.borrow_rate.into(),
+        },
+        U256::from(delta),
+    );
 
     let interest_accumulated =
         simple_interest_factor.mul_scalar_truncate(U256::from(input.total_borrows));
@@ -209,7 +228,7 @@ mod tests {
         let inputs: &[CalculateInterestInput] = &[
             CalculateInterestInput {
                 old_block_timestamp: old_timestamp,
-                new_block_timestamp: old_timestamp + mantissa().as_u64(),
+                new_block_timestamp: old_timestamp + 1000 * 60 * 60 * 24 * 30 * 12, // 1 year
                 borrow_index: Exp {
                     mantissa: WrappedU256::from(U256::zero()),
                 },
@@ -231,7 +250,7 @@ mod tests {
             },
             CalculateInterestInput {
                 old_block_timestamp: old_timestamp,
-                new_block_timestamp: old_timestamp + 999 * 60 * 60 * 2345 * 123,
+                new_block_timestamp: old_timestamp + 1000 * 60 * 60,
                 borrow_index: Exp {
                     mantissa: WrappedU256::from(U256::from(123123123)),
                 },
