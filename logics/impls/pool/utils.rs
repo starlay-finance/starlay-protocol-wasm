@@ -324,7 +324,7 @@ mod tests {
                 .mul(U256::from(input.borrow_index))
                 .div(mantissa())
                 .add(U256::from(input.borrow_index));
-            debug_assert!(U256::from(got.borrow_index).gt(&borrow_idx_simple));
+            assert!(U256::from(got.borrow_index).gt(&borrow_idx_simple));
         }
     }
 
