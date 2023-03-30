@@ -3,11 +3,13 @@ import { BN } from '@polkadot/util'
 import { ReplacedType } from '../scripts/helper/utilityTypes'
 import { waitForTx } from '../scripts/helper/utils'
 
+export const mantissa = () => pow10(18)
 export const toDec6 = (value: number): BN => toDec(value, 6)
 export const toDec18 = (value: number): BN => toDec(value, 18)
 
+const pow10 = (exponent: number) => new BN(10).pow(new BN(exponent))
 const toDec = (value: number, decimals: number): BN =>
-  new BN(value).mul(new BN(10).pow(new BN(decimals)))
+  new BN(value).mul(pow10(decimals))
 
 export const expectToEmit = <T = unknown>(
   event: { name: string; args: T },

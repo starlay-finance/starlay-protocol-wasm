@@ -1,5 +1,4 @@
 import { ReturnNumber } from '@727-ventures/typechain-types'
-import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
 import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
@@ -12,129 +11,19 @@ import {
 } from '../scripts/helper/deploy_helper'
 import { hexToUtf8 } from '../scripts/helper/utils'
 import Controller from '../types/contracts/controller'
-import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
 import { Mint, Redeem } from '../types/event-types/pool'
 import { Transfer } from '../types/event-types/psp22_token'
 import { SUPPORTED_TOKENS } from './../scripts/tokens'
-import { expectToEmit, shouldNotRevert, toDec18, toDec6 } from './testHelpers'
-
-const TOKENS = ['dai', 'usdc', 'usdt'] as const
-const METADATAS: {
-  [key in (typeof TOKENS)[number]]: {
-    name: string
-    symbol: string
-    decimals: number
-  }
-} = {
-  dai: {
-    name: 'Dai Stablecoin',
-    symbol: 'DAI',
-    decimals: 18,
-  },
-  usdc: {
-    name: 'USD Coin',
-    symbol: 'USDC',
-    decimals: 6,
-  },
-  usdt: {
-    name: 'USD Tether',
-    symbol: 'USDT',
-    decimals: 6,
-  },
-} as const
-const preparePoolWithMockToken = async ({
-  api,
-  metadata,
-  controller,
-  rateModel,
-  manager,
-}: {
-  api: ApiPromise
-  metadata: {
-    name: string
-    symbol: string
-    decimals: number
-  }
-  controller: Controller
-  rateModel: DefaultInterestRateModel
-  manager: KeyringPair
-}): Promise<{
-  token: PSP22Token
-  pool: Pool
-}> => {
-  const token = await deployPSP22Token({
-    api,
-    signer: manager,
-    args: [
-      0,
-      metadata.name as unknown as string[],
-      metadata.symbol as unknown as string[],
-      metadata.decimals,
-    ],
-  })
-
-  const pool = await deployPoolFromAsset({
-    api,
-    signer: manager,
-    args: [
-      token.address,
-      controller.address,
-      rateModel.address,
-      [ONE_ETHER.toString()],
-    ],
-    token,
-  })
-
-  return { token, pool }
-}
-
-type Pools = {
-  [key in (typeof TOKENS)[number]]: {
-    token: PSP22Token
-    pool: Pool
-  }
-}
-const preparePoolsWithPreparedTokens = async ({
-  api,
-  controller,
-  rateModel,
-  manager,
-}: {
-  api: ApiPromise
-  controller: Controller
-  rateModel: DefaultInterestRateModel
-  manager: KeyringPair
-}): Promise<Pools> => {
-  const dai = await preparePoolWithMockToken({
-    api,
-    controller,
-    rateModel,
-    manager: manager,
-    metadata: METADATAS.dai,
-  })
-  const usdc = await preparePoolWithMockToken({
-    api,
-    controller,
-    rateModel,
-    manager: manager,
-    metadata: METADATAS.usdc,
-  })
-  const usdt = await preparePoolWithMockToken({
-    api,
-    controller,
-    rateModel,
-    manager: manager,
-    metadata: METADATAS.usdt,
-  })
-  return { dai, usdc, usdt }
-}
-
-const pow10 = (exponent: number) => new BN(10).pow(new BN(exponent))
-const mantissa = () => pow10(18)
-const to_dec18 = (value: number) => new BN(value).mul(pow10(18))
-const to_dec6 = (value: number) => new BN(value).mul(pow10(6))
+import { Pools, preparePoolsWithPreparedTokens } from './testContractHelper'
+import {
+  expectToEmit,
+  mantissa,
+  shouldNotRevert,
+  toDec18,
+  toDec6,
+} from './testHelpers'
 
 describe('Pool spec', () => {
   const setup = async () => {
@@ -805,12 +694,12 @@ describe('Pool spec', () => {
         {
           user: userA,
           sym: dai,
-          amount: to_dec18(500_000),
+          amount: toDec18(500_000),
         },
         {
           user: userB,
           sym: usdc,
-          amount: to_dec6(500_000),
+          amount: toDec6(500_000),
         },
       ]) {
         const { pool, token } = sym
@@ -820,33 +709,31 @@ describe('Pool spec', () => {
       }
       expect(
         (await dai.pool.query.balanceOf(userA.address)).value.ok.toString(),
-      ).toBe(to_dec18(500_000).toString())
+      ).toBe(toDec18(500_000).toString())
       expect(
         (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
-      ).toBe(to_dec6(500_000).toString())
+      ).toBe(toDec6(500_000).toString())
 
       {
         const { events } = await shouldNotRevert(
           dai.pool.withSigner(userA),
           'transfer',
-          [userB.address, to_dec18(100_000), []],
+          [userB.address, toDec18(100_000), []],
         )
         // assertions
         expect(
           (await dai.pool.query.balanceOf(userA.address)).value.ok.toString(),
-        ).toBe(to_dec18(400_000).toString())
+        ).toBe(toDec18(400_000).toString())
         expect(
           (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
-        ).toBe(to_dec18(100_000).toString())
+        ).toBe(toDec18(100_000).toString())
         expect(events).toHaveLength(1)
         //// check event
         const event = events[0]
         expect(event.name).toEqual('Transfer')
         expect(event.args.from).toEqual(userA.address)
         expect(event.args.to).toEqual(userB.address)
-        expect(event.args.value.toString()).toEqual(
-          to_dec18(100_000).toString(),
-        )
+        expect(event.args.value.toString()).toEqual(toDec18(100_000).toString())
         //// check account_liquidity
         assertAccountLiqudity(
           (await controller.query.getAccountLiquidity(userA.address)).value.ok
@@ -869,22 +756,22 @@ describe('Pool spec', () => {
         const { events } = await shouldNotRevert(
           usdc.pool.withSigner(userB),
           'transfer',
-          [userA.address, to_dec6(200_000), []],
+          [userA.address, toDec6(200_000), []],
         )
         // assertions
         expect(
           (await usdc.pool.query.balanceOf(userA.address)).value.ok.toString(),
-        ).toBe(to_dec6(200_000).toString())
+        ).toBe(toDec6(200_000).toString())
         expect(
           (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
-        ).toBe(to_dec6(300_000).toString())
+        ).toBe(toDec6(300_000).toString())
         expect(events).toHaveLength(1)
         //// check event
         const event = events[0]
         expect(event.name).toEqual('Transfer')
         expect(event.args.from).toEqual(userB.address)
         expect(event.args.to).toEqual(userA.address)
-        expect(event.args.value.toString()).toEqual(to_dec6(200_000).toString())
+        expect(event.args.value.toString()).toEqual(toDec6(200_000).toString())
         //// check account_liquidity
         assertAccountLiqudity(
           (await controller.query.getAccountLiquidity(userA.address)).value.ok
@@ -931,12 +818,12 @@ describe('Pool spec', () => {
         {
           user: userA,
           sym: dai,
-          amount: to_dec18(500_000),
+          amount: toDec18(500_000),
         },
         {
           user: userB,
           sym: usdc,
-          amount: to_dec6(500_000),
+          amount: toDec6(500_000),
         },
       ]) {
         const { pool, token } = sym
@@ -955,7 +842,7 @@ describe('Pool spec', () => {
       // case: shortfall of account_liquidity
 
       {
-        await usdc.pool.withSigner(userA).tx.borrow(to_dec6(450_000))
+        await usdc.pool.withSigner(userA).tx.borrow(toDec6(450_000))
         const res = await dai.pool
           .withSigner(userA)
           .query.transfer(userB.address, new BN(2), []) // temp: truncated if less than 1 by collateral_factor?
@@ -1002,12 +889,12 @@ describe('Pool spec', () => {
         {
           user: userA,
           sym: dai,
-          amount: to_dec18(500_000),
+          amount: toDec18(500_000),
         },
         {
           user: userB,
           sym: usdc,
-          amount: to_dec6(500_000),
+          amount: toDec6(500_000),
         },
       ]) {
         const { pool, token } = sym
@@ -1017,39 +904,37 @@ describe('Pool spec', () => {
       }
       expect(
         (await dai.pool.query.balanceOf(userA.address)).value.ok.toString(),
-      ).toBe(to_dec18(500_000).toString())
+      ).toBe(toDec18(500_000).toString())
       expect(
         (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
-      ).toBe(to_dec6(500_000).toString())
+      ).toBe(toDec6(500_000).toString())
 
       {
         // approve
         const { events: approveEvents } = await shouldNotRevert(
           dai.pool.withSigner(userA),
           'approve',
-          [spender.address, to_dec18(100_000)],
+          [spender.address, toDec18(100_000)],
         )
         //// assertions
         expect(
           (
             await dai.pool.query.allowance(userA.address, spender.address)
           ).value.ok.toString(),
-        ).toBe(to_dec18(100_000).toString())
+        ).toBe(toDec18(100_000).toString())
         ////// check event
         expect(approveEvents).toHaveLength(1)
         const event = approveEvents[0]
         expect(event.name).toEqual('Approval')
         expect(event.args.owner).toEqual(userA.address)
         expect(event.args.spender).toEqual(spender.address)
-        expect(event.args.value.toString()).toEqual(
-          to_dec18(100_000).toString(),
-        )
+        expect(event.args.value.toString()).toEqual(toDec18(100_000).toString())
 
         // transfer_from
         const { events: transferFromEvents } = await shouldNotRevert(
           dai.pool.withSigner(spender),
           'transferFrom',
-          [userA.address, userB.address, to_dec18(100_000), []],
+          [userA.address, userB.address, toDec18(100_000), []],
         )
         //// assertions
         expect(
@@ -1059,10 +944,10 @@ describe('Pool spec', () => {
         ).toBe('0')
         expect(
           (await dai.pool.query.balanceOf(userA.address)).value.ok.toString(),
-        ).toBe(to_dec18(400_000).toString())
+        ).toBe(toDec18(400_000).toString())
         expect(
           (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
-        ).toBe(to_dec18(100_000).toString())
+        ).toBe(toDec18(100_000).toString())
         expect(transferFromEvents).toHaveLength(2)
         //// check event
         const approvalEvent = transferFromEvents[0]
@@ -1075,7 +960,7 @@ describe('Pool spec', () => {
         expect(transferEvent.args.from).toEqual(userA.address)
         expect(transferEvent.args.to).toEqual(userB.address)
         expect(transferEvent.args.value.toString()).toEqual(
-          to_dec18(100_000).toString(),
+          toDec18(100_000).toString(),
         )
       }
     })
@@ -1106,12 +991,12 @@ describe('Pool spec', () => {
         {
           user: userA,
           sym: dai,
-          amount: to_dec18(500_000),
+          amount: toDec18(500_000),
         },
         {
           user: userB,
           sym: usdc,
-          amount: to_dec6(500_000),
+          amount: toDec6(500_000),
         },
       ]) {
         const { pool, token } = sym
@@ -1121,30 +1006,30 @@ describe('Pool spec', () => {
       }
       expect(
         (await dai.pool.query.balanceOf(userA.address)).value.ok.toString(),
-      ).toBe(to_dec18(500_000).toString())
+      ).toBe(toDec18(500_000).toString())
       expect(
         (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
-      ).toBe(to_dec6(500_000).toString())
+      ).toBe(toDec6(500_000).toString())
 
       // case: shortage of approval
       {
         await shouldNotRevert(dai.pool.withSigner(userA), 'approve', [
           spender.address,
-          to_dec18(99_999),
+          toDec18(99_999),
         ])
         const res = await dai.pool
           .withSigner(spender)
           .query.transferFrom(
             userA.address,
             userB.address,
-            to_dec18(100_000),
+            toDec18(100_000),
             [],
           )
         expect(res.value.ok.err.insufficientAllowance).toBeTruthy
       }
       await shouldNotRevert(dai.pool.withSigner(userA), 'approve', [
         spender.address,
-        to_dec18(100_000),
+        toDec18(100_000),
       ])
       // case: src == dst
       {
@@ -1155,7 +1040,7 @@ describe('Pool spec', () => {
       }
       // case: shortfall of account_liquidity
       {
-        await usdc.pool.withSigner(userA).tx.borrow(to_dec6(450_000))
+        await usdc.pool.withSigner(userA).tx.borrow(toDec6(450_000))
         const res = await dai.pool
           .withSigner(spender)
           .query.transferFrom(userA.address, userB.address, new BN(2), []) // temp: truncated if less than 1 by collateral_factor?

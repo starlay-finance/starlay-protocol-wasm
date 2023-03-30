@@ -122,11 +122,11 @@ impl<T: Storage<Data>> Internal for T {
         Ok(())
     }
     default fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
-        ControllerRef::set_price_oracle(&self._controller(), new_oracle).unwrap();
+        ControllerRef::set_price_oracle(&self._controller(), new_oracle)?;
         Ok(())
     }
     default fn _support_market(&mut self, pool: AccountId) -> Result<()> {
-        ControllerRef::support_market(&self._controller(), pool).unwrap();
+        ControllerRef::support_market(&self._controller(), pool)?;
         Ok(())
     }
     default fn _support_market_with_collateral_factor_mantissa(
@@ -138,8 +138,7 @@ impl<T: Storage<Data>> Internal for T {
             &self._controller(),
             pool,
             collateral_factor_mantissa,
-        )
-        .unwrap();
+        )?;
         Ok(())
     }
     default fn _set_collateral_factor_mantissa(
@@ -151,24 +150,22 @@ impl<T: Storage<Data>> Internal for T {
             &self._controller(),
             pool,
             new_collateral_factor_mantissa,
-        )
-        .unwrap();
+        )?;
         Ok(())
     }
     default fn _set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
-        ControllerRef::set_mint_guardian_paused(&self._controller(), pool, paused).unwrap();
+        ControllerRef::set_mint_guardian_paused(&self._controller(), pool, paused)?;
         Ok(())
     }
     default fn _set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
-        ControllerRef::set_borrow_guardian_paused(&self._controller(), pool, paused).unwrap();
+        ControllerRef::set_borrow_guardian_paused(&self._controller(), pool, paused)?;
         Ok(())
     }
     default fn _set_close_factor_mantissa(
         &mut self,
         new_close_factor_mantissa: WrappedU256,
     ) -> Result<()> {
-        ControllerRef::set_close_factor_mantissa(&self._controller(), new_close_factor_mantissa)
-            .unwrap();
+        ControllerRef::set_close_factor_mantissa(&self._controller(), new_close_factor_mantissa)?;
         Ok(())
     }
     default fn _set_liquidation_incentive_mantissa(
@@ -178,12 +175,11 @@ impl<T: Storage<Data>> Internal for T {
         ControllerRef::set_liquidation_incentive_mantissa(
             &self._controller(),
             new_liquidation_incentive_mantissa,
-        )
-        .unwrap();
+        )?;
         Ok(())
     }
     default fn _set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()> {
-        ControllerRef::set_borrow_cap(&self._controller(), pool, new_cap).unwrap();
+        ControllerRef::set_borrow_cap(&self._controller(), pool, new_cap)?;
         Ok(())
     }
     default fn _set_reserve_factor_mantissa(
@@ -191,15 +187,15 @@ impl<T: Storage<Data>> Internal for T {
         pool: AccountId,
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()> {
-        PoolRef::set_reserve_factor_mantissa(&pool, new_reserve_factor_mantissa).unwrap();
+        PoolRef::set_reserve_factor_mantissa(&pool, new_reserve_factor_mantissa)?;
         Ok(())
     }
     default fn _reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
-        PoolRef::reduce_reserves(&pool, amount).unwrap();
+        PoolRef::reduce_reserves(&pool, amount)?;
         Ok(())
     }
     default fn _sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()> {
-        PoolRef::sweep_token(&pool, asset).unwrap();
+        PoolRef::sweep_token(&pool, asset)?;
         Ok(())
     }
 }
