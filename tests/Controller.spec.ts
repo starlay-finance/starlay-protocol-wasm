@@ -6,7 +6,7 @@ import {
   deployDefaultInterestRateModel,
   deployPriceOracle,
 } from '../scripts/helper/deploy_helper'
-import { ZERO_ADDRESS } from '../scripts/helper/utils'
+import { hexToUtf8, ZERO_ADDRESS } from '../scripts/helper/utils'
 import { ONE_ETHER } from '../scripts/tokens'
 import {
   preparePoolsWithPreparedTokens,
@@ -572,6 +572,78 @@ describe('Controller spec', () => {
           },
         )
       })
+    })
+  })
+
+  describe('.xxx_allowed', () => {
+    const pow10 = (exponent: number) => new BN(10).pow(new BN(exponent))
+    const mantissa = () => pow10(18)
+    const to_dec6 = (val: number | string) => new BN(val).mul(pow10(6))
+    const to_dec18 = (val: number | string) => new BN(val).mul(pow10(18))
+
+    it('.transfer_allowed', async () => {
+      const { api, deployer, controller, rateModel, priceOracle, users } =
+        await setup()
+      const { dai, usdc } = await preparePoolsWithPreparedTokens({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+      })
+      const [sender, receiver] = users
+
+      // prerequisite
+      //// initialize
+      const toParam = (m: BN) => [m.toString()]
+      for (const sym of [dai, usdc]) {
+        await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+        await controller.tx.supportMarketWithCollateralFactorMantissa(
+          sym.pool.address,
+          toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+        )
+      }
+      //// use protocol
+      for await (const { sym, value, user } of [
+        {
+          sym: usdc,
+          value: to_dec6(50_000),
+          user: sender,
+        },
+      ]) {
+        const { pool, token } = sym
+        await token.withSigner(deployer).tx.mint(user.address, value)
+        await token.withSigner(user).tx.approve(pool.address, value)
+        await pool.withSigner(user).tx.mint(value)
+      }
+
+      {
+        const res = await controller.query.transferAllowed(
+          usdc.pool.address,
+          sender.address,
+          ZERO_ADDRESS,
+          to_dec6(50_000),
+          null,
+        )
+        expect(res.value.ok.ok).toBe(null)
+      }
+      {
+        const res = await controller.query.transferAllowed(
+          usdc.pool.address,
+          sender.address,
+          ZERO_ADDRESS,
+          to_dec6(50_000).add(new BN(1)),
+          null,
+        )
+        expect(res.value.ok.err).toBe('InsufficientLiquidity')
+      }
+      {
+        const res = await usdc.pool
+          .withSigner(sender)
+          .query.transfer(receiver.address, to_dec6(50_000).add(new BN(1)), [])
+        expect(hexToUtf8(res.value.ok.err['custom'])).toBe(
+          'InsufficientLiquidity',
+        )
+      }
     })
   })
 })
