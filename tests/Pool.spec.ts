@@ -1,3 +1,4 @@
+import { ReturnNumber } from '@727-ventures/typechain-types'
 import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
@@ -30,7 +31,7 @@ const METADATAS: {
   dai: {
     name: 'Dai Stablecoin',
     symbol: 'DAI',
-    decimals: 8,
+    decimals: 18,
   },
   usdc: {
     name: 'USD Coin',
@@ -130,9 +131,14 @@ const preparePoolsWithPreparedTokens = async ({
   return { dai, usdc, usdt }
 }
 
+const pow10 = (exponent: number) => new BN(10).pow(new BN(exponent))
+const mantissa = () => pow10(18)
+const to_dec18 = (value: number) => new BN(value).mul(pow10(18))
+const to_dec6 = (value: number) => new BN(value).mul(pow10(6))
+
 describe('Pool spec', () => {
   const setup = async () => {
-    const { api, alice: deployer, bob, charlie } = globalThis.setup
+    const { api, alice: deployer, bob, charlie, django } = globalThis.setup
 
     const controller = await deployController({
       api,
@@ -160,7 +166,7 @@ describe('Pool spec', () => {
       manager: deployer,
     })
 
-    const users = [bob, charlie]
+    const users = [bob, charlie, django]
 
     // initialize
     await controller.tx.setPriceOracle(priceOracle.address)
@@ -195,7 +201,7 @@ describe('Pool spec', () => {
       'Starlay Dai Stablecoin',
     )
     expect(hexToUtf8((await pool.query.tokenSymbol()).value.ok)).toEqual('sDAI')
-    expect((await pool.query.tokenDecimals()).value.ok).toEqual(8)
+    expect((await pool.query.tokenDecimals()).value.ok).toEqual(18)
   })
 
   describe('.mint', () => {
@@ -755,6 +761,416 @@ describe('Pool spec', () => {
       expect(value.ok.err).toStrictEqual({
         liquidateCloseAmountIsZero: null,
       })
+    })
+  })
+
+  describe('.transfer', () => {
+    const assertAccountLiqudity = (
+      actual: [ReturnNumber, ReturnNumber],
+      expected: { collateral: number; shortfall: number },
+    ) => {
+      const collateral = BigInt(actual[0].toString()).toString()
+      const shortfall = BigInt(actual[1].toString()).toString()
+      expect(collateral.toString()).toEqual(
+        new BN(expected.collateral).mul(mantissa()).toString(),
+      )
+      expect(shortfall.toString()).toEqual(
+        new BN(expected.shortfall).mul(mantissa()).toString(),
+      )
+    }
+
+    it('success', async () => {
+      const { api, deployer, controller, rateModel, priceOracle, users } =
+        await setup()
+      const { dai, usdc } = await preparePoolsWithPreparedTokens({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+      })
+      const [userA, userB] = users
+
+      // prerequisite
+      //// initialize
+      const toParam = (m: BN) => [m.toString()]
+      for (const sym of [dai, usdc]) {
+        await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+        await controller.tx.supportMarketWithCollateralFactorMantissa(
+          sym.pool.address,
+          toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+        )
+      }
+      //// use protocol
+      for await (const { user, sym, amount } of [
+        {
+          user: userA,
+          sym: dai,
+          amount: to_dec18(500_000),
+        },
+        {
+          user: userB,
+          sym: usdc,
+          amount: to_dec6(500_000),
+        },
+      ]) {
+        const { pool, token } = sym
+        await token.withSigner(deployer).tx.mint(user.address, amount)
+        await token.withSigner(user).tx.approve(pool.address, amount)
+        await pool.withSigner(user).tx.mint(amount)
+      }
+      expect(
+        (await dai.pool.query.balanceOf(userA.address)).value.ok.toString(),
+      ).toBe(to_dec18(500_000).toString())
+      expect(
+        (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
+      ).toBe(to_dec6(500_000).toString())
+
+      {
+        const { events } = await shouldNotRevert(
+          dai.pool.withSigner(userA),
+          'transfer',
+          [userB.address, to_dec18(100_000), []],
+        )
+        // assertions
+        expect(
+          (await dai.pool.query.balanceOf(userA.address)).value.ok.toString(),
+        ).toBe(to_dec18(400_000).toString())
+        expect(
+          (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
+        ).toBe(to_dec18(100_000).toString())
+        expect(events).toHaveLength(1)
+        //// check event
+        const event = events[0]
+        expect(event.name).toEqual('Transfer')
+        expect(event.args.from).toEqual(userA.address)
+        expect(event.args.to).toEqual(userB.address)
+        expect(event.args.value.toString()).toEqual(
+          to_dec18(100_000).toString(),
+        )
+        //// check account_liquidity
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(userA.address)).value.ok
+            .ok,
+          {
+            collateral: (400_000 * 90) / 100,
+            shortfall: 0,
+          },
+        )
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(userB.address)).value.ok
+            .ok,
+          {
+            collateral: ((100_000 + 500_000) * 90) / 100,
+            shortfall: 0,
+          },
+        )
+      }
+      {
+        const { events } = await shouldNotRevert(
+          usdc.pool.withSigner(userB),
+          'transfer',
+          [userA.address, to_dec6(200_000), []],
+        )
+        // assertions
+        expect(
+          (await usdc.pool.query.balanceOf(userA.address)).value.ok.toString(),
+        ).toBe(to_dec6(200_000).toString())
+        expect(
+          (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
+        ).toBe(to_dec6(300_000).toString())
+        expect(events).toHaveLength(1)
+        //// check event
+        const event = events[0]
+        expect(event.name).toEqual('Transfer')
+        expect(event.args.from).toEqual(userB.address)
+        expect(event.args.to).toEqual(userA.address)
+        expect(event.args.value.toString()).toEqual(to_dec6(200_000).toString())
+        //// check account_liquidity
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(userA.address)).value.ok
+            .ok,
+          {
+            collateral: ((400_000 + 200_000) * 90) / 100,
+            shortfall: 0,
+          },
+        )
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(userB.address)).value.ok
+            .ok,
+          {
+            collateral: ((100_000 + 300_000) * 90) / 100,
+            shortfall: 0,
+          },
+        )
+      }
+    })
+
+    it('failure', async () => {
+      const { api, deployer, controller, rateModel, priceOracle, users } =
+        await setup()
+      const { dai, usdc } = await preparePoolsWithPreparedTokens({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+      })
+      const [userA, userB] = users
+
+      // prerequisite
+      //// initialize
+      const toParam = (m: BN) => [m.toString()]
+      for (const sym of [dai, usdc]) {
+        await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+        await controller.tx.supportMarketWithCollateralFactorMantissa(
+          sym.pool.address,
+          toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+        )
+      }
+      //// use protocol
+      for await (const { user, sym, amount } of [
+        {
+          user: userA,
+          sym: dai,
+          amount: to_dec18(500_000),
+        },
+        {
+          user: userB,
+          sym: usdc,
+          amount: to_dec6(500_000),
+        },
+      ]) {
+        const { pool, token } = sym
+        await token.withSigner(deployer).tx.mint(user.address, amount)
+        await token.withSigner(user).tx.approve(pool.address, amount)
+        await pool.withSigner(user).tx.mint(amount)
+      }
+
+      // case: src == dst
+      {
+        const res = await dai.pool
+          .withSigner(userA)
+          .query.transfer(userA.address, new BN(1), [])
+        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferNotAllowed')
+      }
+      // case: shortfall of account_liquidity
+
+      {
+        await usdc.pool.withSigner(userA).tx.borrow(to_dec6(450_000))
+        const res = await dai.pool
+          .withSigner(userA)
+          .query.transfer(userB.address, new BN(2), []) // temp: truncated if less than 1 by collateral_factor?
+        expect(hexToUtf8(res.value.ok.err['custom'])).toBe(
+          'InsufficientLiquidity',
+        )
+      }
+      // case: paused
+      await controller.tx.setTransferGuardianPaused(true)
+      {
+        const res = await dai.pool
+          .withSigner(userA)
+          .query.transfer(userB.address, new BN(1), [])
+        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferIsPaused')
+      }
+    })
+  })
+
+  describe('.transfer_from', () => {
+    it('success', async () => {
+      const { api, deployer, controller, rateModel, priceOracle, users } =
+        await setup()
+      const { dai, usdc } = await preparePoolsWithPreparedTokens({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+      })
+      const [userA, userB] = users
+      const spender = deployer
+
+      // prerequisite
+      //// initialize
+      const toParam = (m: BN) => [m.toString()]
+      for (const sym of [dai, usdc]) {
+        await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+        await controller.tx.supportMarketWithCollateralFactorMantissa(
+          sym.pool.address,
+          toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+        )
+      }
+      //// use protocol
+      for await (const { user, sym, amount } of [
+        {
+          user: userA,
+          sym: dai,
+          amount: to_dec18(500_000),
+        },
+        {
+          user: userB,
+          sym: usdc,
+          amount: to_dec6(500_000),
+        },
+      ]) {
+        const { pool, token } = sym
+        await token.withSigner(deployer).tx.mint(user.address, amount)
+        await token.withSigner(user).tx.approve(pool.address, amount)
+        await pool.withSigner(user).tx.mint(amount)
+      }
+      expect(
+        (await dai.pool.query.balanceOf(userA.address)).value.ok.toString(),
+      ).toBe(to_dec18(500_000).toString())
+      expect(
+        (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
+      ).toBe(to_dec6(500_000).toString())
+
+      {
+        // approve
+        const { events: approveEvents } = await shouldNotRevert(
+          dai.pool.withSigner(userA),
+          'approve',
+          [spender.address, to_dec18(100_000)],
+        )
+        //// assertions
+        expect(
+          (
+            await dai.pool.query.allowance(userA.address, spender.address)
+          ).value.ok.toString(),
+        ).toBe(to_dec18(100_000).toString())
+        ////// check event
+        expect(approveEvents).toHaveLength(1)
+        const event = approveEvents[0]
+        expect(event.name).toEqual('Approval')
+        expect(event.args.owner).toEqual(userA.address)
+        expect(event.args.spender).toEqual(spender.address)
+        expect(event.args.value.toString()).toEqual(
+          to_dec18(100_000).toString(),
+        )
+
+        // transfer_from
+        const { events: transferFromEvents } = await shouldNotRevert(
+          dai.pool.withSigner(spender),
+          'transferFrom',
+          [userA.address, userB.address, to_dec18(100_000), []],
+        )
+        //// assertions
+        expect(
+          (
+            await dai.pool.query.allowance(userA.address, spender.address)
+          ).value.ok.toString(),
+        ).toBe('0')
+        expect(
+          (await dai.pool.query.balanceOf(userA.address)).value.ok.toString(),
+        ).toBe(to_dec18(400_000).toString())
+        expect(
+          (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
+        ).toBe(to_dec18(100_000).toString())
+        expect(transferFromEvents).toHaveLength(2)
+        //// check event
+        const approvalEvent = transferFromEvents[0]
+        expect(approvalEvent.name).toEqual('Approval')
+        expect(approvalEvent.args.owner).toEqual(userA.address)
+        expect(approvalEvent.args.spender).toEqual(spender.address)
+        expect(approvalEvent.args.value.toString()).toEqual('0')
+        const transferEvent = transferFromEvents[1]
+        expect(transferEvent.name).toEqual('Transfer')
+        expect(transferEvent.args.from).toEqual(userA.address)
+        expect(transferEvent.args.to).toEqual(userB.address)
+        expect(transferEvent.args.value.toString()).toEqual(
+          to_dec18(100_000).toString(),
+        )
+      }
+    })
+    it('failure', async () => {
+      const { api, deployer, controller, rateModel, priceOracle, users } =
+        await setup()
+      const { dai, usdc } = await preparePoolsWithPreparedTokens({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+      })
+      const [userA, userB] = users
+      const spender = deployer
+
+      // prerequisite
+      //// initialize
+      const toParam = (m: BN) => [m.toString()]
+      for (const sym of [dai, usdc]) {
+        await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+        await controller.tx.supportMarketWithCollateralFactorMantissa(
+          sym.pool.address,
+          toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+        )
+      }
+      //// use protocol
+      for await (const { user, sym, amount } of [
+        {
+          user: userA,
+          sym: dai,
+          amount: to_dec18(500_000),
+        },
+        {
+          user: userB,
+          sym: usdc,
+          amount: to_dec6(500_000),
+        },
+      ]) {
+        const { pool, token } = sym
+        await token.withSigner(deployer).tx.mint(user.address, amount)
+        await token.withSigner(user).tx.approve(pool.address, amount)
+        await pool.withSigner(user).tx.mint(amount)
+      }
+      expect(
+        (await dai.pool.query.balanceOf(userA.address)).value.ok.toString(),
+      ).toBe(to_dec18(500_000).toString())
+      expect(
+        (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
+      ).toBe(to_dec6(500_000).toString())
+
+      // case: shortage of approval
+      {
+        await shouldNotRevert(dai.pool.withSigner(userA), 'approve', [
+          spender.address,
+          to_dec18(99_999),
+        ])
+        const res = await dai.pool
+          .withSigner(spender)
+          .query.transferFrom(
+            userA.address,
+            userB.address,
+            to_dec18(100_000),
+            [],
+          )
+        expect(res.value.ok.err.insufficientAllowance).toBeTruthy
+      }
+      await shouldNotRevert(dai.pool.withSigner(userA), 'approve', [
+        spender.address,
+        to_dec18(100_000),
+      ])
+      // case: src == dst
+      {
+        const res = await dai.pool
+          .withSigner(spender)
+          .query.transferFrom(userA.address, userA.address, new BN(1), [])
+        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferNotAllowed')
+      }
+      // case: shortfall of account_liquidity
+      {
+        await usdc.pool.withSigner(userA).tx.borrow(to_dec6(450_000))
+        const res = await dai.pool
+          .withSigner(spender)
+          .query.transferFrom(userA.address, userB.address, new BN(2), []) // temp: truncated if less than 1 by collateral_factor?
+        expect(hexToUtf8(res.value.ok.err['custom'])).toBe(
+          'InsufficientLiquidity',
+        )
+      }
+      // case: paused
+      await controller.tx.setTransferGuardianPaused(true)
+      {
+        const res = await dai.pool
+          .withSigner(spender)
+          .query.transferFrom(userA.address, userB.address, new BN(1), [])
+        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferIsPaused')
+      }
     })
   })
 

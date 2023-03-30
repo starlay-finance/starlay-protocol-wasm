@@ -487,8 +487,24 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         data: Vec<u8>,
     ) -> core::result::Result<(), PSP22Error> {
         let contract_addr = Self::env().account_id();
-        ControllerRef::transfer_allowed(&self._controller(), contract_addr, src, dst, value)
-            .map_err(to_psp22_err_from_controller_err)?;
+        let (account_balance, account_borrow_balance, exchange_rate) =
+            self.get_account_snapshot(src);
+        let pool_attribute = PoolAttributes {
+            underlying: self._underlying(),
+            decimals: self.token_decimals(),
+            account_balance,
+            account_borrow_balance,
+            exchange_rate,
+            total_borrows: self._total_borrows(),
+        };
+        ControllerRef::transfer_allowed(
+            &self._controller(),
+            contract_addr,
+            src,
+            dst,
+            value,
+            Some(pool_attribute),
+        )?;
 
         if src == dst {
             return Err(PSP22Error::Custom(String::from("TransferNotAllowed")))
@@ -1143,22 +1159,24 @@ pub fn to_psp22_error(e: PSP22Error) -> Error {
     Error::PSP22(e)
 }
 
-pub fn to_psp22_err_from_controller_err(e: controller::Error) -> PSP22Error {
-    let convert = { |str: &str| PSP22Error::Custom(String::from(str)) };
-    return match e {
-        controller::Error::MintIsPaused => convert("MintIsPaused"),
-        controller::Error::BorrowIsPaused => convert("BorrowIsPaused"),
-        controller::Error::SeizeIsPaused => convert("SeizeIsPaused"),
-        controller::Error::TransferIsPaused => convert("TransferIsPaused"),
-        controller::Error::MarketNotListed => convert("MarketNotListed"),
-        controller::Error::MarketAlreadyListed => convert("MarketAlreadyListed"),
-        controller::Error::ControllerMismatch => convert("ControllerMismatch"),
-        controller::Error::PriceError => convert("PriceError"),
-        controller::Error::TooMuchRepay => convert("TooMuchRepay"),
-        controller::Error::BorrowCapReached => convert("BorrowCapReached"),
-        controller::Error::InsufficientLiquidity => convert("InsufficientLiquidity"),
-        controller::Error::InsufficientShortfall => convert("InsufficientShortfall"),
-        controller::Error::CallerIsNotManager => convert("CallerIsNotManager"),
-        controller::Error::InvalidCollateralFactor => convert("InvalidCollateralFactor"),
+impl From<controller::Error> for PSP22Error {
+    fn from(error: controller::Error) -> Self {
+        let convert = { |str: &str| PSP22Error::Custom(String::from(str)) };
+        return match error {
+            controller::Error::MintIsPaused => convert("MintIsPaused"),
+            controller::Error::BorrowIsPaused => convert("BorrowIsPaused"),
+            controller::Error::SeizeIsPaused => convert("SeizeIsPaused"),
+            controller::Error::TransferIsPaused => convert("TransferIsPaused"),
+            controller::Error::MarketNotListed => convert("MarketNotListed"),
+            controller::Error::MarketAlreadyListed => convert("MarketAlreadyListed"),
+            controller::Error::ControllerMismatch => convert("ControllerMismatch"),
+            controller::Error::PriceError => convert("PriceError"),
+            controller::Error::TooMuchRepay => convert("TooMuchRepay"),
+            controller::Error::BorrowCapReached => convert("BorrowCapReached"),
+            controller::Error::InsufficientLiquidity => convert("InsufficientLiquidity"),
+            controller::Error::InsufficientShortfall => convert("InsufficientShortfall"),
+            controller::Error::CallerIsNotManager => convert("CallerIsNotManager"),
+            controller::Error::InvalidCollateralFactor => convert("InvalidCollateralFactor"),
+        }
     }
 }
