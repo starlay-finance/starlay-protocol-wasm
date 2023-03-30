@@ -4,6 +4,7 @@ import { BN } from '@polkadot/util'
 import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
+  deployDefaultInterestRateModel,
   deployPoolFromAsset,
   deployPriceOracle,
   deployPSP22Token,
@@ -15,7 +16,6 @@ import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
 import { Mint, Redeem } from '../types/event-types/pool'
 import { Transfer } from '../types/event-types/psp22_token'
-import { deployDefaultInterestRateModel } from './../scripts/helper/deploy_helper'
 import { SUPPORTED_TOKENS } from './../scripts/tokens'
 import { expectToEmit, shouldNotRevert, toDec18, toDec6 } from './testHelpers'
 
