@@ -632,9 +632,13 @@ impl<T: Storage<Data>> Internal for T {
         } else {
             None
         };
-        let (_, shortfall) = self
-            ._get_hypothetical_account_liquidity(redeemer, pool, redeem_amount, 0, caller_pool)
-            .unwrap();
+        let (_, shortfall) = self._get_hypothetical_account_liquidity(
+            redeemer,
+            pool,
+            redeem_amount,
+            0,
+            caller_pool,
+        )?;
         if !shortfall.is_zero() {
             return Err(Error::InsufficientLiquidity)
         }
@@ -687,9 +691,13 @@ impl<T: Storage<Data>> Internal for T {
             }
         }
 
-        let (_, shortfall) = self
-            ._get_hypothetical_account_liquidity(borrower, pool, 0, borrow_amount, caller_pool)
-            .unwrap();
+        let (_, shortfall) = self._get_hypothetical_account_liquidity(
+            borrower,
+            pool,
+            0,
+            borrow_amount,
+            caller_pool,
+        )?;
         if !shortfall.is_zero() {
             return Err(Error::InsufficientLiquidity)
         }
@@ -754,9 +762,13 @@ impl<T: Storage<Data>> Internal for T {
         };
 
         // The borrower must have shortfall in order to be liquidatable
-        let (_, shortfall) = self
-            ._get_hypothetical_account_liquidity(borrower, ZERO_ADDRESS.into(), 0, 0, caller_pool)
-            .unwrap();
+        let (_, shortfall) = self._get_hypothetical_account_liquidity(
+            borrower,
+            ZERO_ADDRESS.into(),
+            0,
+            0,
+            caller_pool,
+        )?;
         if shortfall.is_zero() {
             return Err(Error::InsufficientShortfall)
         }
