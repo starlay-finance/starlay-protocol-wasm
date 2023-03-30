@@ -48,6 +48,28 @@ pub struct CalculateInterestOutput {
     pub interest_accumulated: Balance,
 }
 
+fn compound_interest(borrow_rate_per_millisec: U256, delta: U256) -> U256 {
+    let delta_minus_one = delta - 1;
+    let delta_minus_two = if delta.gt(&U256::from(2)) {
+        delta.sub(U256::from(2))
+    } else {
+        U256::zero()
+    };
+    let base_power_two = borrow_rate_per_millisec.mul(borrow_rate_per_millisec);
+    let base_power_three = base_power_two.mul(borrow_rate_per_millisec);
+
+    let second_term = delta.mul(delta_minus_one).mul(delta_minus_two).div(2);
+    let third_term = delta
+        .mul(delta_minus_one)
+        .mul(delta_minus_two)
+        .mul(base_power_three)
+        .div(U256::from(6));
+    borrow_rate_per_millisec
+        .mul(delta)
+        .add(second_term)
+        .add(third_term)
+}
+
 pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInterestOutput> {
     if input.borrow_rate.gt(&borrow_rate_max_mantissa()) {
         return Err(Error::BorrowRateIsAbsurdlyHigh)
@@ -56,9 +78,8 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
         .new_block_timestamp
         .abs_diff(input.old_block_timestamp);
     let simple_interest_factor = Exp {
-        mantissa: WrappedU256::from(input.borrow_rate),
-    }
-    .mul_scalar(U256::from(delta));
+        mantissa: WrappedU256::from(compound_interest(input.borrow_rate, U256::from(delta))),
+    };
 
     let interest_accumulated =
         simple_interest_factor.mul_scalar_truncate(U256::from(input.total_borrows));
