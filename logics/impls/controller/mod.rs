@@ -172,6 +172,7 @@ pub trait Internal {
         src: AccountId,
         dst: AccountId,
         transfer_tokens: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()>;
     fn _transfer_verify(
         &self,
@@ -413,8 +414,9 @@ impl<T: Storage<Data>> Controller for T {
         src: AccountId,
         dst: AccountId,
         transfer_tokens: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()> {
-        self._transfer_allowed(pool, src, dst, transfer_tokens)
+        self._transfer_allowed(pool, src, dst, transfer_tokens, pool_attribure)
     }
 
     default fn transfer_verify(
@@ -825,12 +827,13 @@ impl<T: Storage<Data>> Internal for T {
         src: AccountId,
         _dst: AccountId,
         transfer_tokens: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()> {
         if self._transfer_guardian_paused() {
             return Err(Error::TransferIsPaused)
         }
 
-        self._redeem_allowed(pool, src, transfer_tokens, None)?;
+        self._redeem_allowed(pool, src, transfer_tokens, pool_attribure)?;
 
         // FEATURE: update governance token supply index & distribute
 

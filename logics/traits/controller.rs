@@ -131,6 +131,7 @@ pub trait Controller {
         src: AccountId,
         dst: AccountId,
         transfer_tokens: Balance,
+        pool_attribure: Option<PoolAttributes>,
     ) -> Result<()>;
 
     #[ink(message)]
