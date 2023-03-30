@@ -44,10 +44,11 @@ pub fn fraction(one: WrappedU256, another: WrappedU256) -> Ray {
 }
 
 impl Exp {
-    fn add(&self, a: Exp) -> Exp {
+    pub fn add(&self, a: Exp) -> Exp {
         self._op(a, |o, v| o.add(v))
     }
-    fn sub(&self, another: Exp) -> Exp {
+
+    pub fn sub(&self, another: Exp) -> Exp {
         self._op(another, |o, v| o.sub(v))
     }
     pub fn to_ray(&self) -> Ray {

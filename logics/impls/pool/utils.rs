@@ -51,7 +51,7 @@ pub struct CalculateInterestOutput {
     pub interest_accumulated: Balance,
 }
 
-fn compound_interest(borrow_rate_per_millisec: Exp, delta: U256) -> Exp {
+fn compound_interest(borrow_rate_per_millisec: &Exp, delta: U256) -> Exp {
     if delta.is_zero() {
         return Exp {
             mantissa: U256::zero().into(),
@@ -93,22 +93,22 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
     let delta = input
         .new_block_timestamp
         .abs_diff(input.old_block_timestamp);
-    let simple_interest_factor = compound_interest(
-        Exp {
+    let compound_interest_factor = compound_interest(
+        &Exp {
             mantissa: input.borrow_rate.into(),
         },
         U256::from(delta),
     );
 
     let interest_accumulated =
-        simple_interest_factor.mul_scalar_truncate(U256::from(input.total_borrows));
+        compound_interest_factor.mul_scalar_truncate(U256::from(input.total_borrows));
 
     let total_borrows_new = interest_accumulated.as_u128().add(input.total_borrows);
     let total_reserves_new = Exp {
         mantissa: WrappedU256::from(input.reserve_factor_mantissa),
     }
     .mul_scalar_truncate_add_uint(interest_accumulated, U256::from(input.total_reserves));
-    let borrow_index_new = simple_interest_factor.mul_scalar_truncate_add_uint(
+    let borrow_index_new = compound_interest_factor.mul_scalar_truncate_add_uint(
         input.borrow_index.mantissa.into(),
         input.borrow_index.mantissa.into(),
     );
@@ -118,7 +118,7 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
         },
         interest_accumulated: interest_accumulated.as_u128(),
         total_borrows: total_borrows_new,
-        total_reserves: total_reserves_new.as_u128(), // TODO
+        total_reserves: total_reserves_new.as_u128(),
     })
 }
 
@@ -223,6 +223,28 @@ mod tests {
     }
 
     #[test]
+    fn test_compound_interest() {
+        struct TestInput {
+            borrow_rate_per_millisec: Exp,
+            delta: U256,
+            want: Exp,
+        }
+        let inputs: &[TestInput] = &[TestInput {
+            borrow_rate_per_millisec: Exp {
+                mantissa: WrappedU256::from(U256::from(1).mul(mantissa())),
+            },
+            delta: U256::from(1000_i128 * 60 * 60 * 24 * 30 * 12), // 1 year
+            want: Exp {
+                mantissa: WrappedU256::from(U256::from(5046410502143999999994816000000_i128)),
+            },
+        }];
+        for input in inputs {
+            let got = compound_interest(&input.borrow_rate_per_millisec, input.delta);
+            assert_eq!(got.mantissa, input.want.mantissa)
+        }
+    }
+
+    #[test]
     fn test_calculate_interest() {
         let old_timestamp = Timestamp::default();
         let inputs: &[CalculateInterestInput] = &[
@@ -266,7 +288,7 @@ mod tests {
                 .new_block_timestamp
                 .abs_diff(input.old_block_timestamp);
             // interest accumulated should be (borrow rate * delta * total borrows)
-            let interest_want = input
+            let simple_interest = input
                 .borrow_rate
                 .mul(U256::from(
                     input.new_block_timestamp - input.old_block_timestamp,
@@ -274,13 +296,15 @@ mod tests {
                 .mul(U256::from(input.total_borrows))
                 .div(mantissa())
                 .as_u128();
-            let reserves_want = U256::from(input.reserve_factor_mantissa)
-                .mul(U256::from(interest_want))
+            let reserves_simple = U256::from(input.reserve_factor_mantissa)
+                .mul(U256::from(simple_interest))
                 .div(U256::from(10_u128.pow(18)))
                 .add(U256::from(input.total_reserves));
-            assert_eq!(got.interest_accumulated, interest_want);
-            assert_eq!(got.total_borrows, interest_want + (input.total_borrows));
-            assert_eq!(got.total_reserves, reserves_want.as_u128());
+            assert!(got.interest_accumulated.gt(&simple_interest));
+            assert!(got
+                .total_borrows
+                .gt(&(simple_interest + (input.total_borrows))));
+            assert!(got.total_reserves.gt(&reserves_simple.as_u128()));
             let borrow_idx_want = input
                 .borrow_rate
                 .mul(U256::from(delta))
