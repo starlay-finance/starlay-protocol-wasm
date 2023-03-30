@@ -1,3 +1,7 @@
+use super::{
+    controller::Error as ControllerError,
+    pool::Error as PoolError,
+};
 use openbrush::{
     contracts::traits::access_control::AccessControlError,
     traits::{
@@ -62,11 +66,25 @@ pub trait Manager {
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {
     AccessControl(AccessControlError),
+    Controller(ControllerError),
+    Pool(PoolError),
 }
 
 impl From<AccessControlError> for Error {
     fn from(error: AccessControlError) -> Self {
         Error::AccessControl(error)
+    }
+}
+
+impl From<ControllerError> for Error {
+    fn from(error: ControllerError) -> Self {
+        Error::Controller(error)
+    }
+}
+
+impl From<PoolError> for Error {
+    fn from(error: PoolError) -> Self {
+        Error::Pool(error)
     }
 }
 
