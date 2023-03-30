@@ -541,6 +541,13 @@ describe('Pool spec', () => {
         .withSigner(repayer)
         .tx.approve(borrowing.pool.address, toDec6(5_000))
 
+      const liquidationIncentiveMantissa = mantissa()
+        .mul(new BN(108))
+        .div(new BN(100)) // 1.08
+      await controller.tx.setLiquidationIncentiveMantissa([
+        liquidationIncentiveMantissa,
+      ])
+
       const { events } = await borrowing.pool
         .withSigner(repayer)
         .tx.liquidateBorrow(
@@ -564,7 +571,6 @@ describe('Pool spec', () => {
           await borrowing.pool.query.borrowBalanceStored(borrower.address)
         ).value.ok.toNumber(),
       ).toEqual(toDec6(5_000).toNumber())
-      // TODO: check seized
 
       expect(events[0].name).toEqual('RepayBorrow')
       const event = events[1]
@@ -575,7 +581,26 @@ describe('Pool spec', () => {
         toDec6(5_000).toNumber(),
       )
       expect(event.args.tokenCollateral).toEqual(collateral.pool.address)
-      expect(event.args.seizeTokens.toNumber()).toEqual(0) // TODO: fix
+      const seizeTokens = event.args.seizeTokens.toNumber()
+      // seizeTokens ≒ (<=) actual_repay_amount * liquidation_incentive
+
+      // temp: check seized (consider the difference in decimals when it comes to seize_amount)
+      expect(seizeTokens).toBeLessThanOrEqual(5000 * 1e6 * 1.08)
+      expect(seizeTokens).toBeGreaterThan(5000 * 1e6 * 1.075)
+      console.log(
+        BigInt(
+          (
+            await collateral.pool.query.balanceOf(repayer.address)
+          ).value.ok.toString(),
+        ).toString(),
+      )
+      console.log(
+        BigInt(
+          (
+            await collateral.pool.query.balanceOf(borrower.address)
+          ).value.ok.toString(),
+        ).toString(),
+      )
     })
   })
 
