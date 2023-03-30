@@ -3,10 +3,11 @@ import { ApiPromise } from '@polkadot/api'
 import { WeightV2 } from '@polkadot/types/interfaces'
 import { BN, BN_ONE } from '@polkadot/util'
 import { ONE_ETHER } from './constants'
+import { ENV, getCurrentEnv } from '../env'
 
 const WAIT_FINALIZED_SECONDS = 10000
-const MAX_CALL_WEIGHT = new BN(900_000_000).isub(BN_ONE).mul(new BN(10))
-const PROOFSIZE = new BN(1_000_000)
+const MAX_CALL_WEIGHT = new BN(990_000_000).isub(BN_ONE).mul(new BN(10))
+const PROOFSIZE = new BN(1_100_000)
 
 export const isTest = (): boolean => process.env.NODE_ENV === 'test'
 
@@ -16,7 +17,7 @@ export const percent = (val: number): BN => {
 export const waitForTx = async (
   result: SignAndSendSuccessResponse,
 ): Promise<void> => {
-  if (isTest()) return
+  if (isTest() || getCurrentEnv() === ENV.test) return
 
   while (!result.result.isFinalized) {
     await new Promise((resolve) => setTimeout(resolve, WAIT_FINALIZED_SECONDS))
@@ -32,19 +33,16 @@ export const sendTxWithPreview = async <
   fn: F,
   args: Parameters<C['tx'][F]>,
 ): Promise<R> => {
+  const calldata = `${contract.name}.${fn as string}(${JSON.stringify(args)})`
   try {
     const preview = await contract.query[fn](...args)
-    if (preview.value.ok.err && Object.keys(preview.value.ok.err).length)
-      throw new Error(preview.value.ok.err)
+    if (preview.value.err) throw preview.value.err
+    if (preview.value.ok.err) throw preview.value.ok.err
   } catch (e) {
-    const calldata = `${contract.name}.${fn as string}(${JSON.stringify(args)})`
     throw new Error(`Failed to preview ${calldata}: ${JSON.stringify(e)}`)
   }
   const res = await contract.tx[fn](...args)
   await waitForTx(res)
-  const calldata = `${contract.name}.${fn as string}(${JSON.stringify(
-    args.slice(0, -1),
-  )})`
   console.log(`Transaction succeeded: ${calldata}`)
   return res
 }

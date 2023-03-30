@@ -1,12 +1,12 @@
 import { CONFIG } from '../config'
-import { from } from '../env'
+import { setEnv } from '../env'
 import { defaultOption } from '../helper/utils'
 import { providerAndSigner } from '../helper/wallet_helper'
 import { DUMMY_TOKENS } from '../tokens'
 import { deployContracts } from './deploy_contracts'
 
 const main = async () => {
-  const env = from(process.argv[2])
+  const env = setEnv(process.argv[2])
   console.log(`env: ${env}`)
   const { api, signer } = await providerAndSigner(env)
   const option = defaultOption(api)

@@ -1,6 +1,7 @@
+import { ReturnNumber } from '@727-ventures/typechain-types'
 import { encodeAddress } from '@polkadot/keyring'
 import BN from 'bn.js'
-import { ONE_ETHER } from '../scripts/helper/constants'
+import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
   deployDefaultInterestRateModel,
@@ -11,7 +12,7 @@ import {
   preparePoolWithMockToken,
   preparePoolsWithPreparedTokens,
 } from './testContractHelper'
-import { shouldNotRevert } from './testHelpers'
+import { shouldNotRevert, toDec18, toDec6 } from './testHelpers'
 
 describe('Controller spec', () => {
   const setup = async () => {
@@ -28,17 +29,11 @@ describe('Controller spec', () => {
       args: [],
     })
     // temp: declare params for rate_model
-    const toParam = (m: BN) => [m.toString()]
     const rateModelArg = new BN(100).mul(ONE_ETHER)
     const rateModel = await deployDefaultInterestRateModel({
       api,
       signer: deployer,
-      args: [
-        toParam(rateModelArg),
-        toParam(rateModelArg),
-        toParam(rateModelArg),
-        toParam(rateModelArg),
-      ],
+      args: [[rateModelArg], [rateModelArg], [rateModelArg], [rateModelArg]],
     })
 
     // initialize
@@ -103,8 +98,6 @@ describe('Controller spec', () => {
   })
 
   describe('.support_market_with_collateral_factor_mantissa', () => {
-    const toParam = (m: BN) => [m.toString()] // temp
-
     it('success', async () => {
       const { api, deployer, controller, rateModel, priceOracle } =
         await setup()
@@ -116,12 +109,11 @@ describe('Controller spec', () => {
       })
 
       // prepares
-      const toParam = (m: BN) => [m.toString()] // temp
       for (const sym of [pools.dai, pools.usdc, pools.usdt]) {
         await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
         await controller.tx.supportMarketWithCollateralFactorMantissa(
           sym.pool.address,
-          toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+          [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
         )
       }
 
@@ -151,7 +143,7 @@ describe('Controller spec', () => {
         const res =
           await controller.query.supportMarketWithCollateralFactorMantissa(
             pool.address,
-            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100)).add(new BN(1))),
+            [ONE_ETHER.mul(new BN(90)).div(new BN(100)).add(new BN(1))],
           )
         expect(res.value.ok.err).toStrictEqual('InvalidCollateralFactor')
       })
@@ -161,7 +153,7 @@ describe('Controller spec', () => {
         const res =
           await controller.query.supportMarketWithCollateralFactorMantissa(
             pool.address,
-            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+            [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
           )
         expect(res.value.ok.err).toStrictEqual('PriceError')
       })
@@ -181,12 +173,11 @@ describe('Controller spec', () => {
     const { dai, usdc, usdt } = pools
 
     // prepares
-    const toParam = (m: BN) => [m.toString()] // temp
     for (const sym of [dai, usdc, usdt]) {
       await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
       await controller.tx.supportMarketWithCollateralFactorMantissa(
         sym.pool.address,
-        toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+        [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
       )
     }
 
@@ -226,12 +217,23 @@ describe('Controller spec', () => {
     ])
   })
 
-  describe('.get_account_liquidity', () => {
+  describe('.get_account_liquidity / .get_hypothetical_account_liquidity', () => {
     const pow10 = (exponent: number) => new BN(10).pow(new BN(exponent))
     const mantissa = () => pow10(18)
-    const to_dec6 = (val: number | string) => new BN(val).mul(pow10(6))
-    const to_dec18 = (val: number | string) => new BN(val).mul(pow10(18))
-    const trimPrefix = (hex: string) => hex.replace(/^0x/, '')
+
+    const assertAccountLiqudity = (
+      actual: [ReturnNumber, ReturnNumber],
+      expected: { collateral: number; shortfall: number },
+    ) => {
+      const collateral = BigInt(actual[0].toString()).toString()
+      const shortfall = BigInt(actual[1].toString()).toString()
+      expect(collateral.toString()).toEqual(
+        new BN(expected.collateral).mul(mantissa()).toString(),
+      )
+      expect(shortfall.toString()).toEqual(
+        new BN(expected.shortfall).mul(mantissa()).toString(),
+      )
+    }
 
     describe('only mint', () => {
       it('single asset', async () => {
@@ -247,24 +249,23 @@ describe('Controller spec', () => {
 
         // prerequisite
         //// initialize
-        const toParam = (m: BN) => [m.toString()]
         for (const sym of [dai, usdc]) {
           await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
           await controller.tx.supportMarketWithCollateralFactorMantissa(
             sym.pool.address,
-            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+            [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
           )
         }
         //// use protocol
         for await (const { sym, value, user } of [
           {
             sym: dai,
-            value: to_dec18(100),
+            value: toDec18(100),
             user: daiUser,
           },
           {
             sym: usdc,
-            value: to_dec6(500),
+            value: toDec6(500),
             user: usdcUser,
           },
         ]) {
@@ -275,28 +276,53 @@ describe('Controller spec', () => {
         }
 
         // execute
-        const resDaiUser = (
-          await controller.query.getAccountLiquidity(daiUser.address)
-        ).value.ok.ok
-        const collateral1 = BigInt(resDaiUser[0].toString()).toString()
-        const shortfall1 = BigInt(resDaiUser[1].toString()).toString()
-        expect(collateral1.toString()).toEqual(
-          new BN(90).mul(mantissa()).toString(),
+        //// .get_account_liquidity
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(daiUser.address)).value.ok
+            .ok,
+          {
+            collateral: 90,
+            shortfall: 0,
+          },
         )
-        expect(shortfall1.toString()).toEqual(
-          new BN(0).mul(mantissa()).toString(),
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(usdcUser.address)).value
+            .ok.ok,
+          {
+            collateral: 450,
+            shortfall: 0,
+          },
         )
-
-        const resUsdcUser = (
-          await controller.query.getAccountLiquidity(usdcUser.address)
-        ).value.ok.ok
-        const collateral2 = BigInt(resUsdcUser[0].toString()).toString()
-        const shortfall2 = BigInt(resUsdcUser[1].toString()).toString()
-        expect(collateral2.toString()).toEqual(
-          new BN(450).mul(mantissa()).toString(),
+        //// .get_hypothetical_account_liquidity
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              daiUser.address,
+              usdc.pool.address,
+              toDec6(50),
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 90 - (50 * 90) / 100,
+            shortfall: 0,
+          },
         )
-        expect(shortfall2.toString()).toEqual(
-          new BN(0).mul(mantissa()).toString(),
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              usdcUser.address,
+              dai.pool.address,
+              new BN(0),
+              toDec18(500),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 0,
+            shortfall: 500 - 450,
+          },
         )
       })
       it('multi asset', async () => {
@@ -312,12 +338,11 @@ describe('Controller spec', () => {
 
         // prerequisite
         //// initialize
-        const toParam = (m: BN) => [m.toString()]
         for (const sym of [dai, usdc, usdt]) {
           await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
           await controller.tx.supportMarketWithCollateralFactorMantissa(
             sym.pool.address,
-            toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+            [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
           )
         }
 
@@ -325,15 +350,15 @@ describe('Controller spec', () => {
         for await (const { sym, value } of [
           {
             sym: dai,
-            value: to_dec18(1_000),
+            value: toDec18(1_000),
           },
           {
             sym: usdc,
-            value: to_dec6(2_000),
+            value: toDec6(2_000),
           },
           {
             sym: usdt,
-            value: to_dec6(3_000),
+            value: toDec6(3_000),
           },
         ]) {
           const { pool, token } = sym
@@ -343,14 +368,192 @@ describe('Controller spec', () => {
         }
 
         // execute
-        const res = (await controller.query.getAccountLiquidity(user.address))
-          .value.ok.ok
-        const collateral = new BN(trimPrefix(res[0].toString()), 16)
-        const shortfall = new BN(trimPrefix(res[1].toString()), 16)
-        expect(collateral.toString()).toEqual(
-          new BN(5_400).mul(mantissa()).toString(),
+        //// .get_account_liquidity
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(user.address)).value.ok
+            .ok,
+          {
+            collateral: 5_400,
+            shortfall: 0,
+          },
         )
-        expect(shortfall.toString()).toEqual(new BN(0).toString())
+        //// .get_hypothetical_account_liquidity
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              ZERO_ADDRESS,
+              new BN(0),
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 5_400,
+            shortfall: 0,
+          },
+        )
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              dai.pool.address,
+              toDec18(10_000), // some redeem
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 0,
+            shortfall: (10_000 * 90) / 100 - 5_400,
+          },
+        )
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              usdc.pool.address,
+              new BN(0),
+              toDec6(5_399), // some borrow
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: 1,
+            shortfall: 0,
+          },
+        )
+      })
+    })
+    describe('with borrows', () => {
+      it('multi asset', async () => {
+        const { api, deployer, controller, rateModel, priceOracle, users } =
+          await setup()
+        const { dai, usdc, usdt } = await preparePoolsWithPreparedTokens({
+          api,
+          controller,
+          rateModel,
+          manager: deployer,
+        })
+        const user = users[0]
+
+        // prerequisite
+        //// initialize
+        for (const sym of [dai, usdc, usdt]) {
+          await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+          await controller.tx.supportMarketWithCollateralFactorMantissa(
+            sym.pool.address,
+            [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
+          )
+        }
+
+        //// use protocol
+        ////// add liquidity
+        for await (const { sym, liquidity } of [
+          {
+            sym: dai,
+            liquidity: toDec18(500_000),
+          },
+          {
+            sym: usdc,
+            liquidity: toDec6(500_000),
+          },
+          {
+            sym: usdt,
+            liquidity: toDec6(500_000),
+          },
+        ]) {
+          const { pool, token } = sym
+          await token.withSigner(deployer).tx.mint(deployer.address, liquidity)
+          await token.withSigner(deployer).tx.approve(pool.address, liquidity)
+          await pool.withSigner(deployer).tx.mint(liquidity)
+        }
+        ////// mint, borrow from user
+        for await (const { sym, mintValue, borrowValue } of [
+          {
+            sym: dai,
+            mintValue: toDec18(250_000),
+            borrowValue: toDec18(50_000),
+          },
+          {
+            sym: usdc,
+            borrowValue: toDec6(150_000),
+          },
+          {
+            sym: usdt,
+            mintValue: toDec6(300_000),
+          },
+        ]) {
+          const { pool, token } = sym
+          if (mintValue) {
+            await token.withSigner(deployer).tx.mint(user.address, mintValue)
+            await token.withSigner(user).tx.approve(pool.address, mintValue)
+            await pool.withSigner(user).tx.mint(mintValue)
+          }
+          if (borrowValue) {
+            await pool.withSigner(user).tx.borrow(borrowValue)
+          }
+        }
+        const expectedCollateral = ((250_000 + 300_000) * 90) / 100
+        const expectedShortfall = 50_000 + 150_000
+
+        // execute
+        //// .get_account_liquidity
+        assertAccountLiqudity(
+          (await controller.query.getAccountLiquidity(user.address)).value.ok
+            .ok,
+          {
+            collateral: expectedCollateral - expectedShortfall,
+            shortfall: 0,
+          },
+        )
+        //// .get_hypothetical_account_liquidity
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              ZERO_ADDRESS,
+              new BN(0),
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: expectedCollateral - expectedShortfall,
+            shortfall: 0,
+          },
+        )
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              dai.pool.address,
+              toDec18(10_000), // some redeem
+              new BN(0),
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral:
+              expectedCollateral - expectedShortfall - (10_000 * 90) / 100,
+            shortfall: 0,
+          },
+        )
+        assertAccountLiqudity(
+          (
+            await controller.query.getHypotheticalAccountLiquidity(
+              user.address,
+              dai.pool.address,
+              new BN(0),
+              toDec18(10_000), // some borrow
+              null,
+            )
+          ).value.ok.ok,
+          {
+            collateral: expectedCollateral - expectedShortfall - 10_000,
+            shortfall: 0,
+          },
+        )
       })
     })
   })

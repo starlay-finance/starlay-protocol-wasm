@@ -391,7 +391,6 @@ mod tests {
 
     #[test]
     fn test_calculate_redeem_values_is_none() {
-        let with_dec = |val: u128| 10_u128.pow(18).mul(val);
         struct Case {
             redeem_tokens_in: u128,
             redeem_amount_in: u128,
