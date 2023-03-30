@@ -850,45 +850,49 @@ describe('Pool spec', () => {
       )
       return { users, api, pools, deployer, controller, pool, token }
     }
-    it('if the utilization rate is 10% then the interest rate should be about 0.44%', async () => {
-      const { pool, users, token } = await setupExtended()
-      const [alice] = users
-      const deposit = 1000
-      const borrow = 100
-      await token.withSigner(alice).tx.mint(alice.address, deposit)
-      await token.withSigner(alice).tx.approve(pool.address, deposit)
-      await pool.withSigner(alice).tx.mint(deposit)
-      await pool.withSigner(alice).tx.borrow(borrow)
-      const borrowRate = new BN(
-        await (await pool.query.borrowRatePerMsec()).value.ok.toNumber(),
-      )
-      const msecPerYear = new BN(365 * 24 * 60 * 60 * 1000)
+    describe('on DAI Stablecoin', () => {
+      it('if the utilization rate is 10% then the borrowing interest rate should be about 0.44%', async () => {
+        const { pool, users, token } = await setupExtended()
+        const [alice] = users
+        const deposit = 1000
+        const borrow = 100
+        await token.withSigner(alice).tx.mint(alice.address, deposit)
+        await token.withSigner(alice).tx.approve(pool.address, deposit)
+        await pool.withSigner(alice).tx.mint(deposit)
+        await pool.withSigner(alice).tx.borrow(borrow)
+        const borrowRate = new BN(
+          await (await pool.query.borrowRatePerMsec()).value.ok.toNumber(),
+        )
+        const msecPerYear = new BN(365 * 24 * 60 * 60 * 1000)
 
-      expect(borrowRate.mul(msecPerYear).toString()).toBe('4444431552000000')
-    })
-    it('if the utilization rate is 95% then the interest rate should be about 34%', async () => {
-      const { pool, users, pools, token } = await setupExtended()
-      const [alice, bob] = users
-      const otherPool = pools.usdt
-      const deposit = 1000
-      const borrow = 950
-      await token.withSigner(alice).tx.mint(alice.address, deposit)
-      await token.withSigner(alice).tx.approve(pool.address, deposit)
-      await pool.withSigner(alice).tx.mint(deposit)
-      await otherPool.token
-        .withSigner(bob)
-        .tx.mint(bob.address, ONE_ETHER.toString())
-      await otherPool.token
-        .withSigner(bob)
-        .tx.approve(otherPool.pool.address, ONE_ETHER.toString())
-      await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER.toString())
-      await pool.withSigner(bob).tx.borrow(borrow)
-      const borrowRate = new BN(
-        await (await pool.query.borrowRatePerMsec()).value.ok.toNumber(),
-      )
-      const msecPerYear = new BN(365 * 24 * 60 * 60 * 1000)
+        expect(borrowRate.mul(msecPerYear).toString()).toBe('4444431552000000')
+      })
+      it('if the utilization rate is 95% then the borrowing interest rate should be about 34%', async () => {
+        const { pool, users, pools, token } = await setupExtended()
+        const [alice, bob] = users
+        const otherPool = pools.usdt
+        const deposit = 1000
+        const borrow = 950
+        await token.withSigner(alice).tx.mint(alice.address, deposit)
+        await token.withSigner(alice).tx.approve(pool.address, deposit)
+        await pool.withSigner(alice).tx.mint(deposit)
+        await otherPool.token
+          .withSigner(bob)
+          .tx.mint(bob.address, ONE_ETHER.toString())
+        await otherPool.token
+          .withSigner(bob)
+          .tx.approve(otherPool.pool.address, ONE_ETHER.toString())
+        await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER.toString())
+        await pool.withSigner(bob).tx.borrow(borrow)
+        const borrowRate = new BN(
+          await (await pool.query.borrowRatePerMsec()).value.ok.toNumber(),
+        )
+        const msecPerYear = new BN(365 * 24 * 60 * 60 * 1000)
 
-      expect(borrowRate.mul(msecPerYear).toString()).toBe('339999959808000000')
+        expect(borrowRate.mul(msecPerYear).toString()).toBe(
+          '339999959808000000',
+        )
+      })
     })
   })
 })
