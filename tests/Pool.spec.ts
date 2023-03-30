@@ -137,7 +137,7 @@ const to_dec6 = (value: number) => new BN(value).mul(pow10(6))
 
 describe('Pool spec', () => {
   const setup = async () => {
-    const { api, alice: deployer, bob, charlie } = globalThis.setup
+    const { api, alice: deployer, bob, charlie, django } = globalThis.setup
 
     const controller = await deployController({
       api,
@@ -171,7 +171,7 @@ describe('Pool spec', () => {
       manager: deployer,
     })
 
-    const users = [bob, charlie]
+    const users = [bob, charlie, django]
 
     // initialize
     await controller.tx.setPriceOracle(priceOracle.address)
@@ -981,6 +981,113 @@ describe('Pool spec', () => {
           .withSigner(userA)
           .query.transfer(userB.address, new BN(1), [])
         expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferIsPaused')
+      }
+    })
+  })
+
+  describe('.transfer_from', () => {
+    it('success', async () => {
+      const { api, deployer, controller, rateModel, priceOracle, users } =
+        await setup()
+      const { dai, usdc } = await preparePoolsWithPreparedTokens({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+      })
+      const [userA, userB] = users
+      const spender = deployer
+
+      // prerequisite
+      //// initialize
+      const toParam = (m: BN) => [m.toString()]
+      for (const sym of [dai, usdc]) {
+        await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+        await controller.tx.supportMarketWithCollateralFactorMantissa(
+          sym.pool.address,
+          toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+        )
+      }
+      //// use protocol
+      for await (const { user, sym, amount } of [
+        {
+          user: userA,
+          sym: dai,
+          amount: to_dec18(500_000),
+        },
+        {
+          user: userB,
+          sym: usdc,
+          amount: to_dec6(500_000),
+        },
+      ]) {
+        const { pool, token } = sym
+        await token.withSigner(deployer).tx.mint(user.address, amount)
+        await token.withSigner(user).tx.approve(pool.address, amount)
+        await pool.withSigner(user).tx.mint(amount)
+      }
+      expect(
+        (await dai.pool.query.balanceOf(userA.address)).value.ok.toString(),
+      ).toBe(to_dec18(500_000).toString())
+      expect(
+        (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
+      ).toBe(to_dec6(500_000).toString())
+
+      {
+        // approve
+        const { events: approveEvents } = await shouldNotRevert(
+          dai.pool.withSigner(userA),
+          'approve',
+          [spender.address, to_dec18(100_000)],
+        )
+        //// assertions
+        expect(
+          (
+            await dai.pool.query.allowance(userA.address, spender.address)
+          ).value.ok.toString(),
+        ).toBe(to_dec18(100_000).toString())
+        ////// check event
+        expect(approveEvents).toHaveLength(1)
+        const event = approveEvents[0]
+        expect(event.name).toEqual('Approval')
+        expect(event.args.owner).toEqual(userA.address)
+        expect(event.args.spender).toEqual(spender.address)
+        expect(event.args.value.toString()).toEqual(
+          to_dec18(100_000).toString(),
+        )
+
+        // transfer_from
+        const { events: transferFromEvents } = await shouldNotRevert(
+          dai.pool.withSigner(spender),
+          'transferFrom',
+          [userA.address, userB.address, to_dec18(100_000), []],
+        )
+        //// assertions
+        expect(
+          (
+            await dai.pool.query.allowance(userA.address, spender.address)
+          ).value.ok.toString(),
+        ).toBe('0')
+        expect(
+          (await dai.pool.query.balanceOf(userA.address)).value.ok.toString(),
+        ).toBe(to_dec18(400_000).toString())
+        expect(
+          (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
+        ).toBe(to_dec18(100_000).toString())
+        expect(transferFromEvents).toHaveLength(2)
+        //// check event
+        const approvalEvent = transferFromEvents[0]
+        expect(approvalEvent.name).toEqual('Approval')
+        expect(approvalEvent.args.owner).toEqual(userA.address)
+        expect(approvalEvent.args.spender).toEqual(spender.address)
+        expect(approvalEvent.args.value.toString()).toEqual('0')
+        const transferEvent = transferFromEvents[1]
+        expect(transferEvent.name).toEqual('Transfer')
+        expect(transferEvent.args.from).toEqual(userA.address)
+        expect(transferEvent.args.to).toEqual(userB.address)
+        expect(transferEvent.args.value.toString()).toEqual(
+          to_dec18(100_000).toString(),
+        )
       }
     })
   })
