@@ -35,10 +35,13 @@ interface DummyTokenProp {
 
 const TOKEN_BASE: Omit<
   TokenConfig,
-  'riskParameter' | 'rateModel' | 'symbol' | 'name'
+  'riskParameter' | 'rateModel' | 'symbol' | 'name' | 'price'
 > = {
   decimals: 18,
-  price: ONE_ETHER,
+}
+
+const price = (val: number) => {
+  return ONE_ETHER.mul(new BN(val))
 }
 
 export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
@@ -47,6 +50,7 @@ export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
     name: 'Wrapped Ether',
     rateModel: RATE_MODELS.weth,
     riskParameter: RISK_PARAMETERS.weth,
+    price: price(1792),
     ...TOKEN_BASE,
   },
   bnb: {
@@ -54,6 +58,7 @@ export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
     name: 'Binance Coin',
     rateModel: RATE_MODELS.bnb,
     riskParameter: RISK_PARAMETERS.bnb,
+    price: price(313),
     ...TOKEN_BASE,
   },
   dai: {
@@ -61,6 +66,7 @@ export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
     name: 'Dai Stablecoin',
     rateModel: RATE_MODELS.dai,
     riskParameter: RISK_PARAMETERS.dai,
+    price: ONE_ETHER,
     ...TOKEN_BASE,
   },
   usdc: {
@@ -69,6 +75,7 @@ export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
     rateModel: RATE_MODELS.usdc,
     riskParameter: RISK_PARAMETERS.usdc,
     decimals: 6,
+    price: ONE_ETHER,
     ...TOKEN_BASE,
   },
   usdt: {
@@ -76,6 +83,7 @@ export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
     name: 'Tether USD',
     rateModel: RATE_MODELS.usdt,
     riskParameter: RISK_PARAMETERS.usdt,
+    price: ONE_ETHER,
     ...TOKEN_BASE,
     decimals: 6,
   },
@@ -84,6 +92,7 @@ export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
     name: 'Binance USD',
     rateModel: RATE_MODELS.busd,
     riskParameter: RISK_PARAMETERS.busd,
+    price: ONE_ETHER,
     ...TOKEN_BASE,
   },
   dot: {
@@ -92,6 +101,7 @@ export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
     rateModel: RATE_MODELS.busd,
     riskParameter: RISK_PARAMETERS.dot,
     ...TOKEN_BASE,
+    price: price(6),
     decimals: 10,
   },
   matic: {
@@ -99,6 +109,7 @@ export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
     name: 'Matic Token',
     rateModel: RATE_MODELS.matic,
     riskParameter: RISK_PARAMETERS.matic,
+    price: ONE_ETHER.mul(new BN(111)).div(new BN(100)),
     ...TOKEN_BASE,
   },
   wastr: {
@@ -106,6 +117,7 @@ export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
     name: 'Wrapped Astr',
     rateModel: RATE_MODELS.wastr,
     riskParameter: RISK_PARAMETERS.wastr,
+    price: price(6).div(new BN(100)),
     ...TOKEN_BASE,
   },
   wbtc: {
@@ -114,6 +126,7 @@ export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
     rateModel: RATE_MODELS.wbtc,
     riskParameter: RISK_PARAMETERS.wbtc,
     ...TOKEN_BASE,
+    price: price(28363),
     decimals: 8,
   },
   wsdn: {
@@ -121,6 +134,7 @@ export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
     name: 'Wrapped SDN',
     rateModel: RATE_MODELS.wsdn,
     riskParameter: RISK_PARAMETERS.wsdn,
+    price: price(3).div(new BN(100)),
     ...TOKEN_BASE,
   },
 }
