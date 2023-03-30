@@ -923,8 +923,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         }
 
         let balance = PSP22Ref::balance_of(&asset, Self::env().account_id());
-        PSP22Ref::transfer(&asset, Self::env().caller(), balance, Vec::<u8>::new())
-            .map_err(to_psp22_error)?;
+        PSP22Ref::transfer(&asset, Self::env().caller(), balance, Vec::<u8>::new())?;
         Ok(())
     }
 
