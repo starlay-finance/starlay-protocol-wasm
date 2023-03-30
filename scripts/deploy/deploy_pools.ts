@@ -74,10 +74,10 @@ const deployAndSetupPool = async (
     api,
     signer,
     args: [
-      [config.rateModel.baseRatePerYear],
-      [config.rateModel.multiplierPerYearSlope1],
-      [config.rateModel.multiplierPerYearSlope2],
-      [config.rateModel.kink],
+      [config.rateModel.baseRatePerYear()],
+      [config.rateModel.multiplierPerYearSlope1()],
+      [config.rateModel.multiplierPerYearSlope2()],
+      [config.rateModel.kink()],
     ],
   })
   const pool = await deployPool({
