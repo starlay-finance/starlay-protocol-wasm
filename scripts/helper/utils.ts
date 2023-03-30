@@ -2,6 +2,7 @@ import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
 import { ApiPromise } from '@polkadot/api'
 import { WeightV2 } from '@polkadot/types/interfaces'
 import { BN, BN_ONE } from '@polkadot/util'
+import { ONE_ETHER } from './constants'
 import { ENV, getCurrentEnv } from '../env'
 
 const WAIT_FINALIZED_SECONDS = 10000
@@ -10,6 +11,9 @@ const PROOFSIZE = new BN(1_100_000)
 
 export const isTest = (): boolean => process.env.NODE_ENV === 'test'
 
+export const percent = (val: number): BN => {
+  return new BN(val).mul(ONE_ETHER).div(new BN(100))
+}
 export const waitForTx = async (
   result: SignAndSendSuccessResponse,
 ): Promise<void> => {

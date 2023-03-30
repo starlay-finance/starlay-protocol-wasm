@@ -8,8 +8,8 @@ import { defaultOption, sendTxWithPreview } from '../helper/utils'
 import { DummyToken, TokenConfig } from '../tokens'
 import {
   deployDefaultInterestRateModel,
-  deployPSP22Token,
   deployPool,
+  deployPSP22Token,
 } from './../helper/deploy_helper'
 
 type DeployPoolArgs = {
@@ -74,10 +74,10 @@ const deployAndSetupPool = async (
     api,
     signer,
     args: [
-      [config.rateModel.baseRatePerYear],
-      [config.rateModel.multiplierPerYearSlope1],
-      [config.rateModel.multiplierPerYearSlope2],
-      [config.rateModel.kink],
+      [config.rateModel.baseRatePerYear()],
+      [config.rateModel.multiplierPerYearSlope1()],
+      [config.rateModel.multiplierPerYearSlope2()],
+      [config.rateModel.kink()],
     ],
   })
   const pool = await deployPool({
@@ -87,7 +87,7 @@ const deployAndSetupPool = async (
       token.address,
       controller.address,
       rateModelContract.address,
-      [config.initialExchangeRateMantissa],
+      [config.riskParameter.initialExchangeRateMantissa],
       [collateralNamePrefix + config.name],
       [collateralSymbolPrefix + config.symbol],
       config.decimals,
@@ -103,10 +103,10 @@ const deployAndSetupPool = async (
   await sendTxWithPreview(
     controller,
     'supportMarketWithCollateralFactorMantissa',
-    [pool.address, [config.collateralFactor], option],
+    [pool.address, [config.riskParameter.collateralFactor], option],
   )
   await sendTxWithPreview(pool, 'setReserveFactorMantissa', [
-    [config.reserveFactor],
+    [config.riskParameter.reserveFactor],
     option,
   ])
 }
