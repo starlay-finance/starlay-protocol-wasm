@@ -92,18 +92,46 @@ describe('Pool spec', () => {
     expect((await pool.query.tokenDecimals()).value.ok).toEqual(18)
   })
 
-  describe('.mint', () => {
+  describe.only('.mint', () => {
     let deployer: KeyringPair
     let token: PSP22Token
     let pool: Pool
 
     beforeAll(async () => {
-      ;({
-        deployer,
-        pools: {
-          dai: { token, pool },
-        },
-      } = await setup())
+      let api
+      let rateModel
+      let controller
+      let priceOracle
+      ;({ api, deployer, rateModel, controller, priceOracle } = await setup())
+
+      token = await deployPSP22Token({
+        api,
+        signer: deployer,
+        args: [
+          0,
+          'Sample' as unknown as string[],
+          'SAMPLE' as unknown as string[],
+          6,
+        ],
+      })
+
+      pool = await deployPoolFromAsset({
+        api,
+        signer: deployer,
+        args: [
+          token.address,
+          controller.address,
+          rateModel.address,
+          [ONE_ETHER.div(new BN(2)).toString()], // pool = underlying * 2
+        ],
+        token,
+      })
+
+      await priceOracle.tx.setFixedPrice(token.address, ONE_ETHER)
+      await controller.tx.supportMarketWithCollateralFactorMantissa(
+        pool.address,
+        [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
+      )
     })
 
     const balance = 10_000
@@ -116,10 +144,15 @@ describe('Pool spec', () => {
 
     it('execute', async () => {
       const depositAmount = 3_000
-      const mintAmount = depositAmount
+      const mintAmount = depositAmount * 2
       await shouldNotRevert(token, 'approve', [pool.address, depositAmount])
       const { events } = await shouldNotRevert(pool, 'mint', [depositAmount])
 
+      const dec18 = BigInt(10) ** BigInt(18)
+      console.log(
+        BigInt((await pool.query.exchageRateStored()).value.ok.toString()) /
+          dec18,
+      )
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toBe(balance - depositAmount)
@@ -128,18 +161,18 @@ describe('Pool spec', () => {
       ).toBe(depositAmount)
       expect(
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toBe(mintAmount)
+      ).toBe(depositAmount) // NOTE: because balanceOf is converted to underlying value
 
       expect(events).toHaveLength(2)
       expectToEmit<Transfer>(events[0], 'Transfer', {
         from: null,
         to: deployer.address,
-        value: depositAmount,
+        value: mintAmount,
       })
       expectToEmit<Mint>(events[1], 'Mint', {
         minter: deployer.address,
-        mintAmount,
-        mintTokens: depositAmount,
+        mintAmount: depositAmount,
+        mintTokens: mintAmount,
       })
     })
   })
