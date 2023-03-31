@@ -531,7 +531,6 @@ describe('Pool spec', () => {
       )
     })
 
-    // TODO: fix/check calculation seize token amount
     it('execute', async () => {
       const [borrower, repayer] = users
       const collateral = pools.dai
@@ -547,8 +546,7 @@ describe('Pool spec', () => {
       await controller.tx.setLiquidationIncentiveMantissa([
         liquidationIncentiveMantissa,
       ])
-
-      const { events } = await borrowing.pool
+      const res = await borrowing.pool
         .withSigner(repayer)
         .tx.liquidateBorrow(
           borrower.address,
@@ -572,35 +570,60 @@ describe('Pool spec', () => {
         ).value.ok.toNumber(),
       ).toEqual(toDec6(5_000).toNumber())
 
-      expect(events[0].name).toEqual('RepayBorrow')
-      const event = events[1]
-      expect(event.name).toEqual('LiquidateBorrow')
-      expect(event.args.liquidator).toEqual(repayer.address)
-      expect(event.args.borrower).toEqual(borrower.address)
-      expect(event.args.repayAmount.toNumber()).toEqual(
+      expect(Object.keys(res.events).length).toBe(2)
+      expect(res.events[0].name).toBe('RepayBorrow')
+      const liquidateBorrowEvent = res.events[1]
+      expect(liquidateBorrowEvent.name).toBe('LiquidateBorrow')
+      expect(liquidateBorrowEvent.args.liquidator).toBe(repayer.address)
+      expect(liquidateBorrowEvent.args.borrower).toBe(borrower.address)
+      expect(liquidateBorrowEvent.args.repayAmount.toNumber()).toBe(
         toDec6(5_000).toNumber(),
       )
-      expect(event.args.tokenCollateral).toEqual(collateral.pool.address)
-      const seizeTokens = event.args.seizeTokens.toNumber()
-      // seizeTokens ≒ (<=) actual_repay_amount * liquidation_incentive
+      expect(liquidateBorrowEvent.args.tokenCollateral).toBe(
+        collateral.pool.address,
+      )
+      const seizeTokens = liquidateBorrowEvent.args.seizeTokens.toString()
+      // seizeTokens ≒ actual_repay_amount * liquidation_incentive
+      const dec18 = BigInt(10) ** BigInt(18)
+      expect(BigInt(seizeTokens)).toBe(
+        (BigInt(5000) * dec18 * BigInt(108)) / BigInt(100),
+      )
 
-      // temp: check seized (consider the difference in decimals when it comes to seize_amount)
-      expect(seizeTokens).toBeLessThanOrEqual(5000 * 1e6 * 1.08)
-      expect(seizeTokens).toBeGreaterThan(5000 * 1e6 * 1.075)
-      console.log(
-        BigInt(
-          (
-            await collateral.pool.query.balanceOf(repayer.address)
-          ).value.ok.toString(),
-        ).toString(),
+      // check events from Pool (execute seize)
+      const contractEvents = res.result['contractEvents']
+      //// Burn
+      const burnEvent = contractEvents.find(
+        (e) =>
+          e.event.identifier == 'Transfer' &&
+          e.args[0].toString() == borrower.address,
       )
-      console.log(
-        BigInt(
-          (
-            await collateral.pool.query.balanceOf(borrower.address)
-          ).value.ok.toString(),
-        ).toString(),
+      expect(burnEvent.args[0].toString()).toBe(borrower.address.toString())
+      expect(burnEvent.args[1].toString()).toBe('')
+      expect(BigInt(burnEvent.args[2].toString())).toBe(5400n * dec18)
+      //// Mint
+      const mintEvent = contractEvents.find(
+        (e) =>
+          e.event.identifier == 'Transfer' &&
+          e.args[1].toString() == repayer.address,
       )
+      expect(mintEvent.args[0].toString()).toBe('')
+      expect(mintEvent.args[1].toString()).toBe(repayer.address.toString())
+      const minted = BigInt(mintEvent.args[2].toString())
+      expect(minted).toBeGreaterThanOrEqual(5248n * dec18)
+      expect(minted).toBeLessThanOrEqual(5249n * dec18)
+      //// ReserveAdded
+      const reservesAddedEvent = contractEvents.find(
+        (e) => e.event.identifier == 'ReservesAdded',
+      )
+      expect(reservesAddedEvent.args[0].toString()).toBe(
+        collateral.pool.address.toString(),
+      )
+      const addedAmount = BigInt(reservesAddedEvent.args[1].toString())
+      expect(addedAmount).toBeGreaterThanOrEqual(151n * dec18)
+      expect(addedAmount).toBeLessThanOrEqual(152n * dec18)
+      const totalReserves = BigInt(reservesAddedEvent.args[2].toString())
+      expect(totalReserves).toBeGreaterThanOrEqual(151n * dec18)
+      expect(totalReserves).toBeLessThanOrEqual(152n * dec18)
     })
   })
 
