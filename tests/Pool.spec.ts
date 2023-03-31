@@ -10,7 +10,6 @@ import {
   deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
 import { hexToUtf8 } from '../scripts/helper/utils'
-import Controller from '../types/contracts/controller'
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
 import { Mint, Redeem } from '../types/event-types/pool'
@@ -469,165 +468,6 @@ describe('Pool spec', () => {
   })
 
   describe('.liquidate_borrow', () => {
-    let deployer: KeyringPair
-    let controller: Controller
-    let pools: Pools
-    let users: KeyringPair[]
-
-    beforeAll(async () => {
-      ;({ deployer, controller, pools, users } = await setup())
-    })
-
-    it('preparations', async () => {
-      const { dai, usdc } = pools
-
-      // add liquidity to usdc pool
-      await usdc.token.tx.mint(deployer.address, toDec6(10_000))
-      await usdc.token.tx.approve(usdc.pool.address, toDec6(10_000))
-      await usdc.pool.tx.mint(toDec6(10_000))
-      expect(
-        (await usdc.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(toDec6(10_000).toNumber())
-
-      // mint to dai pool for collateral
-      const [borrower] = users
-      await dai.token.tx.mint(borrower.address, toDec18(20_000))
-      await dai.token
-        .withSigner(borrower)
-        .tx.approve(dai.pool.address, toDec18(20_000))
-      await dai.pool.withSigner(borrower).tx.mint(toDec18(20_000))
-      expect(
-        BigInt(
-          (
-            await dai.pool.query.balanceOf(borrower.address)
-          ).value.ok.toString(),
-        ).toString(),
-      ).toEqual(toDec18(20_000).toString())
-
-      // borrow usdc
-      await usdc.pool.withSigner(borrower).tx.borrow(toDec6(10_000))
-      expect(
-        (
-          await usdc.token.query.balanceOf(borrower.address)
-        ).value.ok.toNumber(),
-      ).toEqual(toDec6(10_000).toNumber())
-
-      // down collateral_factor for dai
-      await controller.tx.setCollateralFactorMantissa(dai.pool.address, [
-        new BN(1),
-      ])
-      const [collateralValue, shortfallValue] = (
-        await controller.query.getHypotheticalAccountLiquidity(
-          borrower.address,
-          ZERO_ADDRESS,
-          0,
-          0,
-          null,
-        )
-      ).value.ok.ok
-      expect(collateralValue.toString()).toEqual('0')
-      expect(BigInt(shortfallValue.toString())).toBeGreaterThanOrEqual(
-        BigInt(9999) * BigInt(10) ** BigInt(18),
-      )
-    })
-
-    it('execute', async () => {
-      const [borrower, repayer] = users
-      const collateral = pools.dai
-      const borrowing = pools.usdc
-      await borrowing.token.tx.mint(repayer.address, toDec6(5_000))
-      await borrowing.token
-        .withSigner(repayer)
-        .tx.approve(borrowing.pool.address, toDec6(5_000))
-
-      const liquidationIncentiveMantissa = mantissa()
-        .mul(new BN(108))
-        .div(new BN(100)) // 1.08
-      await controller.tx.setLiquidationIncentiveMantissa([
-        liquidationIncentiveMantissa,
-      ])
-      const res = await borrowing.pool
-        .withSigner(repayer)
-        .tx.liquidateBorrow(
-          borrower.address,
-          toDec6(5_000),
-          collateral.pool.address,
-        )
-
-      expect(
-        (
-          await borrowing.token.query.balanceOf(repayer.address)
-        ).value.ok.toNumber(),
-      ).toEqual(0)
-      expect(
-        (
-          await borrowing.token.query.balanceOf(borrower.address)
-        ).value.ok.toNumber(),
-      ).toEqual(toDec6(10_000).toNumber())
-      expect(
-        (
-          await borrowing.pool.query.borrowBalanceStored(borrower.address)
-        ).value.ok.toNumber(),
-      ).toEqual(toDec6(5_000).toNumber())
-
-      expect(Object.keys(res.events).length).toBe(2)
-      expect(res.events[0].name).toBe('RepayBorrow')
-      const liquidateBorrowEvent = res.events[1]
-      expect(liquidateBorrowEvent.name).toBe('LiquidateBorrow')
-      expect(liquidateBorrowEvent.args.liquidator).toBe(repayer.address)
-      expect(liquidateBorrowEvent.args.borrower).toBe(borrower.address)
-      expect(liquidateBorrowEvent.args.repayAmount.toNumber()).toBe(
-        toDec6(5_000).toNumber(),
-      )
-      expect(liquidateBorrowEvent.args.tokenCollateral).toBe(
-        collateral.pool.address,
-      )
-      const seizeTokens = liquidateBorrowEvent.args.seizeTokens.toString()
-      // seizeTokens ≒ actual_repay_amount * liquidation_incentive
-      const dec18 = BigInt(10) ** BigInt(18)
-      expect(BigInt(seizeTokens)).toBe(
-        (BigInt(5000) * dec18 * BigInt(108)) / BigInt(100),
-      )
-
-      // check events from Pool (execute seize)
-      const contractEvents = res.result['contractEvents']
-      //// Burn
-      const burnEvent = contractEvents.find(
-        (e) =>
-          e.event.identifier == 'Transfer' &&
-          e.args[0].toString() == borrower.address,
-      )
-      expect(burnEvent.args[0].toString()).toBe(borrower.address.toString())
-      expect(burnEvent.args[1].toString()).toBe('')
-      expect(BigInt(burnEvent.args[2].toString())).toBe(5400n * dec18)
-      //// Mint
-      const mintEvent = contractEvents.find(
-        (e) =>
-          e.event.identifier == 'Transfer' &&
-          e.args[1].toString() == repayer.address,
-      )
-      expect(mintEvent.args[0].toString()).toBe('')
-      expect(mintEvent.args[1].toString()).toBe(repayer.address.toString())
-      const minted = BigInt(mintEvent.args[2].toString())
-      expect(minted).toBeGreaterThanOrEqual(5248n * dec18)
-      expect(minted).toBeLessThanOrEqual(5249n * dec18)
-      //// ReserveAdded
-      const reservesAddedEvent = contractEvents.find(
-        (e) => e.event.identifier == 'ReservesAdded',
-      )
-      expect(reservesAddedEvent.args[0].toString()).toBe(
-        collateral.pool.address.toString(),
-      )
-      const addedAmount = BigInt(reservesAddedEvent.args[1].toString())
-      expect(addedAmount).toBeGreaterThanOrEqual(151n * dec18)
-      expect(addedAmount).toBeLessThanOrEqual(152n * dec18)
-      const totalReserves = BigInt(reservesAddedEvent.args[2].toString())
-      expect(totalReserves).toBeGreaterThanOrEqual(151n * dec18)
-      expect(totalReserves).toBeLessThanOrEqual(152n * dec18)
-    })
-  })
-
-  describe('.liquidate_borrow (fail case)', () => {
     const setupForShortage = async () => {
       const { deployer, controller, pools, users } = await setup()
       const { dai, usdc } = pools
@@ -684,7 +524,105 @@ describe('Pool spec', () => {
       return { deployer, controller, pools, users }
     }
 
-    it('when liquidator is equal to borrower', async () => {
+    it('execute', async () => {
+      const {
+        controller,
+        pools: { dai: collateral, usdc: borrowing },
+        users,
+      } = await setupForShortage()
+      const [borrower, liquidator] = users
+      await borrowing.token.tx.mint(liquidator.address, toDec6(5_000))
+      await borrowing.token
+        .withSigner(liquidator)
+        .tx.approve(borrowing.pool.address, toDec6(5_000))
+
+      const liquidationIncentiveMantissa = mantissa()
+        .mul(new BN(108))
+        .div(new BN(100)) // 1.08
+      await controller.tx.setLiquidationIncentiveMantissa([
+        liquidationIncentiveMantissa,
+      ])
+      const res = await borrowing.pool
+        .withSigner(liquidator)
+        .tx.liquidateBorrow(
+          borrower.address,
+          toDec6(5_000),
+          collateral.pool.address,
+        )
+
+      expect(
+        (
+          await borrowing.token.query.balanceOf(liquidator.address)
+        ).value.ok.toNumber(),
+      ).toEqual(0)
+      expect(
+        (
+          await borrowing.token.query.balanceOf(borrower.address)
+        ).value.ok.toNumber(),
+      ).toEqual(toDec6(10_000).toNumber())
+      expect(
+        (
+          await borrowing.pool.query.borrowBalanceStored(borrower.address)
+        ).value.ok.toNumber(),
+      ).toEqual(toDec6(5_000).toNumber())
+
+      expect(Object.keys(res.events).length).toBe(2)
+      expect(res.events[0].name).toBe('RepayBorrow')
+      const liquidateBorrowEvent = res.events[1]
+      expect(liquidateBorrowEvent.name).toBe('LiquidateBorrow')
+      expect(liquidateBorrowEvent.args.liquidator).toBe(liquidator.address)
+      expect(liquidateBorrowEvent.args.borrower).toBe(borrower.address)
+      expect(liquidateBorrowEvent.args.repayAmount.toNumber()).toBe(
+        toDec6(5_000).toNumber(),
+      )
+      expect(liquidateBorrowEvent.args.tokenCollateral).toBe(
+        collateral.pool.address,
+      )
+      const seizeTokens = liquidateBorrowEvent.args.seizeTokens.toString()
+      // seizeTokens ≒ actual_repay_amount * liquidation_incentive
+      const dec18 = BigInt(10) ** BigInt(18)
+      expect(BigInt(seizeTokens)).toBe(
+        (BigInt(5000) * dec18 * BigInt(108)) / BigInt(100),
+      )
+
+      // check events from Pool (execute seize)
+      const contractEvents = res.result['contractEvents']
+      //// Burn
+      const burnEvent = contractEvents.find(
+        (e) =>
+          e.event.identifier == 'Transfer' &&
+          e.args[0].toString() == borrower.address,
+      )
+      expect(burnEvent.args[0].toString()).toBe(borrower.address.toString())
+      expect(burnEvent.args[1].toString()).toBe('')
+      expect(BigInt(burnEvent.args[2].toString())).toBe(5400n * dec18)
+      //// Mint
+      const mintEvent = contractEvents.find(
+        (e) =>
+          e.event.identifier == 'Transfer' &&
+          e.args[1].toString() == liquidator.address,
+      )
+      expect(mintEvent.args[0].toString()).toBe('')
+      expect(mintEvent.args[1].toString()).toBe(liquidator.address.toString())
+      const minted = BigInt(mintEvent.args[2].toString())
+      expect(minted).toBeGreaterThanOrEqual(5248n * dec18)
+      expect(minted).toBeLessThanOrEqual(5249n * dec18)
+      //// ReserveAdded
+      const reservesAddedEvent = contractEvents.find(
+        (e) => e.event.identifier == 'ReservesAdded',
+      )
+      expect(reservesAddedEvent.args[0].toString()).toBe(
+        collateral.pool.address.toString(),
+      )
+      const addedAmount = BigInt(reservesAddedEvent.args[1].toString())
+      expect(addedAmount).toBeGreaterThanOrEqual(151n * dec18)
+      expect(addedAmount).toBeLessThanOrEqual(152n * dec18)
+      const totalReserves = BigInt(reservesAddedEvent.args[2].toString())
+      expect(totalReserves).toBeGreaterThanOrEqual(151n * dec18)
+      expect(totalReserves).toBeLessThanOrEqual(152n * dec18)
+    })
+
+    it('fail when liquidator is equal to borrower', async () => {
       const {
         pools: { dai: collateral, usdc: borrowing },
         users,
@@ -697,14 +635,14 @@ describe('Pool spec', () => {
         liquidateLiquidatorIsBorrower: null,
       })
     })
-    it('when repay_amount is zero', async () => {
+    it('fail when repay_amount is zero', async () => {
       const {
         pools: { dai: collateral, usdc: borrowing },
         users,
       } = await setupForShortage()
-      const [borrower, repayer] = users
+      const [borrower, liquidator] = users
       const { value } = await borrowing.pool
-        .withSigner(repayer)
+        .withSigner(liquidator)
         .query.liquidateBorrow(borrower.address, 0, collateral.pool.address)
       expect(value.ok.err).toStrictEqual({
         liquidateCloseAmountIsZero: null,
