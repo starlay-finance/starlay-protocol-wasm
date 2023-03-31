@@ -542,17 +542,17 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         };
 
         let exchange_rate = self._exchange_rate_stored(); // NOTE: need exchange_rate calculation before transfer underlying
-        self._mint_to(minter, mint_amount)?;
-        let actual_mint_amount = U256::from(mint_amount)
-            .mul(exchange_rate)
-            .div(exp_scale())
+        self._transfer_underlying_from(minter, contract_addr, mint_amount)?;
+        let minted_tokens = U256::from(mint_amount)
+            .mul(exp_scale())
+            .div(exchange_rate)
             .as_u128();
-        self._transfer_underlying_from(minter, contract_addr, actual_mint_amount)?;
+        self._mint_to(minter, minted_tokens)?;
 
-        self._emit_mint_event(minter, actual_mint_amount, mint_amount);
+        self._emit_mint_event(minter, mint_amount, minted_tokens);
 
         // skip post-process because nothing is done
-        // ControllerRef::mint_verify(&self._controller(), contract_addr, minter, actual_mint_amount, mint_amount)?;
+        // ControllerRef::mint_verify(&self._controller(), contract_addr, minter, minted_amount, mint_amount)?;
 
         Ok(())
     }
