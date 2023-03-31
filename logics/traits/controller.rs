@@ -150,8 +150,8 @@ pub trait Controller {
         pool_collateral: AccountId,
         exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
-        pool_borrowed_underlying: Option<AccountId>,
-        pool_collateral_underlying: Option<AccountId>,
+        pool_borrowed_attributes: Option<PoolAttributesForSeizeCalculation>,
+        pool_collateral_attributes: Option<PoolAttributesForSeizeCalculation>,
     ) -> Result<Balance>;
 
     // admin functions
@@ -247,6 +247,13 @@ pub struct PoolAttributes {
     pub account_borrow_balance: Balance,
     pub exchange_rate: U256,
     pub total_borrows: Balance,
+}
+
+#[derive(Clone, Decode, Encode)]
+#[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+pub struct PoolAttributesForSeizeCalculation {
+    pub underlying: AccountId,
+    pub decimals: u8,
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]

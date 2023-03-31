@@ -1,5 +1,8 @@
 use super::{
-    controller::PoolAttributes,
+    controller::{
+        PoolAttributes,
+        PoolAttributesForSeizeCalculation,
+    },
     exp_no_err::{
         exp_scale,
         Exp,
@@ -766,19 +769,27 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         let actual_repay_amount = self._repay_borrow(liquidator, borrower, repay_amount)?;
         let exchange_rate = self._exchange_rate_stored();
-        let pool_collateral_underlying = if contract_addr == collateral {
-            Some(self._underlying())
+
+        let pool_borrowed_attributes = Some(PoolAttributesForSeizeCalculation {
+            underlying: self._underlying(),
+            decimals: self.token_decimals(),
+        });
+        let pool_collateral_attributes = if collateral == contract_addr {
+            pool_borrowed_attributes.clone()
         } else {
-            None
+            Some(PoolAttributesForSeizeCalculation {
+                underlying: PoolRef::underlying(&collateral),
+                decimals: PoolRef::token_decimals(&collateral),
+            })
         };
         let seize_tokens = ControllerRef::liquidate_calculate_seize_tokens(
             &self._controller(),
             contract_addr,
             collateral,
-            WrappedU256::from(exchange_rate),
+            WrappedU256::from(exchange_rate), // TODO: use collateral?
             actual_repay_amount,
-            Some(self._underlying()),
-            pool_collateral_underlying,
+            pool_borrowed_attributes,
+            pool_collateral_attributes,
         )?;
         if collateral == contract_addr {
             self._seize(contract_addr, liquidator, borrower, seize_tokens)?;
