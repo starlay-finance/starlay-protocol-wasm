@@ -10,7 +10,6 @@ import {
   deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
 import { hexToUtf8 } from '../scripts/helper/utils'
-import Controller from '../types/contracts/controller'
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
 import { Mint, Redeem } from '../types/event-types/pool'
@@ -469,16 +468,8 @@ describe('Pool spec', () => {
   })
 
   describe('.liquidate_borrow', () => {
-    let deployer: KeyringPair
-    let controller: Controller
-    let pools: Pools
-    let users: KeyringPair[]
-
-    beforeAll(async () => {
-      ;({ deployer, controller, pools, users } = await setup())
-    })
-
-    it('preparations', async () => {
+    const setupForShortage = async () => {
+      const { deployer, controller, pools, users } = await setup()
       const { dai, usdc } = pools
 
       // add liquidity to usdc pool
@@ -529,20 +520,30 @@ describe('Pool spec', () => {
       expect(BigInt(shortfallValue.toString())).toBeGreaterThanOrEqual(
         BigInt(9999) * BigInt(10) ** BigInt(18),
       )
-    })
 
-    // TODO: fix/check calculation seize token amount
+      return { deployer, controller, pools, users }
+    }
+
     it('execute', async () => {
-      const [borrower, repayer] = users
-      const collateral = pools.dai
-      const borrowing = pools.usdc
-      await borrowing.token.tx.mint(repayer.address, toDec6(5_000))
+      const {
+        controller,
+        pools: { dai: collateral, usdc: borrowing },
+        users,
+      } = await setupForShortage()
+      const [borrower, liquidator] = users
+      await borrowing.token.tx.mint(liquidator.address, toDec6(5_000))
       await borrowing.token
-        .withSigner(repayer)
+        .withSigner(liquidator)
         .tx.approve(borrowing.pool.address, toDec6(5_000))
 
-      const { events } = await borrowing.pool
-        .withSigner(repayer)
+      const liquidationIncentiveMantissa = mantissa()
+        .mul(new BN(108))
+        .div(new BN(100)) // 1.08
+      await controller.tx.setLiquidationIncentiveMantissa([
+        liquidationIncentiveMantissa,
+      ])
+      const res = await borrowing.pool
+        .withSigner(liquidator)
         .tx.liquidateBorrow(
           borrower.address,
           toDec6(5_000),
@@ -551,7 +552,7 @@ describe('Pool spec', () => {
 
       expect(
         (
-          await borrowing.token.query.balanceOf(repayer.address)
+          await borrowing.token.query.balanceOf(liquidator.address)
         ).value.ok.toNumber(),
       ).toEqual(0)
       expect(
@@ -564,89 +565,85 @@ describe('Pool spec', () => {
           await borrowing.pool.query.borrowBalanceStored(borrower.address)
         ).value.ok.toNumber(),
       ).toEqual(toDec6(5_000).toNumber())
-      // TODO: check seized
 
-      expect(events[0].name).toEqual('RepayBorrow')
-      const event = events[1]
-      expect(event.name).toEqual('LiquidateBorrow')
-      expect(event.args.liquidator).toEqual(repayer.address)
-      expect(event.args.borrower).toEqual(borrower.address)
-      expect(event.args.repayAmount.toNumber()).toEqual(
+      expect(Object.keys(res.events).length).toBe(2)
+      expect(res.events[0].name).toBe('RepayBorrow')
+      const liquidateBorrowEvent = res.events[1]
+      expect(liquidateBorrowEvent.name).toBe('LiquidateBorrow')
+      expect(liquidateBorrowEvent.args.liquidator).toBe(liquidator.address)
+      expect(liquidateBorrowEvent.args.borrower).toBe(borrower.address)
+      expect(liquidateBorrowEvent.args.repayAmount.toNumber()).toBe(
         toDec6(5_000).toNumber(),
       )
-      expect(event.args.tokenCollateral).toEqual(collateral.pool.address)
-      expect(event.args.seizeTokens.toNumber()).toEqual(0) // TODO: fix
+      expect(liquidateBorrowEvent.args.tokenCollateral).toBe(
+        collateral.pool.address,
+      )
+      const seizeTokens = liquidateBorrowEvent.args.seizeTokens.toString()
+      // seizeTokens ≒ actual_repay_amount * liquidation_incentive
+      const dec18 = BigInt(10) ** BigInt(18)
+      expect(BigInt(seizeTokens)).toBe(
+        (BigInt(5000) * dec18 * BigInt(108)) / BigInt(100),
+      )
+
+      // check events from Pool (execute seize)
+      const contractEvents = res.result['contractEvents']
+      //// Burn
+      const burnEvent = contractEvents.find(
+        (e) =>
+          e.event.identifier == 'Transfer' &&
+          e.args[0].toString() == borrower.address,
+      )
+      expect(burnEvent.args[0].toString()).toBe(borrower.address.toString())
+      expect(burnEvent.args[1].toString()).toBe('')
+      expect(BigInt(burnEvent.args[2].toString())).toBe(5400n * dec18)
+      //// Mint
+      const mintEvent = contractEvents.find(
+        (e) =>
+          e.event.identifier == 'Transfer' &&
+          e.args[1].toString() == liquidator.address,
+      )
+      expect(mintEvent.args[0].toString()).toBe('')
+      expect(mintEvent.args[1].toString()).toBe(liquidator.address.toString())
+      const minted = BigInt(mintEvent.args[2].toString())
+      expect(minted).toBeGreaterThanOrEqual(5248n * dec18)
+      expect(minted).toBeLessThanOrEqual(5249n * dec18)
+      //// ReserveAdded
+      const reservesAddedEvent = contractEvents.find(
+        (e) => e.event.identifier == 'ReservesAdded',
+      )
+      expect(reservesAddedEvent.args[0].toString()).toBe(
+        collateral.pool.address.toString(),
+      )
+      const addedAmount = BigInt(reservesAddedEvent.args[1].toString())
+      expect(addedAmount).toBeGreaterThanOrEqual(151n * dec18)
+      expect(addedAmount).toBeLessThanOrEqual(152n * dec18)
+      const totalReserves = BigInt(reservesAddedEvent.args[2].toString())
+      expect(totalReserves).toBeGreaterThanOrEqual(151n * dec18)
+      expect(totalReserves).toBeLessThanOrEqual(152n * dec18)
     })
-  })
 
-  describe('.liquidate_borrow (fail case)', () => {
-    const setupExtended = async () => {
-      const args = await setup()
-
-      const secondToken = await deployPSP22Token({
-        api: args.api,
-        signer: args.deployer,
-        args: [
-          0,
-          'Dai Stablecoin' as unknown as string[],
-          'DAI' as unknown as string[],
-          8,
-        ],
-      })
-
-      const secondPool = await deployPoolFromAsset({
-        api: args.api,
-        signer: args.deployer,
-        args: [
-          secondToken.address,
-          args.controller.address,
-          args.rateModel.address,
-          [ONE_ETHER.toString()],
-        ],
-        token: secondToken,
-      })
-
-      // initialize for pool
-      await args.controller.tx.supportMarket(secondPool.address)
-      await args.priceOracle.tx.setFixedPrice(secondToken.address, ONE_ETHER)
-      await args.controller.tx.setCollateralFactorMantissa(secondPool.address, [
-        ONE_ETHER.mul(new BN(90)).div(new BN(100)),
-      ])
-      return {
-        ...args,
-        secondToken,
-        secondPool,
-      }
-    }
-
-    it('when liquidator is equal to borrower', async () => {
+    it('fail when liquidator is equal to borrower', async () => {
       const {
-        pools: {
-          dai: { pool },
-        },
+        pools: { dai: collateral, usdc: borrowing },
         users,
-        secondPool,
-      } = await setupExtended()
-      const [user1] = users
-      const { value } = await pool
-        .withSigner(user1)
-        .query.liquidateBorrow(user1.address, 0, secondPool.address)
+      } = await setupForShortage()
+      const [borrower, _] = users
+      const { value } = await borrowing.pool
+        .withSigner(borrower)
+        .query.liquidateBorrow(borrower.address, 0, collateral.pool.address)
       expect(value.ok.err).toStrictEqual({
         liquidateLiquidatorIsBorrower: null,
       })
     })
-    it('when repay_amount is zero', async () => {
+    it('fail when repay_amount is zero', async () => {
       const {
-        pools: {
-          dai: { pool },
-        },
+        pools: { dai: collateral, usdc: borrowing },
         users,
-        secondPool,
-      } = await setupExtended()
-      const [user1, user2] = users
-      const { value } = await pool
-        .withSigner(user1)
-        .query.liquidateBorrow(user2.address, 0, secondPool.address)
+      } = await setupForShortage()
+      const [borrower, liquidator] = users
+      const { value } = await borrowing.pool
+        .withSigner(liquidator)
+        .query.liquidateBorrow(borrower.address, 0, collateral.pool.address)
       expect(value.ok.err).toStrictEqual({
         liquidateCloseAmountIsZero: null,
       })

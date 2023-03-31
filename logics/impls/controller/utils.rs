@@ -20,7 +20,9 @@ use primitive_types::U256;
 
 pub struct LiquidateCalculateSeizeTokensInput {
     pub price_borrowed_mantissa: U256,
+    pub decimals_borrowed: u8,
     pub price_collateral_mantissa: U256,
+    pub decimals_collateral: u8,
     pub exchange_rate_mantissa: U256,
     pub liquidation_incentive_mantissa: U256,
     pub actual_repay_amount: Balance,
@@ -40,7 +42,11 @@ pub fn liquidate_calculate_seize_tokens(input: &LiquidateCalculateSeizeTokensInp
         mantissa: WrappedU256::from(input.exchange_rate_mantissa),
     });
     let ratio = numerator.div(denominator);
-    let seize_tokens = ratio.mul_scalar_truncate(U256::from(input.actual_repay_amount));
+    let seize_tokens = ratio.mul_scalar_truncate(
+        U256::from(input.actual_repay_amount)
+            .mul(U256::from(10).pow(input.decimals_collateral.into()))
+            .div(U256::from(10).pow(input.decimals_borrowed.into())),
+    );
     seize_tokens.as_u128()
 }
 
@@ -166,6 +172,7 @@ mod tests {
         Div,
         Mul,
     };
+    use ink::env::debug_println;
     use openbrush::traits::ZERO_ADDRESS;
     use primitive_types::U256;
     fn mts(val: u128) -> U256 {
@@ -214,7 +221,9 @@ mod tests {
             Case {
                 input: &LiquidateCalculateSeizeTokensInput {
                     price_borrowed_mantissa: mts(100),
+                    decimals_borrowed: 0,
                     price_collateral_mantissa: mts(200),
+                    decimals_collateral: 0,
                     exchange_rate_mantissa: mts(10).div(U256::from(100)),
                     liquidation_incentive_mantissa: mts(10).div(U256::from(100)),
                     actual_repay_amount: 1,
@@ -223,7 +232,9 @@ mod tests {
             Case {
                 input: &LiquidateCalculateSeizeTokensInput {
                     price_borrowed_mantissa: mts(233),
+                    decimals_borrowed: 0,
                     price_collateral_mantissa: mts(957),
+                    decimals_collateral: 0,
                     exchange_rate_mantissa: mts(20).div(U256::from(100)),
                     liquidation_incentive_mantissa: mts(10).div(U256::from(100)),
                     actual_repay_amount: 123,
@@ -232,10 +243,23 @@ mod tests {
             Case {
                 input: &LiquidateCalculateSeizeTokensInput {
                     price_borrowed_mantissa: mts(99827),
+                    decimals_borrowed: 0,
                     price_collateral_mantissa: mts(99823),
+                    decimals_collateral: 0,
                     exchange_rate_mantissa: mts(23).div(U256::from(100)),
                     liquidation_incentive_mantissa: mts(11).div(U256::from(100)),
                     actual_repay_amount: 1237,
+                },
+            },
+            Case {
+                input: &LiquidateCalculateSeizeTokensInput {
+                    price_borrowed_mantissa: mts(1),
+                    decimals_borrowed: 18,
+                    price_collateral_mantissa: mts(1),
+                    decimals_collateral: 6,
+                    exchange_rate_mantissa: mts(1),
+                    liquidation_incentive_mantissa: mts(108).div(U256::from(100)),
+                    actual_repay_amount: 1000 * 10_u128.pow(18),
                 },
             },
         ];
@@ -250,7 +274,9 @@ mod tests {
                 .mul(input.liquidation_incentive_mantissa)
                 .mul(input.price_borrowed_mantissa)
                 .div(input.price_collateral_mantissa)
-                .div(input.exchange_rate_mantissa);
+                .div(input.exchange_rate_mantissa)
+                .mul(U256::from(10).pow(input.decimals_collateral.into()))
+                .div(U256::from(10).pow(input.decimals_borrowed.into()));
             assert_eq!(got, want.as_u128());
         }
     }

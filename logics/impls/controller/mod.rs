@@ -187,8 +187,8 @@ pub trait Internal {
         pool_collateral: AccountId,
         exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
-        pool_borrowed_underlying: Option<AccountId>,
-        pool_collateral_underlying: Option<AccountId>,
+        pool_borrowed_attributes: Option<PoolAttributesForSeizeCalculation>,
+        pool_collateral_attributes: Option<PoolAttributesForSeizeCalculation>,
     ) -> Result<Balance>;
     fn _assert_manager(&self) -> Result<()>;
 
@@ -435,16 +435,16 @@ impl<T: Storage<Data>> Controller for T {
         pool_collateral: AccountId,
         exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
-        pool_borrowed_underlying: Option<AccountId>,
-        pool_collateral_underlying: Option<AccountId>,
+        pool_borrowed_attributes: Option<PoolAttributesForSeizeCalculation>,
+        pool_collateral_attributes: Option<PoolAttributesForSeizeCalculation>,
     ) -> Result<Balance> {
         self._liquidate_calculate_seize_tokens(
             pool_borrowed,
             pool_collateral,
             exchange_rate_mantissa,
             repay_amount,
-            pool_borrowed_underlying,
-            pool_collateral_underlying,
+            pool_borrowed_attributes,
+            pool_collateral_attributes,
         )
     }
 
@@ -866,29 +866,46 @@ impl<T: Storage<Data>> Internal for T {
         pool_collateral: AccountId,
         exchange_rate_mantissa: WrappedU256,
         repay_amount: Balance,
-        pool_borrowed_underlying: Option<AccountId>,
-        pool_collateral_underlying: Option<AccountId>,
+        pool_borrowed_attributes: Option<PoolAttributesForSeizeCalculation>,
+        pool_collateral_attributes: Option<PoolAttributesForSeizeCalculation>,
     ) -> Result<Balance> {
-        let price_borrowed_mantissa = if let Some(underlying) = pool_borrowed_underlying {
-            PriceOracleRef::get_price(&self._oracle(), underlying)
-        } else {
-            PriceOracleRef::get_underlying_price(&self._oracle(), pool_borrowed)
-        };
-
+        let (price_borrowed_mantissa, pool_decimals_borrowed) =
+            if let Some(attrs) = pool_borrowed_attributes {
+                (
+                    PriceOracleRef::get_price(&self._oracle(), attrs.underlying),
+                    attrs.decimals,
+                )
+            } else {
+                (
+                    PriceOracleRef::get_underlying_price(&self._oracle(), pool_borrowed),
+                    PoolRef::token_decimals(&pool_borrowed),
+                )
+            };
         if let None | Some(0) = price_borrowed_mantissa {
             return Err(Error::PriceError)
         }
-        let price_collateral_mantissa = if let Some(underlying) = pool_collateral_underlying {
-            PriceOracleRef::get_price(&self._oracle(), underlying)
-        } else {
-            PriceOracleRef::get_underlying_price(&self._oracle(), pool_collateral)
-        };
+
+        let (price_collateral_mantissa, pool_decimals_collateral) =
+            if let Some(attrs) = pool_collateral_attributes {
+                (
+                    PriceOracleRef::get_price(&self._oracle(), attrs.underlying),
+                    attrs.decimals,
+                )
+            } else {
+                (
+                    PriceOracleRef::get_underlying_price(&self._oracle(), pool_collateral),
+                    PoolRef::token_decimals(&pool_collateral),
+                )
+            };
         if let None | Some(0) = price_collateral_mantissa {
             return Err(Error::PriceError)
         }
+
         let result = liquidate_calculate_seize_tokens(&LiquidateCalculateSeizeTokensInput {
             price_borrowed_mantissa: U256::from(price_borrowed_mantissa.unwrap()),
+            decimals_borrowed: pool_decimals_borrowed,
             price_collateral_mantissa: U256::from(price_collateral_mantissa.unwrap()),
+            decimals_collateral: pool_decimals_collateral,
             exchange_rate_mantissa: exchange_rate_mantissa.into(),
             liquidation_incentive_mantissa: self._liquidation_incentive_mantissa().into(),
             actual_repay_amount: repay_amount,
