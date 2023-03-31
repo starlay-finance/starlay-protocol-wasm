@@ -768,19 +768,17 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         }
 
         let actual_repay_amount = self._repay_borrow(liquidator, borrower, repay_amount)?;
-        let exchange_rate = self._exchange_rate_stored();
         let pool_borrowed_attributes = Some(PoolAttributesForSeizeCalculation {
             underlying: self._underlying(),
             decimals: self.token_decimals(),
         });
-
         let seize_tokens = if collateral == contract_addr {
             let pool_collateral_attributes = pool_borrowed_attributes.clone();
             let seize_tokens = ControllerRef::liquidate_calculate_seize_tokens(
                 &self._controller(),
                 contract_addr,
                 collateral,
-                WrappedU256::from(exchange_rate), // TODO: use collateral?
+                WrappedU256::from(self._exchange_rate_stored()),
                 actual_repay_amount,
                 pool_borrowed_attributes,
                 pool_collateral_attributes,
@@ -794,7 +792,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
                 &self._controller(),
                 contract_addr,
                 collateral,
-                WrappedU256::from(exchange_rate), // TODO: use collateral?
+                PoolRef::exchage_rate_stored(&collateral),
                 actual_repay_amount,
                 pool_borrowed_attributes,
                 Some(PoolAttributesForSeizeCalculation {
