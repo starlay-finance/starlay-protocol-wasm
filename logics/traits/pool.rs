@@ -114,6 +114,8 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn exchange_rate_current(&mut self) -> Result<WrappedU256>;
     #[ink(message)]
+    fn principal_balance_of(&self, account: AccountId) -> Balance;
+    #[ink(message)]
     fn initial_exchange_rate_mantissa(&self) -> WrappedU256;
     #[ink(message)]
     fn reserve_factor_mantissa(&self) -> WrappedU256;

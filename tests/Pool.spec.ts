@@ -92,7 +92,7 @@ describe('Pool spec', () => {
     expect((await pool.query.tokenDecimals()).value.ok).toEqual(18)
   })
 
-  describe.only('.mint', () => {
+  describe('.mint', () => {
     let deployer: KeyringPair
     let token: PSP22Token
     let pool: Pool
@@ -162,6 +162,11 @@ describe('Pool spec', () => {
       expect(
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toBe(depositAmount) // NOTE: because balanceOf is converted to underlying value
+      expect(
+        (
+          await pool.query.principalBalanceOf(deployer.address)
+        ).value.ok.toNumber(),
+      ).toBe(mintAmount)
 
       expect(events).toHaveLength(2)
       expectToEmit<Transfer>(events[0], 'Transfer', {

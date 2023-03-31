@@ -192,6 +192,7 @@ pub trait Internal {
     ) -> WrappedU256;
     fn _borrow_balance_stored(&self, account: AccountId) -> Balance;
     fn _balance_of_underlying(&self, account: AccountId) -> Balance;
+    fn _principal_balance_of(&self, account: &AccountId) -> Balance;
     fn _accural_block_timestamp(&self) -> Timestamp;
     fn _borrow_index(&self) -> Balance;
     fn _initial_exchange_rate_mantissa(&self) -> WrappedU256;
@@ -427,6 +428,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let reserves = self._total_reserves();
         let reserve_factor = self._reserve_factor_mantissa();
         self._supply_rate_per_msec(cash, borrows, reserves, reserve_factor)
+    }
+
+    default fn principal_balance_of(&self, account: AccountId) -> Balance {
+        self._principal_balance_of(&account)
     }
 
     default fn initial_exchange_rate_mantissa(&self) -> WrappedU256 {
@@ -1080,8 +1085,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let exchange_rate = Exp {
             mantissa: self._exchange_rate_stored().into(),
         };
-        let pool_token_balance = psp22::Internal::_balance_of(self, &account);
+        let pool_token_balance = self._principal_balance_of(&account);
         underlying_balance(exchange_rate, pool_token_balance)
+    }
+
+    default fn _principal_balance_of(&self, account: &AccountId) -> Balance {
+        psp22::Internal::_balance_of(self, account)
     }
 
     default fn _initial_exchange_rate_mantissa(&self) -> WrappedU256 {
