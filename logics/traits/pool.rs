@@ -23,29 +23,38 @@ use super::{
 #[openbrush::wrapper]
 pub type PoolRef = dyn Pool + PSP22 + PSP22Metadata;
 
+/// Trait implemented by all pools
 #[openbrush::trait_definition]
 pub trait Pool: PSP22 + PSP22Metadata {
+    /// Applies accrued interest to total borrows and reserves
     #[ink(message)]
     fn accrue_interest(&mut self) -> Result<()>;
 
+    /// Sender supplies assets into the market and receives pool tokens in exchange
     #[ink(message)]
     fn mint(&mut self, mint_amount: Balance) -> Result<()>;
 
+    /// Sender redeems pool tokens in exchange for the underlying asset
     #[ink(message)]
     fn redeem(&mut self, redeem_tokens: Balance) -> Result<()>;
 
+    /// Sender redeems pool tokens in exchange for a specified amount of underlying asset
     #[ink(message)]
     fn redeem_underlying(&mut self, redeem_amount: Balance) -> Result<()>;
 
+    /// Sender borrows assets from the protocol to their own address
     #[ink(message)]
     fn borrow(&mut self, borrow_amount: Balance) -> Result<()>;
 
+    /// Sender repays their own borrow
     #[ink(message)]
     fn repay_borrow(&mut self, repay_amount: Balance) -> Result<()>;
 
+    /// Sender repays a borrow belonging to borrower
     #[ink(message)]
     fn repay_borrow_behalf(&mut self, borrower: AccountId, repay_amount: Balance) -> Result<()>;
 
+    /// The sender liquidates the borrowers collateral.
     #[ink(message)]
     fn liquidate_borrow(
         &mut self,
@@ -54,6 +63,7 @@ pub trait Pool: PSP22 + PSP22Metadata {
         collateral: AccountId,
     ) -> Result<()>;
 
+    /// Transfers collateral tokens (this market) to the liquidator.
     #[ink(message)]
     fn seize(
         &mut self,
@@ -63,24 +73,30 @@ pub trait Pool: PSP22 + PSP22Metadata {
     ) -> Result<()>;
 
     // admin functions
+    /// Sets a new controller for the market
     #[ink(message)]
     fn set_controller(&mut self, new_controller: AccountId) -> Result<()>;
 
+    /// accrues interest and sets a new reserve factor for the protocol using _set_reserve_factor_mantissa
     #[ink(message)]
     fn set_reserve_factor_mantissa(
         &mut self,
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()>;
 
+    /// accrues interest and updates the interest rate model using _set_interest_rate_model
     #[ink(message)]
     fn set_interest_rate_model(&mut self, new_interest_rate_model: AccountId) -> Result<()>;
 
+    /// The sender adds to reserves.
     #[ink(message)]
     fn add_reserves(&mut self, amount: Balance) -> Result<()>;
 
+    /// Accrues interest and reduces reserves by transferring to admin
     #[ink(message)]
     fn reduce_reserves(&mut self, amount: Balance) -> Result<()>;
 
+    /// A public function to sweep accidental token transfers to this contract. Tokens are sent to admin (timelock)
     #[ink(message)]
     fn sweep_token(&mut self, asset: AccountId) -> Result<()>;
 
