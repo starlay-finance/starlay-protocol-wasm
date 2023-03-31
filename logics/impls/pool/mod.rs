@@ -192,6 +192,7 @@ pub trait Internal {
     ) -> WrappedU256;
     fn _borrow_balance_stored(&self, account: AccountId) -> Balance;
     fn _balance_of_underlying(&self, account: AccountId) -> Balance;
+    fn _principal_balance_of(&self, account: &AccountId) -> Balance;
     fn _accural_block_timestamp(&self) -> Timestamp;
     fn _borrow_index(&self) -> Balance;
     fn _initial_exchange_rate_mantissa(&self) -> WrappedU256;
@@ -429,6 +430,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._supply_rate_per_msec(cash, borrows, reserves, reserve_factor)
     }
 
+    default fn principal_balance_of(&self, account: AccountId) -> Balance {
+        self._principal_balance_of(&account)
+    }
+
     default fn initial_exchange_rate_mantissa(&self) -> WrappedU256 {
         self._initial_exchange_rate_mantissa()
     }
@@ -542,17 +547,17 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         };
 
         let exchange_rate = self._exchange_rate_stored(); // NOTE: need exchange_rate calculation before transfer underlying
-        self._mint_to(minter, mint_amount)?;
-        let actual_mint_amount = U256::from(mint_amount)
-            .mul(exchange_rate)
-            .div(exp_scale())
+        self._transfer_underlying_from(minter, contract_addr, mint_amount)?;
+        let minted_tokens = U256::from(mint_amount)
+            .mul(exp_scale())
+            .div(exchange_rate)
             .as_u128();
-        self._transfer_underlying_from(minter, contract_addr, actual_mint_amount)?;
+        self._mint_to(minter, minted_tokens)?;
 
-        self._emit_mint_event(minter, actual_mint_amount, mint_amount);
+        self._emit_mint_event(minter, mint_amount, minted_tokens);
 
         // skip post-process because nothing is done
-        // ControllerRef::mint_verify(&self._controller(), contract_addr, minter, actual_mint_amount, mint_amount)?;
+        // ControllerRef::mint_verify(&self._controller(), contract_addr, minter, minted_amount, mint_amount)?;
 
         Ok(())
     }
@@ -1080,8 +1085,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let exchange_rate = Exp {
             mantissa: self._exchange_rate_stored().into(),
         };
-        let pool_token_balance = psp22::Internal::_balance_of(self, &account);
+        let pool_token_balance = self._principal_balance_of(&account);
         underlying_balance(exchange_rate, pool_token_balance)
+    }
+
+    default fn _principal_balance_of(&self, account: &AccountId) -> Balance {
+        psp22::Internal::_balance_of(self, account)
     }
 
     default fn _initial_exchange_rate_mantissa(&self) -> WrappedU256 {
