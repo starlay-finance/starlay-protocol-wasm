@@ -628,73 +628,84 @@ describe('Pool spec', () => {
   })
 
   describe('.liquidate_borrow (fail case)', () => {
-    const setupExtended = async () => {
-      const args = await setup()
+    const setupForShortage = async () => {
+      const { deployer, controller, pools, users } = await setup()
+      const { dai, usdc } = pools
 
-      const secondToken = await deployPSP22Token({
-        api: args.api,
-        signer: args.deployer,
-        args: [
-          0,
-          'Dai Stablecoin' as unknown as string[],
-          'DAI' as unknown as string[],
-          8,
-        ],
-      })
+      // add liquidity to usdc pool
+      await usdc.token.tx.mint(deployer.address, toDec6(10_000))
+      await usdc.token.tx.approve(usdc.pool.address, toDec6(10_000))
+      await usdc.pool.tx.mint(toDec6(10_000))
+      expect(
+        (await usdc.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(toDec6(10_000).toNumber())
 
-      const secondPool = await deployPoolFromAsset({
-        api: args.api,
-        signer: args.deployer,
-        args: [
-          secondToken.address,
-          args.controller.address,
-          args.rateModel.address,
-          [ONE_ETHER.toString()],
-        ],
-        token: secondToken,
-      })
+      // mint to dai pool for collateral
+      const [borrower] = users
+      await dai.token.tx.mint(borrower.address, toDec18(20_000))
+      await dai.token
+        .withSigner(borrower)
+        .tx.approve(dai.pool.address, toDec18(20_000))
+      await dai.pool.withSigner(borrower).tx.mint(toDec18(20_000))
+      expect(
+        BigInt(
+          (
+            await dai.pool.query.balanceOf(borrower.address)
+          ).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec18(20_000).toString())
 
-      // initialize for pool
-      await args.controller.tx.supportMarket(secondPool.address)
-      await args.priceOracle.tx.setFixedPrice(secondToken.address, ONE_ETHER)
-      await args.controller.tx.setCollateralFactorMantissa(secondPool.address, [
-        ONE_ETHER.mul(new BN(90)).div(new BN(100)),
+      // borrow usdc
+      await usdc.pool.withSigner(borrower).tx.borrow(toDec6(10_000))
+      expect(
+        (
+          await usdc.token.query.balanceOf(borrower.address)
+        ).value.ok.toNumber(),
+      ).toEqual(toDec6(10_000).toNumber())
+
+      // down collateral_factor for dai
+      await controller.tx.setCollateralFactorMantissa(dai.pool.address, [
+        new BN(1),
       ])
-      return {
-        ...args,
-        secondToken,
-        secondPool,
-      }
+      const [collateralValue, shortfallValue] = (
+        await controller.query.getHypotheticalAccountLiquidity(
+          borrower.address,
+          ZERO_ADDRESS,
+          0,
+          0,
+          null,
+        )
+      ).value.ok.ok
+      expect(collateralValue.toString()).toEqual('0')
+      expect(BigInt(shortfallValue.toString())).toBeGreaterThanOrEqual(
+        BigInt(9999) * BigInt(10) ** BigInt(18),
+      )
+
+      return { deployer, controller, pools, users }
     }
 
     it('when liquidator is equal to borrower', async () => {
       const {
-        pools: {
-          dai: { pool },
-        },
+        pools: { dai: collateral, usdc: borrowing },
         users,
-        secondPool,
-      } = await setupExtended()
-      const [user1] = users
-      const { value } = await pool
-        .withSigner(user1)
-        .query.liquidateBorrow(user1.address, 0, secondPool.address)
+      } = await setupForShortage()
+      const [borrower, _] = users
+      const { value } = await borrowing.pool
+        .withSigner(borrower)
+        .query.liquidateBorrow(borrower.address, 0, collateral.pool.address)
       expect(value.ok.err).toStrictEqual({
         liquidateLiquidatorIsBorrower: null,
       })
     })
     it('when repay_amount is zero', async () => {
       const {
-        pools: {
-          dai: { pool },
-        },
+        pools: { dai: collateral, usdc: borrowing },
         users,
-        secondPool,
-      } = await setupExtended()
-      const [user1, user2] = users
-      const { value } = await pool
-        .withSigner(user1)
-        .query.liquidateBorrow(user2.address, 0, secondPool.address)
+      } = await setupForShortage()
+      const [borrower, repayer] = users
+      const { value } = await borrowing.pool
+        .withSigner(repayer)
+        .query.liquidateBorrow(borrower.address, 0, collateral.pool.address)
       expect(value.ok.err).toStrictEqual({
         liquidateCloseAmountIsZero: null,
       })
