@@ -106,7 +106,7 @@ impl Default for Data {
 
 pub trait Internal {
     fn _accrue_interest(&mut self) -> Result<()>;
-    fn _accure_interest_at(&mut self, at: Timestamp) -> Result<()>;
+    fn _accrue_interest_at(&mut self, at: Timestamp) -> Result<()>;
     fn _balance_of(&self, owner: &AccountId) -> Balance;
     fn _total_supply(&self) -> Balance;
     // use in PSP22#transfer,transfer_from interface
@@ -460,9 +460,9 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     for T
 {
     default fn _accrue_interest(&mut self) -> Result<()> {
-        self._accure_interest_at(Self::env().block_timestamp())
+        self._accrue_interest_at(Self::env().block_timestamp())
     }
-    default fn _accure_interest_at(&mut self, at: Timestamp) -> Result<()> {
+    default fn _accrue_interest_at(&mut self, at: Timestamp) -> Result<()> {
         let accrual = self._accrual_block_timestamp();
         if accrual.eq(&at) {
             return Ok(())
