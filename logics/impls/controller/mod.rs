@@ -95,7 +95,7 @@ pub trait Internal {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
     fn _redeem_verify(
         &self,
@@ -109,7 +109,7 @@ pub trait Internal {
         pool: AccountId,
         borrower: AccountId,
         borrow_amount: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
     fn _borrow_verify(
         &self,
@@ -139,7 +139,7 @@ pub trait Internal {
         liquidator: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
     fn _liquidate_borrow_verify(
         &self,
@@ -172,7 +172,7 @@ pub trait Internal {
         src: AccountId,
         dst: AccountId,
         transfer_tokens: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
     fn _transfer_verify(
         &self,
@@ -281,9 +281,9 @@ impl<T: Storage<Data>> Controller for T {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()> {
-        self._redeem_allowed(pool, redeemer, redeem_amount, pool_attribure)
+        self._redeem_allowed(pool, redeemer, redeem_amount, pool_attribute)
     }
 
     default fn redeem_verify(
@@ -301,9 +301,9 @@ impl<T: Storage<Data>> Controller for T {
         pool: AccountId,
         borrower: AccountId,
         borrow_amount: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()> {
-        self._borrow_allowed(pool, borrower, borrow_amount, pool_attribure)
+        self._borrow_allowed(pool, borrower, borrow_amount, pool_attribute)
     }
 
     default fn borrow_verify(
@@ -343,7 +343,7 @@ impl<T: Storage<Data>> Controller for T {
         liquidator: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()> {
         self._liquidate_borrow_allowed(
             pool_borrowed,
@@ -351,7 +351,7 @@ impl<T: Storage<Data>> Controller for T {
             liquidator,
             borrower,
             repay_amount,
-            pool_attribure,
+            pool_attribute,
         )
     }
 
@@ -414,9 +414,9 @@ impl<T: Storage<Data>> Controller for T {
         src: AccountId,
         dst: AccountId,
         transfer_tokens: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()> {
-        self._transfer_allowed(pool, src, dst, transfer_tokens, pool_attribure)
+        self._transfer_allowed(pool, src, dst, transfer_tokens, pool_attribute)
     }
 
     default fn transfer_verify(
@@ -625,10 +625,10 @@ impl<T: Storage<Data>> Internal for T {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()> {
-        let caller_pool = if pool_attribure.is_some() {
-            Some((pool, pool_attribure.unwrap()))
+        let caller_pool = if pool_attribute.is_some() {
+            Some((pool, pool_attribute.unwrap()))
         } else {
             None
         };
@@ -661,20 +661,20 @@ impl<T: Storage<Data>> Internal for T {
         pool: AccountId,
         borrower: AccountId,
         borrow_amount: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()> {
         if let Some(true) | None = self._borrow_guardian_paused(pool) {
             return Err(Error::BorrowIsPaused)
         }
 
-        let (price, total_borrow, caller_pool) = if pool_attribure.is_none() {
+        let (price, total_borrow, caller_pool) = if pool_attribute.is_none() {
             (
                 PriceOracleRef::get_underlying_price(&self._oracle(), pool),
                 PoolRef::total_borrows(&pool),
                 None,
             )
         } else {
-            let attrs = pool_attribure.unwrap();
+            let attrs = pool_attribute.unwrap();
             (
                 PriceOracleRef::get_price(&self._oracle(), attrs.underlying),
                 attrs.total_borrows,
@@ -742,14 +742,14 @@ impl<T: Storage<Data>> Internal for T {
         _liquidator: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()> {
         if !self._is_listed(pool_borrowed) || !self._is_listed(pool_collateral) {
             return Err(Error::MarketNotListed)
         }
 
-        let (caller_pool, borrow_balance) = if pool_attribure.is_some() {
-            let attrs = pool_attribure.unwrap();
+        let (caller_pool, borrow_balance) = if pool_attribute.is_some() {
+            let attrs = pool_attribute.unwrap();
             (
                 Some((pool_borrowed, attrs.clone())),
                 attrs.account_borrow_balance,
@@ -839,13 +839,13 @@ impl<T: Storage<Data>> Internal for T {
         src: AccountId,
         _dst: AccountId,
         transfer_tokens: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()> {
         if self._transfer_guardian_paused() {
             return Err(Error::TransferIsPaused)
         }
 
-        self._redeem_allowed(pool, src, transfer_tokens, pool_attribure)?;
+        self._redeem_allowed(pool, src, transfer_tokens, pool_attribute)?;
 
         // FEATURE: update governance token supply index & distribute
 
