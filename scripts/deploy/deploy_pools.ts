@@ -94,19 +94,23 @@ const deployAndSetupPool = async (
     ],
   })
 
-  await sendTxWithPreview(priceOracle, 'setFixedPrice', [
-    token.address,
-    config.price,
+  await sendTxWithPreview(
+    priceOracle,
+    'setFixedPrice',
+    [token.address, config.price],
     option,
-  ])
+  )
 
   await sendTxWithPreview(
     controller,
     'supportMarketWithCollateralFactorMantissa',
-    [pool.address, [config.riskParameter.collateralFactor], option],
-  )
-  await sendTxWithPreview(pool, 'setReserveFactorMantissa', [
-    [config.riskParameter.reserveFactor],
+    [pool.address, [config.riskParameter.collateralFactor]],
     option,
-  ])
+  )
+  await sendTxWithPreview(
+    pool,
+    'setReserveFactorMantissa',
+    [[config.riskParameter.reserveFactor]],
+    option,
+  )
 }

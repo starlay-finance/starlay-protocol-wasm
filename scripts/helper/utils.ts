@@ -2,8 +2,10 @@ import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
 import { ApiPromise } from '@polkadot/api'
 import { WeightV2 } from '@polkadot/types/interfaces'
 import { BN, BN_ONE } from '@polkadot/util'
-import { ONE_ETHER } from './constants'
+import { LastArrayElement } from 'type-fest'
 import { ENV, getCurrentEnv } from '../env'
+import { ONE_ETHER } from './constants'
+import { ExcludeLastArrayElement } from './utilityTypes'
 
 const WAIT_FINALIZED_SECONDS = 10000
 const MAX_CALL_WEIGHT = new BN(990_000_000).isub(BN_ONE).mul(new BN(10))
@@ -23,6 +25,7 @@ export const waitForTx = async (
     await new Promise((resolve) => setTimeout(resolve, WAIT_FINALIZED_SECONDS))
   }
 }
+
 export const sendTxWithPreview = async <
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends { tx: any; query: any; name: string },
@@ -31,21 +34,34 @@ export const sendTxWithPreview = async <
 >(
   contract: C,
   fn: F,
-  args: Parameters<C['tx'][F]>,
+  args: ExcludeLastArrayElement<Parameters<C['tx'][F]>>,
+  option?: LastArrayElement<Parameters<C['tx'][F]>>,
 ): Promise<R> => {
-  const calldata = `${contract.name}.${fn as string}(${JSON.stringify(args)})`
   try {
-    const preview = await contract.query[fn](...args)
+    const preview = await contract.query[fn](...args, option)
     if (preview.value.err) throw preview.value.err
     if (preview.value.ok.err) throw preview.value.ok.err
   } catch (e) {
-    throw new Error(`Failed to preview ${calldata}: ${JSON.stringify(e)}`)
+    throw new Error(
+      `Failed to preview: ${toCalldata(
+        contract,
+        fn,
+        ...args,
+        option,
+      )}): ${JSON.stringify(e)}`,
+    )
   }
   const res = await contract.tx[fn](...args)
   await waitForTx(res)
-  console.log(`Transaction succeeded: ${calldata}`)
+  console.log(`Succeeded: ${toCalldata(contract, fn, ...args)}`)
   return res
 }
+
+const toCalldata = (
+  contract: { name: string },
+  fn: unknown,
+  ...args: unknown[]
+) => `${contract.name}.${fn}(${JSON.stringify(args)})`
 
 export const defaultOption = (
   api: ApiPromise,
