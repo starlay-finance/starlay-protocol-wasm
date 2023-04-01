@@ -39,7 +39,7 @@ pub trait Controller {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
 
     /// Validates redeem and reverts on rejection. May emit logs.
@@ -59,7 +59,7 @@ pub trait Controller {
         pool: AccountId,
         borrower: AccountId,
         borrow_amount: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
 
     /// Validates borrow and reverts on rejection. May emit logs.
@@ -101,7 +101,7 @@ pub trait Controller {
         liquidator: AccountId,
         borrower: AccountId,
         repay_amount: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
 
     /// Validates liquidateBorrow and reverts on rejection. May emit logs.
@@ -146,7 +146,7 @@ pub trait Controller {
         src: AccountId,
         dst: AccountId,
         transfer_tokens: Balance,
-        pool_attribure: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
 
     /// Validates transfer and reverts on rejection. May emit logs.

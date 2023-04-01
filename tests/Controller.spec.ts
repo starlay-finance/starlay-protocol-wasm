@@ -219,7 +219,7 @@ describe('Controller spec', () => {
   })
 
   describe('.get_account_liquidity / .get_hypothetical_account_liquidity', () => {
-    const assertAccountLiqudity = (
+    const assertAccountLiquidity = (
       actual: [ReturnNumber, ReturnNumber],
       expected: { collateral: number; shortfall: number },
     ) => {
@@ -275,7 +275,7 @@ describe('Controller spec', () => {
 
         // execute
         //// .get_account_liquidity
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(daiUser.address)).value.ok
             .ok,
           {
@@ -283,7 +283,7 @@ describe('Controller spec', () => {
             shortfall: 0,
           },
         )
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(usdcUser.address)).value
             .ok.ok,
           {
@@ -292,7 +292,7 @@ describe('Controller spec', () => {
           },
         )
         //// .get_hypothetical_account_liquidity
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (
             await controller.query.getHypotheticalAccountLiquidity(
               daiUser.address,
@@ -307,7 +307,7 @@ describe('Controller spec', () => {
             shortfall: 0,
           },
         )
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (
             await controller.query.getHypotheticalAccountLiquidity(
               usdcUser.address,
@@ -367,7 +367,7 @@ describe('Controller spec', () => {
 
         // execute
         //// .get_account_liquidity
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(user.address)).value.ok
             .ok,
           {
@@ -376,7 +376,7 @@ describe('Controller spec', () => {
           },
         )
         //// .get_hypothetical_account_liquidity
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (
             await controller.query.getHypotheticalAccountLiquidity(
               user.address,
@@ -391,7 +391,7 @@ describe('Controller spec', () => {
             shortfall: 0,
           },
         )
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (
             await controller.query.getHypotheticalAccountLiquidity(
               user.address,
@@ -406,7 +406,7 @@ describe('Controller spec', () => {
             shortfall: (10_000 * 90) / 100 - 5_400,
           },
         )
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (
             await controller.query.getHypotheticalAccountLiquidity(
               user.address,
@@ -497,7 +497,7 @@ describe('Controller spec', () => {
 
         // execute
         //// .get_account_liquidity
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(user.address)).value.ok
             .ok,
           {
@@ -506,7 +506,7 @@ describe('Controller spec', () => {
           },
         )
         //// .get_hypothetical_account_liquidity
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (
             await controller.query.getHypotheticalAccountLiquidity(
               user.address,
@@ -521,7 +521,7 @@ describe('Controller spec', () => {
             shortfall: 0,
           },
         )
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (
             await controller.query.getHypotheticalAccountLiquidity(
               user.address,
@@ -537,7 +537,7 @@ describe('Controller spec', () => {
             shortfall: 0,
           },
         )
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (
             await controller.query.getHypotheticalAccountLiquidity(
               user.address,
