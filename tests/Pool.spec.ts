@@ -1204,7 +1204,7 @@ describe('Pool spec', () => {
         ).toBe(initialExchangeRate.toString())
         // execution
         expect(
-          (await newPool.query.exchageRateStored()).value.ok.toString(),
+          (await newPool.query.exchangeRateStored()).value.ok.toString(),
         ).toBe(initialExchangeRate.toString())
       })
     })
