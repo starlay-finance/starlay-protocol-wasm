@@ -390,13 +390,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._manager()
     }
 
-    default fn exchage_rate_stored(&self) -> WrappedU256 {
+    default fn exchange_rate_stored(&self) -> WrappedU256 {
         WrappedU256::from(self._exchange_rate_stored())
     }
 
     default fn exchange_rate_current(&mut self) -> Result<WrappedU256> {
         self._accrue_interest()?;
-        Ok(self.exchage_rate_stored())
+        Ok(self.exchange_rate_stored())
     }
 
     default fn get_cash_prior(&self) -> Balance {
@@ -810,7 +810,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
                 &self._controller(),
                 contract_addr,
                 collateral,
-                PoolRef::exchage_rate_stored(&collateral),
+                PoolRef::exchange_rate_stored(&collateral),
                 actual_repay_amount,
                 pool_borrowed_attributes,
                 Some(PoolAttributesForSeizeCalculation {

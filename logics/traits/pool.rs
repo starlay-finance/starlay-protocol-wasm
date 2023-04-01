@@ -134,7 +134,7 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn supply_rate_per_msec(&self) -> WrappedU256;
     #[ink(message)]
-    fn exchage_rate_stored(&self) -> WrappedU256;
+    fn exchange_rate_stored(&self) -> WrappedU256;
     #[ink(message)]
     fn exchange_rate_current(&mut self) -> Result<WrappedU256>;
     #[ink(message)]
