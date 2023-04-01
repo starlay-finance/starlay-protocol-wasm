@@ -54,6 +54,10 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn repay_borrow(&mut self, repay_amount: Balance) -> Result<()>;
 
+    /// Sender repays all their own borrow
+    #[ink(message)]
+    fn repay_borrow_all(&mut self) -> Result<()>;
+
     /// Sender repays a borrow belonging to borrower
     #[ink(message)]
     fn repay_borrow_behalf(&mut self, borrower: AccountId, repay_amount: Balance) -> Result<()>;

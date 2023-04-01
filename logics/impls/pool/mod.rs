@@ -293,6 +293,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
 
+    default fn repay_borrow_all(&mut self) -> Result<()> {
+        self._accrue_interest()?;
+        self._repay_borrow(Self::env().caller(), Self::env().caller(), u128::MAX)?;
+        Ok(())
+    }
+
     default fn repay_borrow_behalf(
         &mut self,
         borrower: AccountId,
