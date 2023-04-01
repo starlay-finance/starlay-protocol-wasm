@@ -1163,8 +1163,6 @@ describe('Pool spec', () => {
     })
   })
 
-  it.todo('.reduceReserves')
-
   describe('.exchange_rate_stored', () => {
     describe('success', () => {
       it('return initial_exchange_rate_stored if no total_supply', async () => {
