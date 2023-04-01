@@ -149,10 +149,6 @@ describe('Pool spec', () => {
       const { events } = await shouldNotRevert(pool, 'mint', [depositAmount])
 
       const dec18 = BigInt(10) ** BigInt(18)
-      console.log(
-        BigInt((await pool.query.exchageRateStored()).value.ok.toString()) /
-          dec18,
-      )
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toBe(balance - depositAmount)
@@ -531,6 +527,51 @@ describe('Pool spec', () => {
       .withSigner(users[0])
       .query.repayBorrowBehalf(users[1].address, 0)
     expect(value.ok.err).toStrictEqual({ notImplemented: null })
+  })
+
+  describe('.repay_borrow_all', () => {
+    it('success', async () => {
+      const {
+        deployer,
+        pools: { usdc, usdt },
+        users,
+      } = await setup()
+      const [borrower] = users
+
+      // prepares
+      //// add liquidity to usdc pool
+      await usdc.token.tx.mint(deployer.address, toDec6(100_000))
+      await usdc.token.tx.approve(usdc.pool.address, toDec6(100_000))
+      await usdc.pool.tx.mint(toDec6(100_000))
+      //// mint to usdt pool for collateral
+      await usdt.token.tx.mint(borrower.address, toDec6(100_000))
+      await usdt.token
+        .withSigner(borrower)
+        .tx.approve(usdt.pool.address, toDec6(100_000))
+      await usdt.pool.withSigner(borrower).tx.mint(toDec6(100_000))
+      //// borrow usdc
+      await usdc.pool.withSigner(borrower).tx.borrow(toDec6(10_000))
+      await usdc.pool.withSigner(borrower).tx.borrow(toDec6(20_000))
+      await usdc.pool.withSigner(borrower).tx.borrow(toDec6(30_000))
+      expect(
+        BigInt(
+          (
+            await usdc.token.query.balanceOf(borrower.address)
+          ).value.ok.toString(),
+        ),
+      ).toBe(BigInt(toDec6(60_000).toString()))
+
+      // execute
+      await usdc.token
+        .withSigner(borrower)
+        .tx.approve(usdc.pool.address, toDec6(999_999))
+      await usdc.pool.withSigner(borrower).tx.repayBorrowAll()
+      expect(
+        (
+          await usdc.token.query.balanceOf(borrower.address)
+        ).value.ok.toNumber(),
+      ).toBe(0)
+    })
   })
 
   describe('.liquidate_borrow', () => {
