@@ -42,6 +42,10 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn redeem_underlying(&mut self, redeem_amount: Balance) -> Result<()>;
 
+    /// Sender redeems pool tokens in exchange for all amount of underlying asset
+    #[ink(message)]
+    fn redeem_all(&mut self) -> Result<()>;
+
     /// Sender borrows assets from the protocol to their own address
     #[ink(message)]
     fn borrow(&mut self, borrow_amount: Balance) -> Result<()>;
@@ -49,6 +53,10 @@ pub trait Pool: PSP22 + PSP22Metadata {
     /// Sender repays their own borrow
     #[ink(message)]
     fn repay_borrow(&mut self, repay_amount: Balance) -> Result<()>;
+
+    /// Sender repays all their own borrow
+    #[ink(message)]
+    fn repay_borrow_all(&mut self) -> Result<()>;
 
     /// Sender repays a borrow belonging to borrower
     #[ink(message)]

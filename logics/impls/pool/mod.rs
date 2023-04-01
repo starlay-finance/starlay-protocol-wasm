@@ -275,6 +275,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._redeem(Self::env().caller(), 0, redeem_amount)
     }
 
+    default fn redeem_all(&mut self) -> Result<()> {
+        self._accrue_interest()?;
+        let caller = Self::env().caller();
+        let all_tokens_redeemed = self._principal_balance_of(&caller);
+        self._redeem(caller, all_tokens_redeemed, 0)
+    }
+
     default fn borrow(&mut self, borrow_amount: Balance) -> Result<()> {
         self._accrue_interest()?;
         self._borrow(Self::env().caller(), borrow_amount)
@@ -283,6 +290,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     default fn repay_borrow(&mut self, repay_amount: Balance) -> Result<()> {
         self._accrue_interest()?;
         self._repay_borrow(Self::env().caller(), Self::env().caller(), repay_amount)?;
+        Ok(())
+    }
+
+    default fn repay_borrow_all(&mut self) -> Result<()> {
+        self._accrue_interest()?;
+        self._repay_borrow(Self::env().caller(), Self::env().caller(), u128::MAX)?;
         Ok(())
     }
 
