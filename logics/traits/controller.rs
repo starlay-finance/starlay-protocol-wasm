@@ -14,7 +14,7 @@ use super::types::WrappedU256;
 #[openbrush::wrapper]
 pub type ControllerRef = dyn Controller;
 
-/// trait defines the interface for the controller of a lending protocol.
+/// Trait defines the interface for the controller of a lending protocol.
 /// It contains a set of functions that are responsible for validating and calculating various actions related to lending, such as minting, borrowing, and liquidation.
 #[openbrush::trait_definition]
 pub trait Controller {

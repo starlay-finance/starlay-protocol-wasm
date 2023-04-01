@@ -96,7 +96,7 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn reduce_reserves(&mut self, amount: Balance) -> Result<()>;
 
-    /// A public function to sweep accidental token transfers to this contract. Tokens are sent to admin (timelock)
+    /// A public function to sweep accidental token transfers to this contract. Tokens are sent to admin
     #[ink(message)]
     fn sweep_token(&mut self, asset: AccountId) -> Result<()>;
 
