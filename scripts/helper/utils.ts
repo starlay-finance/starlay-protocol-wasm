@@ -53,10 +53,15 @@ export const sendTxWithPreview = async <
       )}): ${JSON.stringify(e)}`,
     )
   }
-  const res = await contract.tx[fn](...args, option)
-  await waitForTx(res)
-  console.log(`Succeeded: ${toCalldata(contract, fn, ...args)}`)
-  return res
+  try {
+    const res = await contract.tx[fn](...args, option)
+    await waitForTx(res)
+    console.log(`Succeeded: ${toCalldata(contract, fn, ...args)}`)
+    return res
+  } catch (e) {
+    console.log(`Failed: ${toCalldata(contract, fn, ...args, option)}`)
+    throw e
+  }
 }
 
 const toCalldata = (
