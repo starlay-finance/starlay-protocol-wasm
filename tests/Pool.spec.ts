@@ -758,7 +758,7 @@ describe('Pool spec', () => {
   })
 
   describe('.transfer', () => {
-    const assertAccountLiqudity = (
+    const assertAccountLiquidity = (
       actual: [ReturnNumber, ReturnNumber],
       expected: { collateral: number; shortfall: number },
     ) => {
@@ -839,7 +839,7 @@ describe('Pool spec', () => {
         expect(event.args.to).toEqual(userB.address)
         expect(event.args.value.toString()).toEqual(toDec18(100_000).toString())
         //// check account_liquidity
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(userA.address)).value.ok
             .ok,
           {
@@ -847,7 +847,7 @@ describe('Pool spec', () => {
             shortfall: 0,
           },
         )
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(userB.address)).value.ok
             .ok,
           {
@@ -877,7 +877,7 @@ describe('Pool spec', () => {
         expect(event.args.to).toEqual(userA.address)
         expect(event.args.value.toString()).toEqual(toDec6(200_000).toString())
         //// check account_liquidity
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(userA.address)).value.ok
             .ok,
           {
@@ -885,7 +885,7 @@ describe('Pool spec', () => {
             shortfall: 0,
           },
         )
-        assertAccountLiqudity(
+        assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(userB.address)).value.ok
             .ok,
           {
