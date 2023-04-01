@@ -1064,8 +1064,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return 0
         }
         let borrow_index = self._borrow_index();
-        let prinicipal_times_index = U256::from(snapshot.principal).mul(U256::from(borrow_index));
-        prinicipal_times_index
+        let principal_times_index = U256::from(snapshot.principal).mul(U256::from(borrow_index));
+        principal_times_index
             .div(U256::from(snapshot.interest_index))
             .as_u128()
     }
