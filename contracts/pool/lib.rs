@@ -345,7 +345,7 @@ pub mod contract {
             self.pool.manager = manager;
             self.pool.rate_model = rate_model;
             self.pool.initial_exchange_rate_mantissa = initial_exchange_rate_mantissa;
-            self.pool.accural_block_timestamp = Self::env().block_timestamp();
+            self.pool.accrual_block_timestamp = Self::env().block_timestamp();
             self.metadata.name = Some(name);
             self.metadata.symbol = Some(symbol);
             self.metadata.decimals = decimals;

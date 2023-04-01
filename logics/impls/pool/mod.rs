@@ -80,7 +80,7 @@ pub struct Data {
     pub total_borrows: Balance,
     pub total_reserves: Balance,
     pub account_borrows: Mapping<AccountId, BorrowSnapshot>,
-    pub accural_block_timestamp: Timestamp,
+    pub accrual_block_timestamp: Timestamp,
     pub borrow_index: Balance,
     pub initial_exchange_rate_mantissa: WrappedU256,
     pub reserve_factor_mantissa: WrappedU256,
@@ -96,7 +96,7 @@ impl Default for Data {
             total_borrows: Default::default(),
             total_reserves: Default::default(),
             account_borrows: Default::default(),
-            accural_block_timestamp: 0,
+            accrual_block_timestamp: 0,
             borrow_index: 1,
             initial_exchange_rate_mantissa: WrappedU256::from(U256::zero()),
             reserve_factor_mantissa: WrappedU256::from(U256::zero()),
@@ -193,7 +193,7 @@ pub trait Internal {
     fn _borrow_balance_stored(&self, account: AccountId) -> Balance;
     fn _balance_of_underlying(&self, account: AccountId) -> Balance;
     fn _principal_balance_of(&self, account: &AccountId) -> Balance;
-    fn _accural_block_timestamp(&self) -> Timestamp;
+    fn _accrual_block_timestamp(&self) -> Timestamp;
     fn _borrow_index(&self) -> Balance;
     fn _initial_exchange_rate_mantissa(&self) -> WrappedU256;
     fn _reserve_factor_mantissa(&self) -> WrappedU256;
@@ -262,7 +262,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn get_accrual_block_timestamp(&self) -> Timestamp {
-        self._accural_block_timestamp()
+        self._accrual_block_timestamp()
     }
 
     default fn redeem(&mut self, redeem_tokens: Balance) -> Result<()> {
@@ -463,14 +463,14 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._accure_interest_at(Self::env().block_timestamp())
     }
     default fn _accure_interest_at(&mut self, at: Timestamp) -> Result<()> {
-        let accural = self._accural_block_timestamp();
-        if accural.eq(&at) {
+        let accrual = self._accrual_block_timestamp();
+        if accrual.eq(&at) {
             return Ok(())
         }
 
         let out = self._get_interest_at(at)?;
         let mut data = self.data::<Data>();
-        data.accural_block_timestamp = at;
+        data.accrual_block_timestamp = at;
         data.borrow_index = out.borrow_index;
         data.total_borrows = out.total_borrows;
         data.total_reserves = out.total_reserves;
@@ -494,7 +494,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             total_reserves: reserves,
             borrow_index: idx,
             borrow_rate: borrow_rate.into(),
-            old_block_timestamp: self._accural_block_timestamp(),
+            old_block_timestamp: self._accrual_block_timestamp(),
             new_block_timestamp: at,
             reserve_factor_mantissa: self._reserve_factor_mantissa().into(),
         })
@@ -555,7 +555,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         ControllerRef::mint_allowed(&self._controller(), contract_addr, minter, mint_amount)?;
 
         let current_timestamp = Self::env().block_timestamp();
-        if self._accural_block_timestamp() != current_timestamp {
+        if self._accrual_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         };
 
@@ -612,7 +612,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             Some(pool_attribute),
         )?;
         let current_timestamp = Self::env().block_timestamp();
-        if self._accural_block_timestamp() != current_timestamp {
+        if self._accrual_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
 
@@ -651,7 +651,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         )?;
 
         let current_timestamp = Self::env().block_timestamp();
-        if self._accural_block_timestamp() != current_timestamp {
+        if self._accrual_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         };
         if self._get_cash_prior() < borrow_amount {
@@ -702,7 +702,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         )?;
 
         let current_timestamp = Self::env().block_timestamp();
-        if self._accural_block_timestamp() != current_timestamp {
+        if self._accrual_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         };
 
@@ -770,7 +770,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         )?;
 
         let current_timestamp = Self::env().block_timestamp();
-        if self._accural_block_timestamp() != current_timestamp {
+        if self._accrual_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
         if collateral != contract_addr {
@@ -892,7 +892,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._accrue_interest()?;
 
         let current_timestamp = Self::env().block_timestamp();
-        if self._accural_block_timestamp() != current_timestamp {
+        if self._accrual_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
 
@@ -909,7 +909,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         new_interest_rate_model: AccountId,
     ) -> Result<()> {
         let current_timestamp = Self::env().block_timestamp();
-        if self._accural_block_timestamp() != current_timestamp {
+        if self._accrual_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
 
@@ -919,7 +919,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn _add_reserves(&mut self, amount: Balance) -> Result<()> {
         let current_timestamp = Self::env().block_timestamp();
-        if self._accural_block_timestamp() != current_timestamp {
+        if self._accrual_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
 
@@ -936,7 +936,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()> {
         let current_timestamp = Self::env().block_timestamp();
-        if self._accural_block_timestamp() != current_timestamp {
+        if self._accrual_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
 
@@ -1042,8 +1042,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         )
     }
 
-    default fn _accural_block_timestamp(&self) -> Timestamp {
-        Timestamp::from(self.data::<Data>().accural_block_timestamp)
+    default fn _accrual_block_timestamp(&self) -> Timestamp {
+        Timestamp::from(self.data::<Data>().accrual_block_timestamp)
     }
 
     default fn _total_reserves(&self) -> Balance {
