@@ -90,3 +90,18 @@ export const getGasLimit = (
 
 export const hexToUtf8 = (hexArray: number[]): string =>
   Buffer.from(hexArray.toString().replace('0x', ''), 'hex').toString('utf-8')
+
+export const extractAddressDeep = (records: unknown) =>
+  Object.keys(records).reduce((res, key) => {
+    if ('address' in records[key])
+      return {
+        ...res,
+        [key]: records[key].address,
+      }
+    if (typeof records[key] === 'object')
+      return {
+        ...res,
+        [key]: extractAddressDeep(records[key]),
+      }
+    return res
+  }, {})
