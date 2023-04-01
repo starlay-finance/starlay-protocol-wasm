@@ -320,6 +320,34 @@ describe('Pool spec', () => {
     })
   })
 
+  describe('.redeem_all', () => {
+    it('success', async () => {
+      const {
+        deployer,
+        pools: {
+          usdc: { token, pool },
+        },
+      } = await setup()
+
+      await shouldNotRevert(token, 'mint', [deployer.address, toDec6(60_000)])
+      await shouldNotRevert(token, 'approve', [pool.address, toDec6(60_000)])
+      await shouldNotRevert(pool, 'mint', [toDec6(10_000)])
+      await shouldNotRevert(pool, 'mint', [toDec6(20_000)])
+      await shouldNotRevert(pool, 'mint', [toDec6(30_000)])
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toBe(toDec6(60_000).toNumber())
+
+      await pool.withSigner(deployer).tx.redeemAll()
+      expect(
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toBe(0)
+      expect(
+        (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toBe(toDec6(60_000).toNumber())
+    })
+  })
+
   describe('.borrow', () => {
     let deployer: KeyringPair
     let token: PSP22Token
