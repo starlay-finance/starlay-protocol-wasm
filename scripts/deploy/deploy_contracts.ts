@@ -25,12 +25,12 @@ export const deployContracts = async ({
   config,
   tokenConfigs,
   option,
-}: DeployContractArgs): Promise<void> => {
-  await deployLens({ api, signer, args: [] })
-  await deployFaucet({ api, signer, args: [] })
+}: DeployContractArgs) => {
+  const lens = await deployLens({ api, signer, args: [] })
+  const faucet = await deployFaucet({ api, signer, args: [] })
   const priceOracle = await deployPriceOracle({ api, signer, args: [] })
 
-  const { controller } = await deployManagerAndController({
+  const { manager, controller } = await deployManagerAndController({
     api,
     signer,
     priceOracle,
@@ -38,7 +38,7 @@ export const deployContracts = async ({
     option,
   })
 
-  await deployPools({
+  const pools = await deployPools({
     api,
     signer,
     tokenConfigs,
@@ -47,4 +47,13 @@ export const deployContracts = async ({
     config,
     option,
   })
+
+  return {
+    lens,
+    faucet,
+    controller,
+    manager,
+    priceOracle,
+    pools,
+  }
 }

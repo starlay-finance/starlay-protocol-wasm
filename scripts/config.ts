@@ -9,6 +9,9 @@ export type Config = {
   roleGrantees?: Partial<
     Record<Exclude<keyof typeof ROLE, 'DEFAULT_ADMIN_ROLE'>, string>
   >
+  // for local only
+  mintee?: string[]
+  mintAmount?: string
 }
 
 export const CONFIG: Config = {

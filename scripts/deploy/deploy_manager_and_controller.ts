@@ -39,29 +39,37 @@ export const deployManagerAndController: DeployManagerAndController = async ({
     args: [signer.address],
   })
 
-  await sendTxWithPreview(manager, 'setController', [
-    controller.address,
+  await sendTxWithPreview(
+    manager,
+    'setController',
+    [controller.address],
     option,
-  ])
+  )
 
   for (const key of Object.keys(ROLE)) {
     const role = ROLE[key]
     if (role === ROLE.DEFAULT_ADMIN_ROLE) continue
     const grantee = (roleGrantees && roleGrantees[role]) || signer.address
-    await sendTxWithPreview(manager, 'grantRole', [role, grantee, option])
+    await sendTxWithPreview(manager, 'grantRole', [role, grantee], option)
   }
 
-  await sendTxWithPreview(controller, 'setPriceOracle', [
-    priceOracle.address,
+  await sendTxWithPreview(
+    controller,
+    'setPriceOracle',
+    [priceOracle.address],
     option,
-  ])
-  await sendTxWithPreview(controller, 'setCloseFactorMantissa', [
-    [closeFactor],
+  )
+  await sendTxWithPreview(
+    controller,
+    'setCloseFactorMantissa',
+    [[closeFactor]],
     option,
-  ])
-  await sendTxWithPreview(controller, 'setLiquidationIncentiveMantissa', [
-    [liquidationIncentive],
+  )
+  await sendTxWithPreview(
+    controller,
+    'setLiquidationIncentiveMantissa',
+    [[liquidationIncentive]],
     option,
-  ])
+  )
   return { manager, controller }
 }

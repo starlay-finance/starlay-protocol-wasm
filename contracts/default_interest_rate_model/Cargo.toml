@@ -14,7 +14,7 @@ scale-info = { version = "2.3", default-features = false, features = [
     "derive",
 ], optional = true }
 
-openbrush = { version = "3.0.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false }
+openbrush = { tag = "3.0.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false }
 logics = { path = "../../logics", default-features = false }
 
 [lib]

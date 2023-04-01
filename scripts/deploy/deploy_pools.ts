@@ -1,6 +1,8 @@
 import { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import Controller from '../../types/contracts/controller'
+import InterestRateModel from '../../types/contracts/default_interest_rate_model'
+import Pool from '../../types/contracts/pool'
 import PriceOracle from '../../types/contracts/price_oracle'
 import PSP22Token from '../../types/contracts/psp22_token'
 import { Config } from '../config'
@@ -8,8 +10,8 @@ import { defaultOption, sendTxWithPreview } from '../helper/utils'
 import { DummyToken, TokenConfig } from '../tokens'
 import {
   deployDefaultInterestRateModel,
-  deployPool,
   deployPSP22Token,
+  deployPool,
 } from './../helper/deploy_helper'
 
 type DeployPoolArgs = {
@@ -23,11 +25,19 @@ export const deployPools = async ({
   signer,
   tokenConfigs,
   ...args
-}: DeployPoolArgs): Promise<void> => {
+}: DeployPoolArgs): Promise<
+  Record<
+    string,
+    { token: PSP22Token; pool: Pool; interestRateModel: InterestRateModel }
+  >
+> => {
+  const deployments = {}
   const tokens = await deployDummyTokens(api, signer, tokenConfigs)
   for (const token of tokens) {
-    await deployAndSetupPool(api, signer, { token, ...args })
+    const res = await deployAndSetupPool(api, signer, { token, ...args })
+    deployments[token.config.symbol] = { token: token.token, ...res }
   }
+  return deployments
 }
 
 const deployDummyTokens = async (
@@ -70,7 +80,10 @@ const deployAndSetupPool = async (
     option,
   }: SetupPoolArgs,
 ) => {
-  const rateModelContract = await deployDefaultInterestRateModel({
+  console.log(
+    `---------------- Start setting up pool for ${config.symbol} ----------------`,
+  )
+  const interestRateModel = await deployDefaultInterestRateModel({
     api,
     signer,
     args: [
@@ -86,7 +99,7 @@ const deployAndSetupPool = async (
     args: [
       token.address,
       controller.address,
-      rateModelContract.address,
+      interestRateModel.address,
       [config.riskParameter.initialExchangeRateMantissa],
       [collateralNamePrefix + config.name],
       [collateralSymbolPrefix + config.symbol],
@@ -94,19 +107,26 @@ const deployAndSetupPool = async (
     ],
   })
 
-  await sendTxWithPreview(priceOracle, 'setFixedPrice', [
-    token.address,
-    config.price,
+  await sendTxWithPreview(
+    priceOracle,
+    'setFixedPrice',
+    [token.address, config.price],
     option,
-  ])
+  )
 
   await sendTxWithPreview(
     controller,
     'supportMarketWithCollateralFactorMantissa',
-    [pool.address, [config.riskParameter.collateralFactor], option],
-  )
-  await sendTxWithPreview(pool, 'setReserveFactorMantissa', [
-    [config.riskParameter.reserveFactor],
+    [pool.address, [config.riskParameter.collateralFactor]],
     option,
-  ])
+  )
+  await sendTxWithPreview(
+    pool,
+    'setReserveFactorMantissa',
+    [[config.riskParameter.reserveFactor]],
+    option,
+  )
+  console.log(`---------------- Finished ----------------`)
+
+  return { pool, interestRateModel }
 }

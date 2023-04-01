@@ -29,8 +29,8 @@
     "generate": "typechain-polkadot --in artifacts --out types --plugins typechain/plugins",
     "lint": "prettier --check . && eslint . && cargo check",
     "lint:fix": "prettier --write . && eslint . --fix && cargo fmt --all",
-    "deploy:local": "yarn compile:release && ts-node scripts/deploy/index.ts test",
-    "deploy:shibuya": "yarn compile:release && ts-node scripts/deploy/index.ts testnet"
+    "deploy:local": "yarn compile:release && ts-node scripts/deploy/index.ts local",
+    "deploy:shibuya": "yarn compile:release && ts-node scripts/deploy/index.ts shibuya"
   },
   "resolutions": {
     "@polkadot/api": "^9.10.3",

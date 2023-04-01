@@ -1,27 +1,43 @@
 import { CONFIG } from '../config'
 import { setEnv } from '../env'
-import { defaultOption } from '../helper/utils'
+import {
+  defaultOption,
+  extractAddressDeep,
+  mintNativeToken,
+} from '../helper/utils'
 import { providerAndSigner } from '../helper/wallet_helper'
 import { DUMMY_TOKENS } from '../tokens'
+import { ENV } from './../env'
 import { deployContracts } from './deploy_contracts'
 
 const main = async () => {
   const env = setEnv(process.argv[2])
-  console.log(`env: ${env}`)
+  console.log(`Start deploying to: ${env}`)
+
   const { api, signer } = await providerAndSigner(env)
+  const config = CONFIG
   const option = defaultOption(api)
-  await deployContracts({
+
+  const deployments = await deployContracts({
     api,
     signer,
-    config: CONFIG,
+    config,
     tokenConfigs: DUMMY_TOKENS,
     option,
   })
+
+  if (env === ENV.local) await mintNativeToken(api, signer, config)
+
+  return {
+    env,
+    deployments,
+  }
 }
 
 main()
-  .then(() => {
-    console.log('finish')
+  .then(({ env, deployments }) => {
+    console.log(`Finished deployment for: ${env}`)
+    console.log(extractAddressDeep(deployments))
     process.exit(0)
   })
   .catch((e) => {
