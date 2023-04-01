@@ -10,8 +10,8 @@ import { ONE_ETHER } from './constants'
 import { ExcludeLastArrayElement } from './utilityTypes'
 
 const WAIT_FINALIZED_SECONDS = 10000
-const MAX_CALL_WEIGHT = new BN(990_000_000).isub(BN_ONE).mul(new BN(10))
-const PROOFSIZE = new BN(1_100_000)
+const MAX_CALL_WEIGHT = new BN(2_000_000_000).isub(BN_ONE).mul(new BN(10))
+const PROOFSIZE = new BN(2_000_000)
 
 export const isTest = (): boolean => process.env.NODE_ENV === 'test'
 
@@ -53,7 +53,7 @@ export const sendTxWithPreview = async <
       )}): ${JSON.stringify(e)}`,
     )
   }
-  const res = await contract.tx[fn](...args)
+  const res = await contract.tx[fn](...args, option)
   await waitForTx(res)
   console.log(`Succeeded: ${toCalldata(contract, fn, ...args)}`)
   return res
