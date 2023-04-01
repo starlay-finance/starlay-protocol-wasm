@@ -17,7 +17,7 @@ export const percent = (val: number): BN => {
 export const waitForTx = async (
   result: SignAndSendSuccessResponse,
 ): Promise<void> => {
-  if (isTest() || getCurrentEnv() === ENV.test) return
+  if (isTest() || getCurrentEnv() === ENV.local) return
 
   while (!result.result.isFinalized) {
     await new Promise((resolve) => setTimeout(resolve, WAIT_FINALIZED_SECONDS))

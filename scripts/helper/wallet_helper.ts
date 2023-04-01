@@ -18,6 +18,6 @@ const provider = (env: Env) => {
 const getSigner = async (env: Env) => {
   await waitReady()
   const keyring = new Keyring({ type: 'sr25519' })
-  if (env === ENV.test) return keyring.addFromUri('//Alice')
+  if (env === ENV.local) return keyring.addFromUri('//Alice')
   return keyring.addFromMnemonic(mnemonic())
 }
