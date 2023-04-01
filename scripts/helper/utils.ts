@@ -1,8 +1,10 @@
 import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
 import { ApiPromise } from '@polkadot/api'
+import type { KeyringPair } from '@polkadot/keyring/types'
 import { WeightV2 } from '@polkadot/types/interfaces'
 import { BN, BN_ONE } from '@polkadot/util'
 import { LastArrayElement } from 'type-fest'
+import { Config } from '../config'
 import { ENV, getCurrentEnv } from '../env'
 import { ONE_ETHER } from './constants'
 import { ExcludeLastArrayElement } from './utilityTypes'
@@ -105,3 +107,17 @@ export const extractAddressDeep = (records: unknown) =>
       }
     return res
   }, {})
+
+export const mintNativeToken = async (
+  api: ApiPromise,
+  signer: KeyringPair,
+  config: Config,
+) => {
+  if (!config.mintee) return
+  const amount = config.mintAmount || '0xffffffffffffffffffff'
+  for (const address of config.mintee) {
+    const transfer = api.tx.balances.transfer(address, amount)
+    await transfer.signAndSend(signer)
+    console.log(`Native token minted: ${amount}@${address}`)
+  }
+}

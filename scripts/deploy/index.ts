@@ -3,6 +3,7 @@ import { setEnv } from '../env'
 import {
   defaultOption,
   extractAddressDeep,
+  mintNativeToken,
 } from '../helper/utils'
 import { providerAndSigner } from '../helper/wallet_helper'
 import { DUMMY_TOKENS } from '../tokens'
@@ -14,15 +15,18 @@ const main = async () => {
   console.log(`Start deploying to: ${env}`)
 
   const { api, signer } = await providerAndSigner(env)
+  const config = CONFIG
   const option = defaultOption(api)
 
   const deployments = await deployContracts({
     api,
     signer,
-    config: CONFIG,
+    config,
     tokenConfigs: DUMMY_TOKENS,
     option,
   })
+
+  if (env === ENV.local) await mintNativeToken(api, signer, config)
 
   return {
     env,
