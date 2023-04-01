@@ -14,11 +14,15 @@ use super::types::WrappedU256;
 #[openbrush::wrapper]
 pub type ControllerRef = dyn Controller;
 
+/// trait defines the interface for the controller of a lending protocol.
+/// It contains a set of functions that are responsible for validating and calculating various actions related to lending, such as minting, borrowing, and liquidation.
 #[openbrush::trait_definition]
 pub trait Controller {
+    /// Checks if the account should be allowed to mint tokens in the given market
     #[ink(message)]
     fn mint_allowed(&self, pool: AccountId, minter: AccountId, mint_amount: Balance) -> Result<()>;
 
+    /// Validates mint and reverts on rejection. May emit logs.
     #[ink(message)]
     fn mint_verify(
         &self,
@@ -28,6 +32,7 @@ pub trait Controller {
         mint_tokens: Balance,
     ) -> Result<()>;
 
+    /// Checks if the account should be allowed to redeem tokens in the given market
     #[ink(message)]
     fn redeem_allowed(
         &self,
@@ -37,6 +42,7 @@ pub trait Controller {
         pool_attribure: Option<PoolAttributes>,
     ) -> Result<()>;
 
+    /// Validates redeem and reverts on rejection. May emit logs.
     #[ink(message)]
     fn redeem_verify(
         &self,
@@ -46,6 +52,7 @@ pub trait Controller {
         redeem_tokens: Balance,
     ) -> Result<()>;
 
+    /// Checks if the account should be allowed to borrow the underlying asset of the given market
     #[ink(message)]
     fn borrow_allowed(
         &self,
@@ -55,6 +62,7 @@ pub trait Controller {
         pool_attribure: Option<PoolAttributes>,
     ) -> Result<()>;
 
+    /// Validates borrow and reverts on rejection. May emit logs.
     #[ink(message)]
     fn borrow_verify(
         &self,
@@ -63,6 +71,7 @@ pub trait Controller {
         borrow_amount: Balance,
     ) -> Result<()>;
 
+    /// Checks if the account should be allowed to repay a borrow in the given market
     #[ink(message)]
     fn repay_borrow_allowed(
         &self,
@@ -72,6 +81,7 @@ pub trait Controller {
         repay_amount: Balance,
     ) -> Result<()>;
 
+    /// Validates repayBorrow and reverts on rejection. May emit logs.
     #[ink(message)]
     fn repay_borrow_verify(
         &self,
@@ -82,6 +92,7 @@ pub trait Controller {
         borrower_index: u128,
     ) -> Result<()>;
 
+    /// Checks if the liquidation should be allowed to occur
     #[ink(message)]
     fn liquidate_borrow_allowed(
         &self,
@@ -93,6 +104,7 @@ pub trait Controller {
         pool_attribure: Option<PoolAttributes>,
     ) -> Result<()>;
 
+    /// Validates liquidateBorrow and reverts on rejection. May emit logs.
     #[ink(message)]
     fn liquidate_borrow_verify(
         &self,
@@ -104,6 +116,7 @@ pub trait Controller {
         seize_tokens: Balance,
     ) -> Result<()>;
 
+    /// Checks if the seizing of assets should be allowed to occur
     #[ink(message)]
     fn seize_allowed(
         &self,
@@ -114,6 +127,7 @@ pub trait Controller {
         seize_tokens: Balance,
     ) -> Result<()>;
 
+    /// Validates seize and reverts on rejection. May emit logs.
     #[ink(message)]
     fn seize_verify(
         &self,
@@ -124,6 +138,7 @@ pub trait Controller {
         seize_tokens: Balance,
     ) -> Result<()>;
 
+    /// Checks if the account should be allowed to transfer tokens in the given market
     #[ink(message)]
     fn transfer_allowed(
         &self,
@@ -134,6 +149,7 @@ pub trait Controller {
         pool_attribure: Option<PoolAttributes>,
     ) -> Result<()>;
 
+    /// Validates transfer and reverts on rejection. May emit logs.
     #[ink(message)]
     fn transfer_verify(
         &self,
@@ -143,6 +159,7 @@ pub trait Controller {
         transfer_tokens: Balance,
     ) -> Result<()>;
 
+    /// Checks if the account should be allowed to transfer tokens in the given market
     #[ink(message)]
     fn liquidate_calculate_seize_tokens(
         &self,
@@ -155,12 +172,16 @@ pub trait Controller {
     ) -> Result<Balance>;
 
     // admin functions
+
+    /// Sets a new price oracle for the controller
     #[ink(message)]
     fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
 
+    /// Add the market to the markets mapping and set it as listed
     #[ink(message)]
     fn support_market(&mut self, pool: AccountId) -> Result<()>;
 
+    /// Add the market to the markets mapping and set it as listed with collateral_factor
     #[ink(message)]
     fn support_market_with_collateral_factor_mantissa(
         &mut self,
@@ -168,6 +189,7 @@ pub trait Controller {
         collateral_factor_mantissa: WrappedU256,
     ) -> Result<()>;
 
+    /// Sets the collateralFactor for a market
     #[ink(message)]
     fn set_collateral_factor_mantissa(
         &mut self,
@@ -175,59 +197,96 @@ pub trait Controller {
         new_collateral_factor_mantissa: WrappedU256,
     ) -> Result<()>;
 
+    /// Update the pause status of mint action in the pool
     #[ink(message)]
     fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()>;
 
+    /// Update the pause status of borrow action in the pool
     #[ink(message)]
     fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()>;
 
+    /// Update the pause status of seize action in the pool
     #[ink(message)]
     fn set_seize_guardian_paused(&mut self, paused: bool) -> Result<()>;
 
+    /// Update the transfer status of seize action in the pool
     #[ink(message)]
     fn set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()>;
 
+    /// Sets the closeFactor used when liquidating borrows
     #[ink(message)]
     fn set_close_factor_mantissa(&mut self, new_close_factor_mantissa: WrappedU256) -> Result<()>;
 
+    /// Sets liquidationIncentive
     #[ink(message)]
     fn set_liquidation_incentive_mantissa(
         &mut self,
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()>;
 
+    /// Set the given borrow caps for the given pool.
+    /// Borrowing that brings total borrows to or above borrow cap will revert.
     #[ink(message)]
     fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()>;
 
     // view function
+    /// Returns the list of all markets that are currently supported
     #[ink(message)]
     fn markets(&self) -> Vec<AccountId>;
+
+    /// Returns the collateral factor for a given pool
     #[ink(message)]
     fn collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256>;
+
+    /// Returns the current mint pause status for a given pool
     #[ink(message)]
     fn mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
+
+    /// Returns the current borrow pause status for a given pool
     #[ink(message)]
     fn borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
+
+    /// Returns the current seize pause status
     #[ink(message)]
     fn seize_guardian_paused(&self) -> bool;
+
+    /// Returns the current transfer pause status
     #[ink(message)]
     fn transfer_guardian_paused(&self) -> bool;
+
+    /// Returns the price oracle account id
     #[ink(message)]
     fn oracle(&self) -> AccountId;
+
+    /// Returns the close factor
     #[ink(message)]
     fn close_factor_mantissa(&self) -> WrappedU256;
+
+    /// Returns the liquidation incentive
     #[ink(message)]
     fn liquidation_incentive_mantissa(&self) -> WrappedU256;
+
+    /// Returns the borrow cap for a given pool
     #[ink(message)]
     fn borrow_cap(&self, pool: AccountId) -> Option<Balance>;
+
+    /// Returns the account id of the manager account
     #[ink(message)]
     fn manager(&self) -> AccountId;
+
+    /// Returns whether a given pool is currently listed
     #[ink(message)]
     fn is_listed(&self, pool: AccountId) -> bool;
+
+    /// Returns a list of assets associated with a given account
     #[ink(message)]
     fn account_assets(&self, account: AccountId) -> Vec<AccountId>;
+
+    /// Determine the current account liquidity with respect to collateral requirements
     #[ink(message)]
     fn get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)>;
+
+    /// Determine what the account liquidity would be if the given amounts were redeemed/borrowed
     #[ink(message)]
     fn get_hypothetical_account_liquidity(
         &self,
