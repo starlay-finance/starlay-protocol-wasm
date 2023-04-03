@@ -1,3 +1,4 @@
+/* eslint-disable dot-notation */
 import { ReturnNumber } from '@727-ventures/typechain-types'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
@@ -39,12 +40,10 @@ describe('Pool spec', () => {
       args: [],
     })
 
-    // temp: declare params for rate_model
-    const rateModelArg = new BN(100).mul(ONE_ETHER)
     const rateModel = await deployDefaultInterestRateModel({
       api,
       signer: deployer,
-      args: [[rateModelArg], [rateModelArg], [rateModelArg], [rateModelArg]],
+      args: [[0], [0], [0], [0]],
     })
 
     const pools = await preparePoolsWithPreparedTokens({
@@ -510,7 +509,7 @@ describe('Pool spec', () => {
       expect(event.args.accountBorrows.toString()).toEqual(
         toDec6(5_500).toString(),
       )
-      expect(event.args.totalBorrows.toNumber()).toBeGreaterThanOrEqual(
+      expect(event.args.totalBorrows.toNumber()).toEqual(
         toDec6(5_500).toNumber(),
       )
     })
