@@ -447,6 +447,14 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._principal_balance_of(&account)
     }
 
+    default fn accrual_block_timestamp(&self) -> Timestamp {
+        self._accrual_block_timestamp()
+    }
+
+    default fn borrow_index(&self) -> Balance {
+        self._borrow_index()
+    }
+
     default fn initial_exchange_rate_mantissa(&self) -> WrappedU256 {
         self._initial_exchange_rate_mantissa()
     }

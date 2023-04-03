@@ -45,6 +45,12 @@ pub mod contract {
     }
 
     #[ink(event)]
+    pub struct AccrueInterest {
+        interest_accumulated: Balance,
+        borrow_index: Balance,
+        total_borrows: Balance,
+    }
+    #[ink(event)]
     pub struct Mint {
         minter: AccountId,
         mint_amount: Balance,
@@ -128,6 +134,18 @@ pub mod contract {
         }
     }
     impl Internal for PoolContract {
+        fn _emit_accrue_interest_event(
+            &self,
+            interest_accumulated: Balance,
+            borrow_index: Balance,
+            total_borrows: Balance,
+        ) {
+            self.env().emit_event(AccrueInterest {
+                interest_accumulated,
+                borrow_index,
+                total_borrows,
+            })
+        }
         fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance) {
             self.env().emit_event(Mint {
                 minter,

@@ -140,6 +140,10 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn principal_balance_of(&self, account: AccountId) -> Balance;
     #[ink(message)]
+    fn accrual_block_timestamp(&self) -> Timestamp;
+    #[ink(message)]
+    fn borrow_index(&self) -> Balance;
+    #[ink(message)]
     fn initial_exchange_rate_mantissa(&self) -> WrappedU256;
     #[ink(message)]
     fn reserve_factor_mantissa(&self) -> WrappedU256;
