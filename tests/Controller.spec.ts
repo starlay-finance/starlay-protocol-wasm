@@ -39,7 +39,6 @@ describe('Controller spec', () => {
 
     // initialize
     await controller.tx.setPriceOracle(priceOracle.address)
-    await controller.tx.setCloseFactorMantissa([ONE_ETHER])
 
     return {
       api,
