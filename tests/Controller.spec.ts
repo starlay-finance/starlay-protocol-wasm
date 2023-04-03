@@ -312,6 +312,46 @@ describe('Controller spec', () => {
     })
   })
 
+  describe('.seize_allowed', () => {
+    it('check pause status', async () => {
+      const {
+        controller,
+        pools: { dai },
+      } = await setupWithPools()
+      await controller.tx.setSeizeGuardianPaused(true)
+      const { value } = await controller.query.seizeAllowed(
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+      )
+      expect(value.ok.err).toBe('SeizeIsPaused')
+    })
+    it('check listed markets', async () => {
+      const {
+        controller,
+        pools: { dai },
+      } = await setupWithPools()
+      const { value: val1 } = await controller.query.seizeAllowed(
+        dai.pool.address,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+      )
+      expect(val1.ok.err).toBe('MarketNotListed')
+      const { value: val2 } = await controller.query.seizeAllowed(
+        ZERO_ADDRESS,
+        dai.pool.address,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+      )
+      expect(val2.ok.err).toBe('MarketNotListed')
+    })
+  })
+
   it('.set_close_factor_mantissa', async () => {
     const { controller } = await setup()
     const expScale = new BN(10).pow(new BN(18))
