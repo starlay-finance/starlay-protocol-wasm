@@ -1,3 +1,5 @@
+[![ci](https://github.com/starlay-finance/starlay-protocol-wasm/actions/workflows/ci.yml/badge.svg)](https://github.com/starlay-finance/starlay-protocol-wasm/actions/workflows/ci.yml)
+
 # starlay-protocol-wasm
 
 This repository is a Lending Protocol Template for WASM contracts using [ink!](https://use.ink/).
