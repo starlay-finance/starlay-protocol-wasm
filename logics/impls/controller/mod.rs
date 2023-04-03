@@ -686,7 +686,7 @@ impl<T: Storage<Data>> Internal for T {
         }
         let borrow_cap = self._borrow_cap(pool).unwrap();
         if borrow_cap != 0 {
-            if total_borrow > borrow_cap - borrow_amount {
+            if borrow_cap < borrow_amount || total_borrow > borrow_cap - borrow_amount {
                 return Err(Error::BorrowCapReached)
             }
         }

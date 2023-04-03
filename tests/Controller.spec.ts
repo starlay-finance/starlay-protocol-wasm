@@ -50,6 +50,38 @@ describe('Controller spec', () => {
     }
   }
 
+  const setupWithPools = async () => {
+    const { api, deployer, rateModel, controller, priceOracle } = await setup()
+
+    const pools = await preparePoolsWithPreparedTokens({
+      api,
+      controller,
+      rateModel,
+      manager: deployer,
+    })
+
+    // initialize
+    await controller.tx.setPriceOracle(priceOracle.address)
+    await controller.tx.setCloseFactorMantissa([ONE_ETHER])
+    //// for pool
+    for (const sym of [pools.dai, pools.usdc, pools.usdt]) {
+      await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+      await controller.tx.supportMarketWithCollateralFactorMantissa(
+        sym.pool.address,
+        [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
+      )
+    }
+
+    return {
+      api,
+      deployer,
+      rateModel,
+      controller,
+      priceOracle,
+      pools,
+    }
+  }
+
   it('instantiate', async () => {
     const { controller, priceOracle } = await setup()
     const markets = (await controller.query.markets()).value.ok
@@ -83,7 +115,7 @@ describe('Controller spec', () => {
   })
 
   describe('.redeem_allowed', () => {
-    it('check hypothetical account liquidity', async () => {
+    it('check account liquidity', async () => {
       const { api, deployer, rateModel, controller, priceOracle } =
         await setup()
       const usdc = await preparePoolWithMockToken({
@@ -105,6 +137,98 @@ describe('Controller spec', () => {
         null,
       )
       expect(value.ok.err).toBe('InsufficientLiquidity')
+    })
+  })
+
+  describe('.borrow_allowed', () => {
+    it('check pause status', async () => {
+      const {
+        controller,
+        pools: { dai },
+      } = await setupWithPools()
+      await controller.tx.setBorrowGuardianPaused(dai.pool.address, true)
+      const { value } = await controller.query.borrowAllowed(
+        dai.pool.address,
+        ZERO_ADDRESS,
+        0,
+        null,
+      )
+      expect(value.ok.err).toBe('BorrowIsPaused')
+    })
+    it('check price error', async () => {
+      const { api, deployer, rateModel, controller, priceOracle } =
+        await setup()
+      const sampleCoin = await preparePoolWithMockToken({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+        metadata: {
+          name: 'Sample',
+          symbol: 'SAMPLE',
+          decimals: 6,
+        },
+      })
+      await controller.tx.supportMarket(sampleCoin.pool.address)
+
+      const { value: value1 } = await controller.query.borrowAllowed(
+        sampleCoin.pool.address,
+        ZERO_ADDRESS,
+        0,
+        null,
+      )
+      expect(value1.ok.err).toBe('PriceError')
+
+      await priceOracle.tx.setFixedPrice(sampleCoin.token.address, 0)
+      const { value: value2 } = await controller.query.borrowAllowed(
+        sampleCoin.pool.address,
+        ZERO_ADDRESS,
+        0,
+        null,
+      )
+      expect(value2.ok.err).toBe('PriceError')
+    })
+    it('check borrow cap', async () => {
+      const {
+        controller,
+        pools: { dai },
+      } = await setupWithPools()
+      await controller.tx.setBorrowCap(dai.pool.address, 1)
+
+      const { value } = await controller.query.borrowAllowed(
+        dai.pool.address,
+        ZERO_ADDRESS,
+        2,
+        null,
+      )
+      expect(value.ok.err).toBe('BorrowCapReached')
+    })
+    it('check account liquidity', async () => {
+      const {
+        controller,
+        pools: { dai },
+      } = await setupWithPools()
+
+      const { value } = await controller.query.borrowAllowed(
+        dai.pool.address,
+        ZERO_ADDRESS,
+        1,
+        null,
+      )
+      expect(value.ok.err).toBe('InsufficientLiquidity')
+    })
+  })
+
+  describe('.repay_borrow_allowed', () => {
+    it('do nothing', async () => {
+      const { controller } = await setup()
+      const { value } = await controller.query.repayBorrowAllowed(
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+      )
+      expect(value.ok.ok).toBeNull
     })
   })
 
