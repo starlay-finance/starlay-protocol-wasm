@@ -9,9 +9,9 @@ import {
 } from '../scripts/helper/deploy_helper'
 import { hexToUtf8 } from '../scripts/helper/utils'
 import {
-  preparePoolsWithPreparedTokens,
-  preparePoolWithMockToken,
   TEST_METADATAS,
+  preparePoolWithMockToken,
+  preparePoolsWithPreparedTokens,
 } from './testContractHelper'
 import { mantissa, shouldNotRevert, toDec18, toDec6 } from './testHelpers'
 
@@ -50,6 +50,39 @@ describe('Controller spec', () => {
     }
   }
 
+  const setupWithPools = async () => {
+    const { api, deployer, rateModel, controller, priceOracle, users } =
+      await setup()
+
+    const pools = await preparePoolsWithPreparedTokens({
+      api,
+      controller,
+      rateModel,
+      manager: deployer,
+    })
+
+    // initialize
+    await controller.tx.setPriceOracle(priceOracle.address)
+    //// for pool
+    for (const sym of [pools.dai, pools.usdc, pools.usdt]) {
+      await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+      await controller.tx.supportMarketWithCollateralFactorMantissa(
+        sym.pool.address,
+        [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
+      )
+    }
+
+    return {
+      api,
+      deployer,
+      rateModel,
+      controller,
+      priceOracle,
+      pools,
+      users,
+    }
+  }
+
   it('instantiate', async () => {
     const { controller, priceOracle } = await setup()
     const markets = (await controller.query.markets()).value.ok
@@ -64,6 +97,324 @@ describe('Controller spec', () => {
       await controller.query.liquidationIncentiveMantissa()
     ).value.ok
     expect(liquidationIncentiveMantissa.toNumber()).toEqual(0)
+  })
+
+  describe('.mint_allowed', () => {
+    it('check pause status', async () => {
+      const { controller } = await setup()
+      const poolAddr = encodeAddress(
+        '0x0000000000000000000000000000000000000000000000000000000000000001',
+      )
+      await controller.tx.setMintGuardianPaused(poolAddr, true)
+      const { value } = await controller.query.mintAllowed(
+        poolAddr,
+        ZERO_ADDRESS,
+        0,
+      )
+      expect(value.ok.err).toBe('MintIsPaused')
+    })
+  })
+
+  describe('.redeem_allowed', () => {
+    it('check account liquidity', async () => {
+      const { api, deployer, rateModel, controller, priceOracle } =
+        await setup()
+      const usdc = await preparePoolWithMockToken({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+        metadata: TEST_METADATAS.usdc,
+      })
+      await priceOracle.tx.setFixedPrice(usdc.token.address, ONE_ETHER)
+      await controller.tx.supportMarketWithCollateralFactorMantissa(
+        usdc.pool.address,
+        [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
+      )
+      const { value } = await controller.query.redeemAllowed(
+        usdc.pool.address,
+        deployer.address,
+        1,
+        null,
+      )
+      expect(value.ok.err).toBe('InsufficientLiquidity')
+    })
+  })
+
+  describe('.borrow_allowed', () => {
+    it('check pause status', async () => {
+      const {
+        controller,
+        pools: { dai },
+      } = await setupWithPools()
+      await controller.tx.setBorrowGuardianPaused(dai.pool.address, true)
+      const { value } = await controller.query.borrowAllowed(
+        dai.pool.address,
+        ZERO_ADDRESS,
+        0,
+        null,
+      )
+      expect(value.ok.err).toBe('BorrowIsPaused')
+    })
+    it('check price error', async () => {
+      const { api, deployer, rateModel, controller, priceOracle } =
+        await setup()
+      const sampleCoin = await preparePoolWithMockToken({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+        metadata: {
+          name: 'Sample',
+          symbol: 'SAMPLE',
+          decimals: 6,
+        },
+      })
+      await controller.tx.supportMarket(sampleCoin.pool.address)
+
+      const { value: value1 } = await controller.query.borrowAllowed(
+        sampleCoin.pool.address,
+        ZERO_ADDRESS,
+        0,
+        null,
+      )
+      expect(value1.ok.err).toBe('PriceError')
+
+      await priceOracle.tx.setFixedPrice(sampleCoin.token.address, 0)
+      const { value: value2 } = await controller.query.borrowAllowed(
+        sampleCoin.pool.address,
+        ZERO_ADDRESS,
+        0,
+        null,
+      )
+      expect(value2.ok.err).toBe('PriceError')
+    })
+    it('check borrow cap', async () => {
+      const {
+        controller,
+        pools: { dai },
+      } = await setupWithPools()
+      await controller.tx.setBorrowCap(dai.pool.address, 1)
+
+      const { value } = await controller.query.borrowAllowed(
+        dai.pool.address,
+        ZERO_ADDRESS,
+        2,
+        null,
+      )
+      expect(value.ok.err).toBe('BorrowCapReached')
+    })
+    it('check account liquidity', async () => {
+      const {
+        controller,
+        pools: { dai },
+      } = await setupWithPools()
+
+      const { value } = await controller.query.borrowAllowed(
+        dai.pool.address,
+        ZERO_ADDRESS,
+        1,
+        null,
+      )
+      expect(value.ok.err).toBe('InsufficientLiquidity')
+    })
+  })
+
+  describe('.repay_borrow_allowed', () => {
+    it('do nothing', async () => {
+      const { controller } = await setup()
+      const { value } = await controller.query.repayBorrowAllowed(
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+      )
+      expect(value.ok.ok).toBeNull
+    })
+  })
+
+  describe('.liquidate_borrow_allowed', () => {
+    it('check listed markets', async () => {
+      const {
+        controller,
+        pools: { dai, usdc },
+      } = await setupWithPools()
+
+      const { value: val1 } = await controller.query.liquidateBorrowAllowed(
+        dai.pool.address,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+        null,
+      )
+      expect(val1.ok.err).toBe('MarketNotListed')
+      const { value: val2 } = await controller.query.liquidateBorrowAllowed(
+        ZERO_ADDRESS,
+        usdc.pool.address,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+        null,
+      )
+      expect(val2.ok.err).toBe('MarketNotListed')
+    })
+    it('check account liquidity', async () => {
+      const {
+        controller,
+        pools: { dai, usdc },
+      } = await setupWithPools()
+      const { value } = await controller.query.liquidateBorrowAllowed(
+        dai.pool.address,
+        usdc.pool.address,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+        null,
+      )
+      expect(value.ok.err).toBe('InsufficientShortfall')
+    })
+    it('check too much repay', async () => {
+      const {
+        deployer,
+        controller,
+        pools: { dai, usdc },
+        users: [borrower],
+      } = await setupWithPools()
+
+      // Prepares
+      //// add liquidity to usdc pool
+      await usdc.token.tx.mint(deployer.address, toDec6(10_000))
+      await usdc.token.tx.approve(usdc.pool.address, toDec6(10_000))
+      await usdc.pool.tx.mint(toDec6(10_000))
+      //// mint to dai pool for collateral
+      await dai.token.tx.mint(borrower.address, toDec18(20_000))
+      await dai.token
+        .withSigner(borrower)
+        .tx.approve(dai.pool.address, toDec18(20_000))
+      await dai.pool.withSigner(borrower).tx.mint(toDec18(20_000))
+      //// borrow usdc
+      await usdc.pool.withSigner(borrower).tx.borrow(toDec6(10_000))
+      //// down collateral_factor for dai
+      await controller.tx.setCollateralFactorMantissa(dai.pool.address, [
+        new BN(1),
+      ])
+
+      const { value } = await controller.query.liquidateBorrowAllowed(
+        usdc.pool.address,
+        dai.pool.address,
+        deployer.address,
+        borrower.address,
+        toDec6(10_000),
+        null,
+      )
+      expect(value.ok.err).toBe('TooMuchRepay')
+    })
+  })
+
+  describe('.seize_allowed', () => {
+    it('check pause status', async () => {
+      const {
+        controller,
+        pools: { dai },
+      } = await setupWithPools()
+      await controller.tx.setSeizeGuardianPaused(true)
+      const { value } = await controller.query.seizeAllowed(
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+      )
+      expect(value.ok.err).toBe('SeizeIsPaused')
+    })
+    it('check listed markets', async () => {
+      const {
+        controller,
+        pools: { dai },
+      } = await setupWithPools()
+      const { value: val1 } = await controller.query.seizeAllowed(
+        dai.pool.address,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+      )
+      expect(val1.ok.err).toBe('MarketNotListed')
+      const { value: val2 } = await controller.query.seizeAllowed(
+        ZERO_ADDRESS,
+        dai.pool.address,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+      )
+      expect(val2.ok.err).toBe('MarketNotListed')
+    })
+  })
+
+  it('.transfer_allowed', async () => {
+    const { api, deployer, controller, rateModel, priceOracle, users } =
+      await setup()
+    const { dai, usdc } = await preparePoolsWithPreparedTokens({
+      api,
+      controller,
+      rateModel,
+      manager: deployer,
+    })
+    const [sender, receiver] = users
+
+    // prerequisite
+    //// initialize
+    const toParam = (m: BN) => [m.toString()]
+    for (const sym of [dai, usdc]) {
+      await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+      await controller.tx.supportMarketWithCollateralFactorMantissa(
+        sym.pool.address,
+        toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+      )
+    }
+    //// use protocol
+    for await (const { sym, value, user } of [
+      {
+        sym: usdc,
+        value: toDec6(50_000),
+        user: sender,
+      },
+    ]) {
+      const { pool, token } = sym
+      await token.withSigner(deployer).tx.mint(user.address, value)
+      await token.withSigner(user).tx.approve(pool.address, value)
+      await pool.withSigner(user).tx.mint(value)
+    }
+
+    {
+      const res = await controller.query.transferAllowed(
+        usdc.pool.address,
+        sender.address,
+        ZERO_ADDRESS,
+        toDec6(50_000),
+        null,
+      )
+      expect(res.value.ok.ok).toBe(null)
+    }
+    {
+      const res = await controller.query.transferAllowed(
+        usdc.pool.address,
+        sender.address,
+        ZERO_ADDRESS,
+        toDec6(50_000).add(new BN(1)),
+        null,
+      )
+      expect(res.value.ok.err).toBe('InsufficientLiquidity')
+    }
+    {
+      const res = await usdc.pool
+        .withSigner(sender)
+        .query.transfer(receiver.address, toDec6(50_000).add(new BN(1)), [])
+      expect(hexToUtf8(res.value.ok.err['custom'])).toBe(
+        'InsufficientLiquidity',
+      )
+    }
   })
 
   it('.set_close_factor_mantissa', async () => {
@@ -553,73 +904,6 @@ describe('Controller spec', () => {
           },
         )
       })
-    })
-  })
-
-  describe('.xxx_allowed', () => {
-    it('.transfer_allowed', async () => {
-      const { api, deployer, controller, rateModel, priceOracle, users } =
-        await setup()
-      const { dai, usdc } = await preparePoolsWithPreparedTokens({
-        api,
-        controller,
-        rateModel,
-        manager: deployer,
-      })
-      const [sender, receiver] = users
-
-      // prerequisite
-      //// initialize
-      const toParam = (m: BN) => [m.toString()]
-      for (const sym of [dai, usdc]) {
-        await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
-        await controller.tx.supportMarketWithCollateralFactorMantissa(
-          sym.pool.address,
-          toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
-        )
-      }
-      //// use protocol
-      for await (const { sym, value, user } of [
-        {
-          sym: usdc,
-          value: toDec6(50_000),
-          user: sender,
-        },
-      ]) {
-        const { pool, token } = sym
-        await token.withSigner(deployer).tx.mint(user.address, value)
-        await token.withSigner(user).tx.approve(pool.address, value)
-        await pool.withSigner(user).tx.mint(value)
-      }
-
-      {
-        const res = await controller.query.transferAllowed(
-          usdc.pool.address,
-          sender.address,
-          ZERO_ADDRESS,
-          toDec6(50_000),
-          null,
-        )
-        expect(res.value.ok.ok).toBe(null)
-      }
-      {
-        const res = await controller.query.transferAllowed(
-          usdc.pool.address,
-          sender.address,
-          ZERO_ADDRESS,
-          toDec6(50_000).add(new BN(1)),
-          null,
-        )
-        expect(res.value.ok.err).toBe('InsufficientLiquidity')
-      }
-      {
-        const res = await usdc.pool
-          .withSigner(sender)
-          .query.transfer(receiver.address, toDec6(50_000).add(new BN(1)), [])
-        expect(hexToUtf8(res.value.ok.err['custom'])).toBe(
-          'InsufficientLiquidity',
-        )
-      }
     })
   })
 })

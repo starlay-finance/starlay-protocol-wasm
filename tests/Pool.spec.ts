@@ -6,9 +6,9 @@ import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
   deployDefaultInterestRateModel,
+  deployPSP22Token,
   deployPoolFromAsset,
   deployPriceOracle,
-  deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
 import { hexToUtf8 } from '../scripts/helper/utils'
 import Pool from '../types/contracts/pool'
@@ -754,6 +754,40 @@ describe('Pool spec', () => {
         liquidateCloseAmountIsZero: null,
       })
     })
+  })
+
+  it('.seize (cannot call by users)', async () => {
+    const { api, deployer, controller, rateModel, priceOracle, users } =
+      await setup()
+    const { dai, usdc } = await preparePoolsWithPreparedTokens({
+      api,
+      controller,
+      rateModel,
+      manager: deployer,
+    })
+    const toParam = (m: BN) => [m.toString()]
+    for (const sym of [dai, usdc]) {
+      await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+      await controller.tx.supportMarketWithCollateralFactorMantissa(
+        sym.pool.address,
+        toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+      )
+    }
+
+    // call dai pool from user
+    const { value: val1 } = await dai.pool.query.seize(
+      deployer.address,
+      users[0].address,
+      toDec18(100),
+    )
+    expect(val1.ok.err).toEqual({ controller: 'MarketNotListed' })
+    // call usdc pool from user
+    const { value: val2 } = await usdc.pool.query.seize(
+      deployer.address,
+      users[0].address,
+      toDec6(100),
+    )
+    expect(val2.ok.err).toEqual({ controller: 'MarketNotListed' })
   })
 
   describe('.transfer', () => {
