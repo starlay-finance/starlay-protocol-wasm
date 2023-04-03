@@ -1323,6 +1323,42 @@ describe('Pool spec', () => {
         ).value.ok
         expect(balance2.ok.toNumber()).toBeGreaterThan(balance1.ok.toNumber())
       })
+      it('in repay_borrow_all, a user should repay all borrow balance including accrued interest', async () => {
+        const { pool, users, pools, token } = await setupExtended()
+        const [alice, bob] = users
+        const otherPool = pools.usdt
+        const deposit = new BN(1000).mul(new BN(10).pow(new BN(8)))
+        const borrow = new BN(950).mul(new BN(10).pow(new BN(8)))
+        await token.withSigner(alice).tx.mint(alice.address, deposit)
+        await token.withSigner(alice).tx.approve(pool.address, deposit)
+        await pool.withSigner(alice).tx.mint(deposit)
+        await otherPool.token
+          .withSigner(bob)
+          .tx.mint(bob.address, ONE_ETHER.toString())
+        await otherPool.token
+          .withSigner(bob)
+          .tx.approve(otherPool.pool.address, ONE_ETHER.toString())
+        await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER.toString())
+        await pool.withSigner(bob).tx.borrow(borrow)
+        // wait 2 sec
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+
+        await token.withSigner(bob).tx.mint(bob.address, deposit)
+        await token
+          .withSigner(bob)
+          .tx.approve(pool.address, ONE_ETHER.mul(new BN(100)).toString())
+        await pool.tx.accrueInterest()
+        const tx = await pool.withSigner(bob).tx.repayBorrowAll()
+        expect(BigInt(tx.events[0].args['repayAmount'])).toBeGreaterThan(
+          borrow.toNumber(),
+        )
+        await pool.tx.accrueInterest()
+        expect(
+          await (
+            await pool.query.borrowBalanceCurrent(bob.address)
+          ).value.ok.ok.toNumber(),
+        ).toBe(0)
+      })
     })
   })
 })
