@@ -1,7 +1,11 @@
 /* eslint-disable dot-notation */
-import { ReturnNumber } from '@727-ventures/typechain-types'
+import {
+  ReturnNumber,
+  SignAndSendSuccessResponse,
+} from '@727-ventures/typechain-types'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
+import { setTimeout } from 'timers/promises'
 import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
@@ -1196,6 +1200,106 @@ describe('Pool spec', () => {
     })
   })
 
+  it.only('.borrow_balance_stored', async () => {
+    const { deployer, controller, pools, users } = await setup()
+    const { dai, usdc } = pools
+
+    // prepares
+    //// add liquidity to usdc pool
+    await usdc.token.tx.mint(deployer.address, toDec6(10_000))
+    await usdc.token.tx.approve(usdc.pool.address, toDec6(10_000))
+    await usdc.pool.tx.mint(toDec6(10_000))
+    expect(
+      (await usdc.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+    ).toEqual(toDec6(10_000).toNumber())
+    //// mint to dai pool for collateral
+    const [borrower] = users
+    await dai.token.tx.mint(borrower.address, toDec18(20_000))
+    await dai.token
+      .withSigner(borrower)
+      .tx.approve(dai.pool.address, toDec18(20_000))
+    await dai.pool.withSigner(borrower).tx.mint(toDec18(20_000))
+    expect(
+      BigInt(
+        (await dai.pool.query.balanceOf(borrower.address)).value.ok.toString(),
+      ).toString(),
+    ).toEqual(toDec18(20_000).toString())
+    //// borrow usdc
+    await usdc.pool.withSigner(borrower).tx.borrow(toDec6(8_000))
+    expect(
+      (await usdc.token.query.balanceOf(borrower.address)).value.ok.toNumber(),
+    ).toEqual(toDec6(8_000).toNumber())
+
+    // execute
+    const accrualBlockTimestamp = async () =>
+      usdc.pool.query.accrualBlockTimestamp().then((v) => v.value.ok)
+    const borrowIndex = async () =>
+      usdc.pool.query.borrowIndex().then((v) => BigInt(v.value.ok.toString()))
+    const borrowBalaceStored = async (account: string) =>
+      usdc.pool.query
+        .borrowBalanceStored(account)
+        .then((v) => v.value.ok.toNumber())
+    const accountBorrow = async (account: string) =>
+      usdc.pool.query.accountBorrow(account).then((v) => {
+        const accountBorrow = v.value.ok
+        accountBorrow.principal
+        return {
+          interestIndex: BigInt(
+            accountBorrow.interestIndex.toString(),
+          ).toString(),
+          principal: accountBorrow.principal.toString(),
+        }
+      })
+
+    console.log(await accrualBlockTimestamp())
+    console.log(await borrowIndex())
+    console.log(await borrowBalaceStored(borrower.address))
+    console.log(await accountBorrow(borrower.address))
+
+    let res: SignAndSendSuccessResponse
+    let event: any
+    console.log('>>> First')
+    res = await usdc.pool.tx.accrueInterest()
+    event = res.events[0]
+    console.log('> Event')
+    expect(event.name).toEqual('AccrueInterest')
+    console.log(event.args.interestAccumulated.toString())
+    console.log(BigInt(event.args.borrowIndex.toString()).toString())
+    console.log(event.args.totalBorrows.toString())
+    await setTimeout(2000).then(() => console.log('Wait 2000 millisecounds'))
+    console.log(await accrualBlockTimestamp())
+    console.log(await borrowIndex())
+    console.log(await borrowBalaceStored(borrower.address))
+    console.log(await accountBorrow(borrower.address))
+
+    console.log('>>> Second')
+    res = await usdc.pool.tx.accrueInterest()
+    event = res.events[0]
+    console.log('> Event')
+    expect(event.name).toEqual('AccrueInterest')
+    console.log(event.args.interestAccumulated.toString())
+    console.log(BigInt(event.args.borrowIndex.toString()).toString())
+    console.log(event.args.totalBorrows.toString())
+    await setTimeout(4000).then(() => console.log('Wait 4000 millisecounds'))
+    console.log(await accrualBlockTimestamp())
+    console.log(await borrowIndex())
+    console.log(await borrowBalaceStored(borrower.address))
+
+    console.log('>>> Third')
+    res = await usdc.pool.tx.accrueInterest()
+    event = res.events[0]
+    console.log('> Event')
+    expect(event.name).toEqual('AccrueInterest')
+    console.log(event.args.interestAccumulated.toString())
+    console.log(BigInt(event.args.borrowIndex.toString()).toString())
+    console.log(event.args.totalBorrows.toString())
+    await setTimeout(4000).then(() => console.log('Wait 4000 millisecounds'))
+    console.log(await accrualBlockTimestamp())
+    console.log(await borrowIndex())
+    console.log(await borrowBalaceStored(borrower.address))
+    console.log(await accountBorrow(borrower.address))
+  })
+
   describe('.exchange_rate_stored', () => {
     describe('success', () => {
       it('return initial_exchange_rate_stored if no total_supply', async () => {
@@ -1350,7 +1454,9 @@ describe('Pool spec', () => {
           await pool.query.borrowBalanceCurrent(bob.address)
         ).value.ok
         // wait 2 sec
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+        await setTimeout(2000).then(() =>
+          console.log('Wait 2000 millisecounds'),
+        )
         await pool.tx.accrueInterest()
         const balance2 = await (
           await pool.query.borrowBalanceCurrent(bob.address)
@@ -1375,7 +1481,9 @@ describe('Pool spec', () => {
         await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER.toString())
         await pool.withSigner(bob).tx.borrow(borrow)
         // wait 2 sec
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+        await setTimeout(2000).then(() =>
+          console.log('Wait 2000 millisecounds'),
+        )
 
         await token.withSigner(bob).tx.mint(bob.address, deposit)
         await token
