@@ -29,7 +29,64 @@ The Manager contract is a contract that manages the protocol. It is responsible 
 
 The PriceOracle contract is a contract that manages the price of the assets. It is responsible for the management of the price of each asset.
 
-## Instllation
+## Architecture
+
+Here, we will provide an explanation of the templates constructed in this repository.
+
+- Based on the code of Compound on Ethereum.
+- using the following as the core libraries for the contracts in this template.
+  - [openbrush](https://github.com/727-Ventures/openbrush-contracts)
+    - framework for ink! development (equivalent to OpenZeppelin in Ethereum)
+  - [primitive-types](https://github.com/paritytech/parity-common/tree/master/primitive-types)
+    - primitive types shared by Substrate and Parity Ethereum
+      - U256 and others commonly used in Ethereum and its encoding/decoding
+
+## Project Structure
+
+```txt
+(root)
+|--- contracts: ... Smart contract definitions
+|--- logics: ... Components that compose the smart contracts
+| |- impls: ... State / logic implementations
+| L- traits: ... Interfaces
+|--- scripts: ... Utilities for offchain activities (deploy, e2e etc)
+L--- tests: ... End-to-end tests
+```
+
+## Customize
+
+The implementation is based on the interface of Compound V2.
+It includes several customizations, and we will provide a brief overview of them.
+
+### Functions
+
+- Pool’s decimals is equal to the underlying
+  - In Compound, the decimals of cToken are uniformly set to 8
+  - Affects due to this change
+    - the number of significant digits used when calculating liquidity is 18
+      - This is because the minimum unit of the amount varies for each Pool
+- balance_of
+  - return the value converted to the quantity in underlying
+- interest_rate_model
+
+### Others
+
+- Events
+  - We have implemented events that mainly focus on operations that use assets
+    - such as mint, redeem, repay, and borrow
+  - The interface for triggering events is in compliance with Compound standards, so users can add events as they like.
+- Permission
+  - We use Role Based Access Control implemented with OpenBrush's access_control
+  - The defined/used roles are as follows:
+    - DEFAULT_ADMIN_ROLE: management of the manager itself
+    - CONTROLLER_ADMIN: management of the controller
+    - TOKEN_ADMIN: management of the pool
+    - BORROW_CAP_GUARDIAN: operator of the controller's borrow_cap
+    - PAUSE_GUARDIAN: operator of the controller's paused state operation
+
+## How to use
+
+### Instllation
 
 To run starlay-protocol-wasm, pull the repository from GitHub and install the dependencies.
 
@@ -39,15 +96,15 @@ cd starlay-protocol-wasm
 cargo build
 ```
 
-### Prerequisites
+#### Prerequisites
 
 - [Rust](https://www.rust-lang.org/tools/install)
 - [cargo-contract](https://github.com/paritytech/cargo-contract)
 - [swanky-cli](https://github.com/AstarNetwork/swanky-cli)
 
-## Testing
+### Testing
 
-### Unit Tests
+#### Unit Tests
 
 To run the unit tests, run the following command:
 
@@ -55,7 +112,7 @@ To run the unit tests, run the following command:
 cargo test
 ```
 
-### End-to-End Tests
+#### End-to-End Tests
 
 Before running the tests, you need to run the local node and deploy the
 
@@ -69,9 +126,9 @@ To run the end-to-end tests, run the following command:
 yarn test
 ```
 
-## Deployment
+### Deployment
 
-### to Local Node
+#### to Local Node
 
 To deploy the contracts to a local node, run the following command:
 
@@ -79,7 +136,7 @@ To deploy the contracts to a local node, run the following command:
 yarn deploy:local
 ```
 
-### to Astar Testnet(Shibuya)
+#### to Astar Testnet(Shibuya)
 
 To deploy the contracts to the Astar Testnet(Shibuya), run the following command:
 
