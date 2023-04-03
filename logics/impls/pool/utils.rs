@@ -37,7 +37,7 @@ pub fn protocol_seize_share_mantissa() -> U256 {
 pub struct CalculateInterestInput {
     pub total_borrows: Balance,
     pub total_reserves: Balance,
-    pub borrow_index: Balance,
+    pub borrow_index: U256,
     pub borrow_rate: U256,
     pub old_block_timestamp: Timestamp,
     pub new_block_timestamp: Timestamp,
@@ -45,7 +45,7 @@ pub struct CalculateInterestInput {
 }
 
 pub struct CalculateInterestOutput {
-    pub borrow_index: Balance,
+    pub borrow_index: U256,
     pub total_borrows: Balance,
     pub total_reserves: Balance,
     pub interest_accumulated: Balance,
@@ -111,7 +111,7 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
     let borrow_index_new = compound_interest_factor
         .mul_scalar_truncate_add_uint(input.borrow_index.into(), input.borrow_index.into());
     Ok(CalculateInterestOutput {
-        borrow_index: borrow_index_new.as_u128(),
+        borrow_index: borrow_index_new,
 
         interest_accumulated: interest_accumulated.as_u128(),
         total_borrows: total_borrows_new,
@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn test_calculate_interest_panic_if_over_borrow_rate_max() {
         let input = CalculateInterestInput {
-            borrow_index: 0,
+            borrow_index: 0.into(),
             borrow_rate: U256::one().mul(U256::from(10)).pow(U256::from(18)),
             new_block_timestamp: Timestamp::default(),
             old_block_timestamp: Timestamp::default(),
@@ -275,7 +275,7 @@ mod tests {
             CalculateInterestInput {
                 old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + 1000 * 60 * 60 * 24 * 30 * 12, // 1 year
-                borrow_index: 1,
+                borrow_index: 1.into(),
                 borrow_rate: mantissa().div(100000), // 0.001 %
                 reserve_factor_mantissa: mantissa().div(100), // 1 %
                 total_borrows: 10_000 * (10_u128.pow(18)),
@@ -284,7 +284,7 @@ mod tests {
             CalculateInterestInput {
                 old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + 1000 * 60 * 60, // 1 hour
-                borrow_index: 123123123,
+                borrow_index: 123123123.into(),
                 borrow_rate: mantissa().div(1000000),
                 reserve_factor_mantissa: mantissa().div(10),
                 total_borrows: 100_000 * (10_u128.pow(18)),
@@ -293,7 +293,7 @@ mod tests {
             CalculateInterestInput {
                 old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + 1000 * 60 * 60,
-                borrow_index: 123123123,
+                borrow_index: 123123123.into(),
                 borrow_rate: mantissa().div(123123),
                 reserve_factor_mantissa: mantissa().div(10).mul(2),
                 total_borrows: 123_456 * (10_u128.pow(18)),
