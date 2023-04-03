@@ -9,9 +9,9 @@ import {
 } from '../scripts/helper/deploy_helper'
 import { hexToUtf8 } from '../scripts/helper/utils'
 import {
-  preparePoolsWithPreparedTokens,
-  preparePoolWithMockToken,
   TEST_METADATAS,
+  preparePoolWithMockToken,
+  preparePoolsWithPreparedTokens,
 } from './testContractHelper'
 import { mantissa, shouldNotRevert, toDec18, toDec6 } from './testHelpers'
 
@@ -39,6 +39,7 @@ describe('Controller spec', () => {
 
     // initialize
     await controller.tx.setPriceOracle(priceOracle.address)
+    await controller.tx.setCloseFactorMantissa([ONE_ETHER])
 
     return {
       api,
@@ -64,6 +65,48 @@ describe('Controller spec', () => {
       await controller.query.liquidationIncentiveMantissa()
     ).value.ok
     expect(liquidationIncentiveMantissa.toNumber()).toEqual(0)
+  })
+
+  describe('.mint_allowed', () => {
+    it('check pause status', async () => {
+      const { controller } = await setup()
+      const poolAddr = encodeAddress(
+        '0x0000000000000000000000000000000000000000000000000000000000000001',
+      )
+      await controller.tx.setMintGuardianPaused(poolAddr, true)
+      const { value } = await controller.query.mintAllowed(
+        poolAddr,
+        ZERO_ADDRESS,
+        0,
+      )
+      expect(value.ok.err).toBe('MintIsPaused')
+    })
+  })
+
+  describe('.redeem_allowed', () => {
+    it('check hypothetical account liquidity', async () => {
+      const { api, deployer, rateModel, controller, priceOracle } =
+        await setup()
+      const usdc = await preparePoolWithMockToken({
+        api,
+        controller,
+        rateModel,
+        manager: deployer,
+        metadata: TEST_METADATAS.usdc,
+      })
+      await priceOracle.tx.setFixedPrice(usdc.token.address, ONE_ETHER)
+      await controller.tx.supportMarketWithCollateralFactorMantissa(
+        usdc.pool.address,
+        [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
+      )
+      const { value } = await controller.query.redeemAllowed(
+        usdc.pool.address,
+        deployer.address,
+        1,
+        null,
+      )
+      expect(value.ok.err).toBe('InsufficientLiquidity')
+    })
   })
 
   it('.set_close_factor_mantissa', async () => {
