@@ -51,7 +51,8 @@ describe('Controller spec', () => {
   }
 
   const setupWithPools = async () => {
-    const { api, deployer, rateModel, controller, priceOracle } = await setup()
+    const { api, deployer, rateModel, controller, priceOracle, users } =
+      await setup()
 
     const pools = await preparePoolsWithPreparedTokens({
       api,
@@ -62,7 +63,6 @@ describe('Controller spec', () => {
 
     // initialize
     await controller.tx.setPriceOracle(priceOracle.address)
-    await controller.tx.setCloseFactorMantissa([ONE_ETHER])
     //// for pool
     for (const sym of [pools.dai, pools.usdc, pools.usdt]) {
       await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
@@ -79,6 +79,7 @@ describe('Controller spec', () => {
       controller,
       priceOracle,
       pools,
+      users,
     }
   }
 
@@ -229,6 +230,85 @@ describe('Controller spec', () => {
         0,
       )
       expect(value.ok.ok).toBeNull
+    })
+  })
+
+  describe('.liquidate_borrow_allowed', () => {
+    it('check listed markets', async () => {
+      const {
+        controller,
+        pools: { dai, usdc },
+      } = await setupWithPools()
+
+      const { value: val1 } = await controller.query.liquidateBorrowAllowed(
+        dai.pool.address,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+        null,
+      )
+      expect(val1.ok.err).toBe('MarketNotListed')
+      const { value: val2 } = await controller.query.liquidateBorrowAllowed(
+        ZERO_ADDRESS,
+        usdc.pool.address,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+        null,
+      )
+      expect(val2.ok.err).toBe('MarketNotListed')
+    })
+    it('check account liquidity', async () => {
+      const {
+        controller,
+        pools: { dai, usdc },
+      } = await setupWithPools()
+      const { value } = await controller.query.liquidateBorrowAllowed(
+        dai.pool.address,
+        usdc.pool.address,
+        ZERO_ADDRESS,
+        ZERO_ADDRESS,
+        0,
+        null,
+      )
+      expect(value.ok.err).toBe('InsufficientShortfall')
+    })
+    it('check too much repay', async () => {
+      const {
+        deployer,
+        controller,
+        pools: { dai, usdc },
+        users: [borrower],
+      } = await setupWithPools()
+
+      // Prepares
+      //// add liquidity to usdc pool
+      await usdc.token.tx.mint(deployer.address, toDec6(10_000))
+      await usdc.token.tx.approve(usdc.pool.address, toDec6(10_000))
+      await usdc.pool.tx.mint(toDec6(10_000))
+      //// mint to dai pool for collateral
+      await dai.token.tx.mint(borrower.address, toDec18(20_000))
+      await dai.token
+        .withSigner(borrower)
+        .tx.approve(dai.pool.address, toDec18(20_000))
+      await dai.pool.withSigner(borrower).tx.mint(toDec18(20_000))
+      //// borrow usdc
+      await usdc.pool.withSigner(borrower).tx.borrow(toDec6(10_000))
+      //// down collateral_factor for dai
+      await controller.tx.setCollateralFactorMantissa(dai.pool.address, [
+        new BN(1),
+      ])
+
+      const { value } = await controller.query.liquidateBorrowAllowed(
+        usdc.pool.address,
+        dai.pool.address,
+        deployer.address,
+        borrower.address,
+        toDec6(10_000),
+        null,
+      )
+      expect(value.ok.err).toBe('TooMuchRepay')
     })
   })
 
