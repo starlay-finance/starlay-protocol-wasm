@@ -1206,10 +1206,20 @@ describe('Pool spec', () => {
       usdc.pool.query
         .borrowBalanceStored(account)
         .then((v) => v.value.ok.toNumber())
+    const accountBorrow = async (account: string) =>
+      usdc.pool.query.accountBorrow(account).then((v) => {
+        const accountBorrow = v.value.ok
+        accountBorrow.principal
+        return {
+          interestIndex: accountBorrow.interestIndex.toString(),
+          principal: accountBorrow.principal.toString(),
+        }
+      })
 
     console.log(await accrualBlockTimestamp())
     console.log(await borrowIndex())
     console.log(await borrowBalaceStored(borrower.address))
+    console.log(await accountBorrow(borrower.address))
 
     let res: SignAndSendSuccessResponse
     let event: any
@@ -1225,6 +1235,7 @@ describe('Pool spec', () => {
     console.log(await accrualBlockTimestamp())
     console.log(await borrowIndex())
     console.log(await borrowBalaceStored(borrower.address))
+    console.log(await accountBorrow(borrower.address))
 
     console.log('>>> Second')
     res = await usdc.pool.tx.accrueInterest()
@@ -1251,6 +1262,7 @@ describe('Pool spec', () => {
     console.log(await accrualBlockTimestamp())
     console.log(await borrowIndex())
     console.log(await borrowBalaceStored(borrower.address))
+    console.log(await accountBorrow(borrower.address))
   })
 
   describe('.exchange_rate_stored', () => {

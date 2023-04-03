@@ -15,6 +15,8 @@ use openbrush::{
 };
 use primitive_types::U256;
 
+use crate::impls::pool::BorrowSnapshot;
+
 use super::{
     controller::Error as ControllerError,
     types::WrappedU256,
@@ -143,6 +145,8 @@ pub trait Pool: PSP22 + PSP22Metadata {
     fn accrual_block_timestamp(&self) -> Timestamp;
     #[ink(message)]
     fn borrow_index(&self) -> Balance;
+    #[ink(message)]
+    fn account_borrow(&self, account: AccountId) -> Option<BorrowSnapshot>;
     #[ink(message)]
     fn initial_exchange_rate_mantissa(&self) -> WrappedU256;
     #[ink(message)]
