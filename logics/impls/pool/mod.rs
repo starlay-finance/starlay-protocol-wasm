@@ -261,6 +261,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._mint(Self::env().caller(), mint_amount)
     }
 
+    default fn mint_to(&mut self, mint_account: AccountId, mint_amount: Balance) -> Result<()> {
+        self._accrue_interest()?;
+        self._mint(mint_account, mint_amount)
+    }
+
     default fn get_accrual_block_timestamp(&self) -> Timestamp {
         self._accrual_block_timestamp()
     }

@@ -34,6 +34,10 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn mint(&mut self, mint_amount: Balance) -> Result<()>;
 
+    /// Sender supplies assets into the market and receives pool tokens in exchange
+    #[ink(message)]
+    fn mint_to(&mut self, mint_account: AccountId, mint_amount: Balance) -> Result<()>;
+
     /// Sender redeems pool tokens in exchange for the underlying asset
     #[ink(message)]
     fn redeem(&mut self, redeem_tokens: Balance) -> Result<()>;

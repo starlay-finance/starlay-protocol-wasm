@@ -77,14 +77,9 @@ where
             return Err(WETHGatewayError::from(deposit_result.err().unwrap()))
         }
         // ILendingPool(lendingPool).deposit(address(WETH), msg.value, onBehalfOf, referralCode);
-        let mint_result = PoolRef::mint(&lending_pool, deposit_value);
+        let mint_result = PoolRef::mint_to(&lending_pool, on_behalf_of, deposit_value);
         if mint_result.is_err() {
             return Err(WETHGatewayError::from(mint_result.err().unwrap()))
-        }
-        let transfer_result =
-            PoolRef::transfer(&lending_pool, on_behalf_of, deposit_value, Vec::<u8>::new());
-        if transfer_result.is_err() {
-            return Err(WETHGatewayError::from(transfer_result.err().unwrap()))
         }
 
         Ok(())
