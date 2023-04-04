@@ -1393,6 +1393,60 @@ describe('Pool spec', () => {
           ).value.ok.ok.toNumber(),
         ).toBe(0)
       })
+      it('all the borrowed amount can be repayable', async () => {
+        const { pool, users, token: dai } = await setupExtended()
+        const [alice] = users
+        const decimals = SUPPORTED_TOKENS.dai.decimals
+        const deposit = new BN(90).mul(new BN(10).pow(new BN(decimals)))
+        const borrowAmount1 = new BN(50).mul(new BN(10).pow(new BN(decimals)))
+        const borrowAmount2 = new BN(22).mul(new BN(10).pow(new BN(decimals)))
+        const repayAmount = new BN(72).mul(new BN(10).pow(new BN(decimals)))
+        const wait = () => new Promise((resolve) => setTimeout(resolve, 2000))
+        await dai
+          .withSigner(alice)
+          .tx.mint(alice.address, deposit.mul(new BN(1000000)))
+        await dai.withSigner(alice).tx.approve(pool.address, deposit)
+        // deposit 90 DAI
+        await pool.withSigner(alice).tx.mint(deposit)
+        const totalBorrows0 = (await pool.query.totalBorrows()).value.ok
+        expect(totalBorrows0.toNumber()).toBe(0)
+        // borrow 50 DAI
+        await wait()
+        await pool.tx.accrueInterest()
+        await pool.withSigner(alice).tx.borrow(borrowAmount1)
+        expect((await pool.query.totalBorrows()).value.ok.toString()).not.toBe(
+          '0',
+        )
+        // borrow 22 DAI
+        await wait()
+        await pool.tx.accrueInterest()
+        await pool.withSigner(alice).tx.borrow(borrowAmount2)
+        expect((await pool.query.totalBorrows()).value.ok.toString()).not.toBe(
+          '0',
+        )
+        // repay 72 DAI
+        await wait()
+        await pool.tx.accrueInterest()
+        await dai
+          .withSigner(alice)
+          .tx.approve(pool.address, ONE_ETHER.mul(new BN(1000)))
+        await pool.withSigner(alice).tx.repayBorrow(repayAmount)
+        expect((await pool.query.totalBorrows()).value.ok.toString()).not.toBe(
+          '0',
+        )
+        // repay all
+        await wait()
+        await pool.tx.accrueInterest()
+        await dai
+          .withSigner(alice)
+          .tx.approve(pool.address, ONE_ETHER.mul(new BN(1000)))
+        await pool.withSigner(alice).tx.repayBorrowAll()
+
+        // confirmations
+        await wait()
+        await pool.tx.accrueInterest()
+        expect((await pool.query.totalBorrows()).value.ok.toString()).toBe('0')
+      })
     })
   })
 })
