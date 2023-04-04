@@ -141,7 +141,7 @@ impl Ray {
 
         self._op(another, |o, v| o.mul(v).div(ray_scale()))
     }
-    fn div(&self, another: Ray) -> Ray {
+    pub fn div(&self, another: Ray) -> Ray {
         self._op(another, |o, v| o.mul(ray_scale()).div(v))
     }
     fn _op(&self, a: Ray, op: fn(one: U256, another: U256) -> U256) -> Ray {

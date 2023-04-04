@@ -10,7 +10,10 @@ use super::super::exp_no_err::{
 };
 pub use crate::traits::pool::*;
 use crate::{
-    impls::exp_no_err::exp_ray_ratio,
+    impls::exp_no_err::{
+        exp_ray_ratio,
+        Ray,
+    },
     traits::types::WrappedU256,
 };
 use core::ops::{
@@ -49,6 +52,17 @@ pub struct CalculateInterestOutput {
     pub total_borrows: Balance,
     pub total_reserves: Balance,
     pub interest_accumulated: Balance,
+}
+
+pub fn scaled_amount_of(amount: Balance, idx: Exp) -> Balance {
+    // TODO: should we use Ray here?
+    Ray {
+        mantissa: WrappedU256::from(U256::from(amount)),
+    }
+    .div(idx.to_ray())
+    .to_exp()
+    .truncate()
+    .as_u128()
 }
 
 fn compound_interest(borrow_rate_per_millisec: &Exp, delta: U256) -> Exp {
