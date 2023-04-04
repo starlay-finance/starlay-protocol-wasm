@@ -10,24 +10,39 @@ We detail a few of the contracts in this repository.
 
 ### Pool
 
-The Pool contract is the core of the lending protocol. It is a contract that manages the assets of the user and the assets of the protocol.
-The pool contanis the core logic of the pool itself and public interfaces for P2P22[https://github.com/w3f/PSPs/blob/master/PSPs/psp-22.md] tokens respectively. Each pool is assigned an interest rate and risk model(see DefaultInterestRateModel and Controller sections). The pool is also responsible for the transfer of assets between the user and the protocol. It allows accounts to deposit, borrow and repay assets.
+Pool is the core of the lending protocol. The contract manages the assets of the user and the assets of the protocol.
+
+- The pool contains the core logic of the pool itself and public interfaces for P2P22[https://github.com/w3f/PSPs/blob/master/PSPs/psp-22.md] tokens respectively.
+- Each pool is assigned an interest rate and risk model (see DefaultInterestRateModel and Controller sections).
+- The pool is also responsible for the transfer of assets between the user and the protocol.
+  - It allows accounts to deposit, borrow and repay assets.
 
 ### Controller
 
-The Controller contract is a contract that manages the risk of the protocol. It is responsible for the risk model of the protocol and the risk model of each pool. It is also responsible for the management of the borrow_cap of each pool. The controller is also responsible for the management of the paused state of the protocol.
+The Controller manages the risk of the protocol.
+It is responsible for followings
+
+- the risk model of the protocol and each pool
+- the management of the borrow_cap of each pool
+- the management of the paused state of the protocol
 
 ### DefaultInterestRateModel
 
-The DefaultInterestRateModel contract is a contract that manages the interest rate of the protocol. The interest rate model is based on the Compound V2 interest rate model.
+The DefaultInterestRateModel contract manages the interest rate of the protocol.
+
+The interest rate model is based on the Compound V2 interest rate model.
 
 ### Manager
 
-The Manager contract is a contract that manages the protocol. It is responsible for the management of configurations of the controller and the pools.
+The Manager manages the protocol configurations.
+
+It is responsible for the management of configurations of the controller and the pools.
 
 ### PriceOracle
 
-The PriceOracle contract is a contract that manages the price of the assets. It is responsible for the management of the price of each asset.
+The PriceOracle contract manages the price of the assets.
+
+It is responsible for the management of the price of each asset.
 
 ## Architecture
 
