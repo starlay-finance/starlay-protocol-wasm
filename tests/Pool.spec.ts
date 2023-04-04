@@ -1259,6 +1259,7 @@ describe('Pool spec', () => {
     let res: SignAndSendSuccessResponse
     let event: any
     console.log('>>> First')
+    await setTimeout(2000).then(() => console.log('Wait 2000 millisecounds'))
     res = await usdc.pool.tx.accrueInterest()
     event = res.events[0]
     console.log('> Event')
@@ -1266,13 +1267,13 @@ describe('Pool spec', () => {
     console.log(event.args.interestAccumulated.toString())
     console.log(BigInt(event.args.borrowIndex.toString()).toString())
     console.log(event.args.totalBorrows.toString())
-    await setTimeout(2000).then(() => console.log('Wait 2000 millisecounds'))
     console.log(await accrualBlockTimestamp())
     console.log(await borrowIndex())
     console.log(await borrowBalaceStored(borrower.address))
     console.log(await accountBorrow(borrower.address))
 
     console.log('>>> Second')
+    await setTimeout(4000).then(() => console.log('Wait 4000 millisecounds'))
     res = await usdc.pool.tx.accrueInterest()
     event = res.events[0]
     console.log('> Event')
@@ -1280,12 +1281,12 @@ describe('Pool spec', () => {
     console.log(event.args.interestAccumulated.toString())
     console.log(BigInt(event.args.borrowIndex.toString()).toString())
     console.log(event.args.totalBorrows.toString())
-    await setTimeout(4000).then(() => console.log('Wait 4000 millisecounds'))
     console.log(await accrualBlockTimestamp())
     console.log(await borrowIndex())
     console.log(await borrowBalaceStored(borrower.address))
 
     console.log('>>> Third')
+    await setTimeout(6000).then(() => console.log('Wait 6000 millisecounds'))
     res = await usdc.pool.tx.accrueInterest()
     event = res.events[0]
     console.log('> Event')
@@ -1293,7 +1294,6 @@ describe('Pool spec', () => {
     console.log(event.args.interestAccumulated.toString())
     console.log(BigInt(event.args.borrowIndex.toString()).toString())
     console.log(event.args.totalBorrows.toString())
-    await setTimeout(6000).then(() => console.log('Wait 6000 millisecounds'))
     console.log(await accrualBlockTimestamp())
     console.log(await borrowIndex())
     console.log(await borrowBalaceStored(borrower.address))
