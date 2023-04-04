@@ -33,7 +33,10 @@ where
         if burn_result.is_err() {
             return burn_result
         }
-        Self::env().transfer(caller, value);
+        let transfer_result = Self::env().transfer(caller, value);
+        if transfer_result.is_err() {
+            return Err(PSP22Error::Custom("Cannot send ASTR.".into()))
+        }
         self._emit_withdraw_event(caller, value);
         Ok(())
     }

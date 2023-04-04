@@ -7,7 +7,7 @@ use openbrush::{
 pub type WETHRef = dyn WETH + PSP22 + PSP22Metadata;
 
 #[openbrush::trait_definition]
-pub trait WETH: PSP22 + PSP22Metadata {
+pub trait WETH {
     #[ink(message, payable)]
     fn deposit(&mut self) -> Result<(), PSP22Error>;
 
