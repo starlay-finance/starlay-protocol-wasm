@@ -1206,29 +1206,29 @@ describe('Pool spec', () => {
 
     // prepares
     //// add liquidity to usdc pool
-    await usdc.token.tx.mint(deployer.address, toDec6(10_000))
-    await usdc.token.tx.approve(usdc.pool.address, toDec6(10_000))
-    await usdc.pool.tx.mint(toDec6(10_000))
+    await usdc.token.tx.mint(deployer.address, toDec6(500_000))
+    await usdc.token.tx.approve(usdc.pool.address, toDec6(500_000))
+    await usdc.pool.tx.mint(toDec6(500_000))
     expect(
       (await usdc.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-    ).toEqual(toDec6(10_000).toNumber())
+    ).toEqual(toDec6(500_000).toNumber())
     //// mint to dai pool for collateral
     const [borrower] = users
-    await dai.token.tx.mint(borrower.address, toDec18(20_000))
+    await dai.token.tx.mint(borrower.address, toDec18(1_000_000))
     await dai.token
       .withSigner(borrower)
-      .tx.approve(dai.pool.address, toDec18(20_000))
-    await dai.pool.withSigner(borrower).tx.mint(toDec18(20_000))
+      .tx.approve(dai.pool.address, toDec18(1_000_000))
+    await dai.pool.withSigner(borrower).tx.mint(toDec18(1_000_000))
     expect(
       BigInt(
         (await dai.pool.query.balanceOf(borrower.address)).value.ok.toString(),
       ).toString(),
-    ).toEqual(toDec18(20_000).toString())
+    ).toEqual(toDec18(1_000_000).toString())
     //// borrow usdc
-    await usdc.pool.withSigner(borrower).tx.borrow(toDec6(8_000))
+    await usdc.pool.withSigner(borrower).tx.borrow(toDec6(500_000))
     expect(
       (await usdc.token.query.balanceOf(borrower.address)).value.ok.toNumber(),
-    ).toEqual(toDec6(8_000).toNumber())
+    ).toEqual(toDec6(500_000).toNumber())
 
     // execute
     const accrualBlockTimestamp = async () =>
@@ -1293,7 +1293,7 @@ describe('Pool spec', () => {
     console.log(event.args.interestAccumulated.toString())
     console.log(BigInt(event.args.borrowIndex.toString()).toString())
     console.log(event.args.totalBorrows.toString())
-    await setTimeout(4000).then(() => console.log('Wait 4000 millisecounds'))
+    await setTimeout(6000).then(() => console.log('Wait 6000 millisecounds'))
     console.log(await accrualBlockTimestamp())
     console.log(await borrowIndex())
     console.log(await borrowBalaceStored(borrower.address))
