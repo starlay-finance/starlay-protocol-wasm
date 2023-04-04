@@ -98,17 +98,16 @@ where
     ) -> Result<()> {
         let caller = Self::env().caller();
         // ILToken lWETH = ILToken(ILendingPool(lendingPool).getReserveData(address(WETH)).lTokenAddress);
-        let l_weth: AccountId = ZERO_ADDRESS.into();
         let contract_address = Self::env().account_id();
-        let user_balance: Balance = PSP22Ref::balance_of(&l_weth, caller);
+        let user_balance: Balance = PoolRef::balance_of(&lending_pool, caller);
         let mut amount_to_withdraw: Balance = amount;
 
         if amount == u128::MAX {
             amount_to_withdraw = user_balance;
         }
 
-        let transfer_result = PSP22Ref::transfer_from(
-            &l_weth,
+        let transfer_result = PoolRef::transfer_from(
+            &lending_pool,
             caller,
             contract_address,
             amount_to_withdraw,
@@ -118,6 +117,10 @@ where
             return Err(WETHGatewayError::from(transfer_result.err().unwrap()))
         }
         // ILendingPool(lendingPool).withdraw(address(WETH), amountToWithdraw, address(this));
+        let redeem_result = PoolRef::redeem(&lending_pool, amount_to_withdraw);
+        if redeem_result.is_err() {
+            return Err(WETHGatewayError::from(redeem_result.err().unwrap()))
+        }
         let withdraw_result = WETHRef::withdraw(&self.data::<Data>().weth, amount_to_withdraw);
         if withdraw_result.is_err() {
             return Err(WETHGatewayError::from(withdraw_result.err().unwrap()))
