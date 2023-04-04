@@ -1445,6 +1445,11 @@ describe('Pool spec', () => {
         // confirmations
         await wait()
         await pool.tx.accrueInterest()
+        expect(
+          (
+            await pool.query.borrowBalanceCurrent(alice.address)
+          ).value.ok.ok.toString(),
+        ).toBe('0')
         expect((await pool.query.totalBorrows()).value.ok.toString()).toBe('0')
       })
     })
