@@ -92,8 +92,7 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
     }
     let delta = input
         .new_block_timestamp
-        .abs_diff(input.old_block_timestamp)
-        * 1000;
+        .abs_diff(input.old_block_timestamp);
     let compound_interest_factor = compound_interest(
         &Exp {
             mantissa: input.borrow_rate.into(),
