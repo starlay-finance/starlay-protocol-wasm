@@ -651,10 +651,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         let idx = self._borrow_index();
         let account_borrows_prev = self._borrow_balance_stored(borrower);
-        let borrow_addend = scaled_amount_of(borrow_amount, Exp { mantissa: idx });
 
         let account_borrows_new = account_borrows_prev + borrow_amount;
         let total_borrows_new = self._total_borrows() + borrow_amount;
+        let borrow_addend = scaled_amount_of(borrow_amount, Exp { mantissa: idx });
         let account_borrows_scaled_new = self
             .data::<Data>()
             .account_borrows

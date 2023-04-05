@@ -172,7 +172,6 @@ mod tests {
         Div,
         Mul,
     };
-    use ink::env::debug_println;
     use openbrush::traits::ZERO_ADDRESS;
     use primitive_types::U256;
     fn mts(val: u128) -> U256 {

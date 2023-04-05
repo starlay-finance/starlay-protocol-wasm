@@ -1400,7 +1400,7 @@ describe('Pool spec', () => {
         const borrowAmount1 = new BN(50).mul(new BN(10).pow(new BN(decimals)))
         const borrowAmount2 = new BN(22).mul(new BN(10).pow(new BN(decimals)))
         const repayAmount = new BN(72).mul(new BN(10).pow(new BN(decimals)))
-        const wait = () => new Promise((resolve) => setTimeout(resolve, 2000))
+        const wait = () => new Promise((resolve) => setTimeout(resolve, 100))
         await dai
           .withSigner(alice)
           .tx.mint(alice.address, deposit.mul(new BN(1000000)))

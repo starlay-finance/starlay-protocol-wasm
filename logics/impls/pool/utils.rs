@@ -12,6 +12,7 @@ pub use crate::traits::pool::*;
 use crate::{
     impls::exp_no_err::{
         exp_ray_ratio,
+        ray_scale,
         Ray,
     },
     traits::types::WrappedU256,
@@ -57,7 +58,7 @@ pub struct CalculateInterestOutput {
 pub fn scaled_amount_of(amount: Balance, idx: Exp) -> Balance {
     // TODO: should we use Ray here?
     Ray {
-        mantissa: WrappedU256::from(U256::from(amount)),
+        mantissa: WrappedU256::from(U256::from(amount).mul(ray_scale())),
     }
     .div(idx.to_ray())
     .to_exp()
@@ -215,6 +216,47 @@ mod tests {
     use primitive_types::U256;
     fn mantissa() -> U256 {
         U256::from(10).pow(U256::from(18))
+    }
+    #[test]
+    fn test_scaled_amount_of() {
+        struct TestCase {
+            amount: Balance,
+            idx: Exp,
+            want: Balance,
+        }
+        let cases = vec![
+            TestCase {
+                amount: 100,
+                idx: Exp {
+                    mantissa: WrappedU256::from(U256::from(1).mul(mantissa())),
+                },
+                want: 100,
+            },
+            TestCase {
+                amount: 200,
+                idx: Exp {
+                    mantissa: WrappedU256::from(U256::from(1).mul(mantissa())),
+                },
+                want: 200,
+            },
+            TestCase {
+                amount: 100,
+                idx: Exp {
+                    mantissa: WrappedU256::from(U256::from(100).mul(mantissa())),
+                },
+                want: 1,
+            },
+            TestCase {
+                amount: 90,
+                idx: Exp {
+                    mantissa: WrappedU256::from(U256::from(100).mul(mantissa())),
+                },
+                want: 0,
+            },
+        ];
+        for c in cases {
+            assert_eq!(scaled_amount_of(c.amount, c.idx), c.want)
+        }
     }
     #[test]
     fn test_calculate_interest_panic_if_over_borrow_rate_max() {
