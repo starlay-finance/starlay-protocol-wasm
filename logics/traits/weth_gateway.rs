@@ -42,7 +42,7 @@ pub trait WETHGateway: Ownable {
         &mut self,
         lending_pool: AccountId,
         amount: Balance,
-        rate_mode: u128,
+        // rate_mode: u128,
         on_behalf_of: AccountId,
     ) -> Result<()>;
 
@@ -76,6 +76,7 @@ pub trait WETHGateway: Ownable {
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum WETHGatewayError {
     SafeETHTransferFailed,
+    InsufficientPayback,
     Pool(PoolError),
     PSP22(PSP22Error),
 }

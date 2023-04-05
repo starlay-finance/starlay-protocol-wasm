@@ -72,7 +72,9 @@ where
         // let weth_contract: WETHRef = FromAccountId::from_account_id(self.data::<Data>().weth);
         // WETH.deposit{value: msg.value}();
         // TODO: need to make payable call with transferred_value
-        let deposit_result = WETHRef::deposit(&self.data::<Data>().weth);
+        let deposit_result = WETHRef::deposit_builder(&self.data::<Data>().weth)
+            .transferred_value(deposit_value)
+            .invoke();
         if deposit_result.is_err() {
             return Err(WETHGatewayError::from(deposit_result.err().unwrap()))
         }
@@ -127,9 +129,42 @@ where
         &mut self,
         lending_pool: AccountId,
         amount: Balance,
-        rate_mode: u128,
+        // rate_mode: u128,
         on_behalf_of: AccountId,
     ) -> Result<()> {
+        let transferred_value = Self::env().transferred_value();
+        let mut payback_amount = PoolRef::borrow_balance_stored(&lending_pool, on_behalf_of);
+        if amount < payback_amount {
+            payback_amount = amount;
+        }
+        if transferred_value < payback_amount {
+            return Err(WETHGatewayError::InsufficientPayback)
+        }
+
+        let deposit_result = WETHRef::deposit_builder(&self.data::<Data>().weth)
+            .transferred_value(payback_amount)
+            .invoke();
+        if deposit_result.is_err() {
+            return Err(WETHGatewayError::from(deposit_result.err().unwrap()))
+        }
+
+        let repay_result = PoolRef::repay_borrow_behalf(
+            &self.data::<Data>().weth,
+            on_behalf_of,
+            transferred_value,
+        );
+        if repay_result.is_err() {
+            return Err(WETHGatewayError::from(repay_result.err().unwrap()))
+        }
+
+        let caller = Self::env().caller();
+        if transferred_value > payback_amount {
+            let transfer_result =
+                self._safe_transfer_eth(caller, transferred_value - payback_amount);
+            if transfer_result.is_err() {
+                return transfer_result
+            }
+        }
         Ok(())
     }
 
