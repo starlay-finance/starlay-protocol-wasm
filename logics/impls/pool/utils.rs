@@ -10,7 +10,7 @@ use super::super::exp_no_err::{
 };
 pub use crate::traits::pool::*;
 use crate::{
-    impls::exp_no_err::{
+    impls::wad_ray_math::{
         exp_ray_ratio,
         ray_scale,
         Ray,
@@ -57,13 +57,12 @@ pub struct CalculateInterestOutput {
 
 pub fn scaled_amount_of(amount: Balance, idx: Exp) -> Balance {
     // TODO: should we use Ray here?
-    Ray {
+    let divided = Ray {
         mantissa: WrappedU256::from(U256::from(amount).mul(ray_scale())),
     }
-    .div(idx.to_ray())
-    .to_exp()
-    .truncate()
-    .as_u128()
+    .ray_div(idx.to_ray())
+    .unwrap();
+    divided.to_exp().truncate().as_u128()
 }
 
 fn compound_interest(borrow_rate_per_millisec: &Exp, delta: U256) -> Exp {
@@ -80,8 +79,11 @@ fn compound_interest(borrow_rate_per_millisec: &Exp, delta: U256) -> Exp {
     };
     let base_power_two = borrow_rate_per_millisec
         .to_ray()
-        .mul(borrow_rate_per_millisec.to_ray());
-    let base_power_three = base_power_two.mul(borrow_rate_per_millisec.to_ray());
+        .ray_mul(borrow_rate_per_millisec.to_ray())
+        .unwrap();
+    let base_power_three = base_power_two
+        .ray_mul(borrow_rate_per_millisec.to_ray())
+        .unwrap();
     let second_term_ray = delta
         .mul(delta_minus_one)
         .mul(U256::from(base_power_two.mantissa))

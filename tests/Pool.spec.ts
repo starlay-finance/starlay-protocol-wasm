@@ -1161,7 +1161,7 @@ describe('Pool spec', () => {
             toDec18(100_000),
             [],
           )
-        expect(res.value.ok.err.insufficientAllowance).toBeTruthy()
+        expect(res.value.ok.err.insufficientAllowance).toBeTruthy
       }
       await shouldNotRevert(dai.pool.withSigner(userA), 'approve', [
         spender.address,
@@ -1444,6 +1444,8 @@ describe('Pool spec', () => {
         // confirmations
         await wait()
         await pool.tx.accrueInterest()
+        const borrows = await pool.query.borrowsScaled()
+        console.log(borrows.value.ok.toString())
         expect(
           (
             await pool.query.borrowBalanceCurrent(alice.address)

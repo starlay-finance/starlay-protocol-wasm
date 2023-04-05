@@ -62,6 +62,9 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn repay_borrow_behalf(&mut self, borrower: AccountId, repay_amount: Balance) -> Result<()>;
 
+    #[ink(message)]
+    fn borrows_scaled(&self) -> Balance;
+
     /// The sender liquidates the borrowers collateral.
     #[ink(message)]
     fn liquidate_borrow(

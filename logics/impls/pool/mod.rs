@@ -192,6 +192,7 @@ pub trait Internal {
     fn _reserve_factor_mantissa(&self) -> WrappedU256;
     fn _exchange_rate_stored(&self) -> U256;
     fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput>;
+    fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool);
 
     // event emission
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
@@ -245,6 +246,9 @@ pub trait Internal {
 impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metadata::Data>> Pool
     for T
 {
+    default fn borrows_scaled(&self) -> Balance {
+        self._borrows_scaled()
+    }
     default fn accrue_interest(&mut self) -> Result<()> {
         self._accrue_interest()
     }
@@ -621,6 +625,26 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         Ok(())
     }
+    default fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool) {
+        let idx = self._borrow_index();
+        let scaled = scaled_amount_of(amount, Exp { mantissa: idx });
+        let account_borrows_prev = self
+            .data::<Data>()
+            .account_borrows
+            .get(&borrower)
+            .unwrap_or(0);
+        if neg {
+            self.data::<Data>()
+                .account_borrows
+                .insert(&borrower, &(account_borrows_prev - scaled));
+            self.data::<Data>().borrows_scaled -= scaled
+        } else {
+            self.data::<Data>()
+                .account_borrows
+                .insert(&borrower, &(account_borrows_prev + scaled));
+            self.data::<Data>().borrows_scaled += scaled
+        }
+    }
     default fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
         let contract_addr = Self::env().account_id();
         let (account_balance, account_borrow_balance, exchange_rate) =
@@ -649,24 +673,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Err(Error::BorrowCashNotAvailable)
         }
 
-        let idx = self._borrow_index();
         let account_borrows_prev = self._borrow_balance_stored(borrower);
-
         let account_borrows_new = account_borrows_prev + borrow_amount;
         let total_borrows_new = self._total_borrows() + borrow_amount;
-        let borrow_addend = scaled_amount_of(borrow_amount, Exp { mantissa: idx });
-        let account_borrows_scaled_new = self
-            .data::<Data>()
-            .account_borrows
-            .get(&borrower)
-            .unwrap_or(0)
-            + borrow_addend;
-        self.data::<Data>()
-            .account_borrows
-            .insert(&borrower, &account_borrows_scaled_new);
-        self.data::<Data>().borrows_scaled += borrow_addend;
 
         self._transfer_underlying(borrower, borrow_amount)?;
+        self._increase_debt(borrower, borrow_amount, false);
 
         self._emit_borrow_event(
             borrower,
@@ -712,24 +724,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         let account_borrows_new = account_borrow_prev - repay_amount_final;
         let total_borrows_new = self._total_borrows() - repay_amount_final;
-        let repay_amount_scaled = scaled_amount_of(
-            repay_amount_final,
-            Exp {
-                mantissa: self._borrow_index(),
-            },
-        );
-
-        let account_borrows_scaled = self
-            .data::<Data>()
-            .account_borrows
-            .get(&borrower)
-            .unwrap_or(0)
-            - repay_amount_scaled;
-        self.data::<Data>()
-            .account_borrows
-            .insert(&borrower, &account_borrows_scaled);
-        self.data::<Data>().borrows_scaled -= repay_amount_scaled;
-
+        self._increase_debt(borrower, repay_amount_final, true);
         self._emit_repay_borrow_event(
             payer,
             borrower,
