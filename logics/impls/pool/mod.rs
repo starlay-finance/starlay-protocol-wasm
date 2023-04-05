@@ -50,25 +50,17 @@ use self::utils::{
     calculate_interest,
     calculate_redeem_values,
     exchange_rate,
+    from_scaled_amount,
     protocol_seize_amount,
     protocol_seize_share_mantissa,
     reserve_factor_max_mantissa,
+    scaled_amount_of,
     underlying_balance,
     CalculateInterestInput,
     CalculateInterestOutput,
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
-
-#[derive(Debug, scale::Decode, scale::Encode)]
-#[cfg_attr(
-    feature = "std",
-    derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout)
-)]
-pub struct BorrowSnapshot {
-    principal: Balance,
-    interest_index: WrappedU256,
-}
 
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
@@ -77,9 +69,9 @@ pub struct Data {
     pub controller: AccountId,
     pub manager: AccountId,
     pub rate_model: AccountId,
-    pub total_borrows: Balance,
-    pub total_reserves: Balance,
-    pub account_borrows: Mapping<AccountId, BorrowSnapshot>,
+    pub borrows_scaled: Balance,
+    pub reserves_scaled: Balance,
+    pub account_borrows: Mapping<AccountId, Balance>,
     pub accrual_block_timestamp: Timestamp,
     pub borrow_index: WrappedU256,
     pub initial_exchange_rate_mantissa: WrappedU256,
@@ -93,8 +85,8 @@ impl Default for Data {
             controller: ZERO_ADDRESS.into(),
             manager: ZERO_ADDRESS.into(),
             rate_model: ZERO_ADDRESS.into(),
-            total_borrows: Default::default(),
-            total_reserves: Default::default(),
+            borrows_scaled: Default::default(),
+            reserves_scaled: Default::default(),
             account_borrows: Default::default(),
             accrual_block_timestamp: 0,
             borrow_index: exp_scale().into(),
@@ -175,7 +167,9 @@ pub trait Internal {
     fn _manager(&self) -> AccountId;
     fn _get_cash_prior(&self) -> Balance;
     fn _total_borrows(&self) -> Balance;
+    fn _borrows_scaled(&self) -> Balance;
     fn _total_reserves(&self) -> Balance;
+    fn _reserves_scaled(&self) -> Balance;
     fn _rate_model(&self) -> AccountId;
     fn _borrow_rate_per_msec(
         &self,
@@ -199,6 +193,7 @@ pub trait Internal {
     fn _reserve_factor_mantissa(&self) -> WrappedU256;
     fn _exchange_rate_stored(&self) -> U256;
     fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput>;
+    fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool);
 
     // event emission
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
@@ -252,6 +247,10 @@ pub trait Internal {
 impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metadata::Data>> Pool
     for T
 {
+    default fn borrows_scaled(&self) -> Balance {
+        self._borrows_scaled()
+    }
+
     default fn accrue_interest(&mut self) -> Result<()> {
         self._accrue_interest()
     }
@@ -472,8 +471,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let mut data = self.data::<Data>();
         data.accrual_block_timestamp = at;
         data.borrow_index = out.borrow_index.into();
-        data.total_borrows = out.total_borrows;
-        data.total_reserves = out.total_reserves;
         self._emit_accrue_interest_event(
             out.interest_accumulated,
             out.borrow_index.into(),
@@ -630,6 +627,30 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         Ok(())
     }
+    default fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool) {
+        let scaled = scaled_amount_of(
+            amount,
+            Exp {
+                mantissa: self._borrow_index(),
+            },
+        );
+        let account_borrows_prev = self
+            .data::<Data>()
+            .account_borrows
+            .get(&borrower)
+            .unwrap_or(0);
+        if neg {
+            self.data::<Data>()
+                .account_borrows
+                .insert(&borrower, &(account_borrows_prev - scaled));
+            self.data::<Data>().borrows_scaled -= scaled
+        } else {
+            self.data::<Data>()
+                .account_borrows
+                .insert(&borrower, &(account_borrows_prev + scaled));
+            self.data::<Data>().borrows_scaled += scaled
+        }
+    }
     default fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
         let contract_addr = Self::env().account_id();
         let (account_balance, account_borrow_balance, exchange_rate) =
@@ -661,17 +682,9 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let account_borrows_prev = self._borrow_balance_stored(borrower);
         let account_borrows_new = account_borrows_prev + borrow_amount;
         let total_borrows_new = self._total_borrows() + borrow_amount;
-        let idx = self._borrow_index();
-        self.data::<Data>().account_borrows.insert(
-            &borrower,
-            &BorrowSnapshot {
-                principal: account_borrows_new,
-                interest_index: idx,
-            },
-        );
-        self.data::<Data>().total_borrows = total_borrows_new;
 
         self._transfer_underlying(borrower, borrow_amount)?;
+        self._increase_debt(borrower, borrow_amount, false);
 
         self._emit_borrow_event(
             borrower,
@@ -717,17 +730,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         let account_borrows_new = account_borrow_prev - repay_amount_final;
         let total_borrows_new = self._total_borrows() - repay_amount_final;
-
-        let idx = self._borrow_index();
-        self.data::<Data>().account_borrows.insert(
-            &borrower,
-            &BorrowSnapshot {
-                principal: account_borrows_new,
-                interest_index: idx,
-            },
-        );
-        self.data::<Data>().total_borrows = total_borrows_new;
-
+        self._increase_debt(borrower, repay_amount_final, true);
         self._emit_repay_borrow_event(
             payer,
             borrower,
@@ -866,7 +869,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let total_reserves_new = self._total_reserves() + protocol_seize_amount;
 
         // EFFECTS & INTERACTIONS
-        self.data::<Data>().total_reserves = total_reserves_new;
+        self.data::<Data>().reserves_scaled += scaled_amount_of(
+            protocol_seize_amount,
+            Exp {
+                mantissa: self._borrow_index(),
+            },
+        );
         self.data::<PSP22Data>().supply -= protocol_seize_tokens;
         self._burn_from(borrower, seize_tokens)?;
         self._mint_to(liquidator, liquidator_seize_tokens)?;
@@ -924,7 +932,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         }
 
         let total_reserves_new = self._total_reserves().add(amount);
-        self.data::<Data>().total_reserves = total_reserves_new;
+
+        self.data::<Data>().reserves_scaled += scaled_amount_of(
+            amount,
+            Exp {
+                mantissa: self._borrow_index(),
+            },
+        );
         let caller = Self::env().caller();
         self._transfer_underlying_from(caller, Self::env().account_id(), amount)?;
 
@@ -948,7 +962,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         }
         let total_reserves_new = self._total_reserves().sub(amount);
         let mut data = self.data::<Data>();
-        data.total_reserves = total_reserves_new;
+        data.reserves_scaled -= scaled_amount_of(
+            amount,
+            Exp {
+                mantissa: data.borrow_index,
+            },
+        );
         self._transfer_underlying(admin, amount)?;
 
         // event
@@ -1010,7 +1029,20 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _total_borrows(&self) -> Balance {
-        self.data::<Data>().total_borrows
+        let borrows = self.data::<Data>().borrows_scaled;
+        if borrows == 0 {
+            return 0
+        };
+        from_scaled_amount(
+            self.data::<Data>().borrows_scaled.into(),
+            Exp {
+                mantissa: self._borrow_index(),
+            },
+        )
+    }
+
+    default fn _borrows_scaled(&self) -> Balance {
+        self.data::<Data>().borrows_scaled
     }
 
     default fn _rate_model(&self) -> AccountId {
@@ -1047,27 +1079,35 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _total_reserves(&self) -> Balance {
-        self.data::<Data>().total_reserves
+        Exp {
+            mantissa: self._borrow_index(),
+        }
+        .mul_scalar_truncate(self.data::<Data>().reserves_scaled.into())
+        .as_u128()
     }
-
+    default fn _reserves_scaled(&self) -> Balance {
+        self.data::<Data>().reserves_scaled
+    }
     default fn _borrow_index(&self) -> WrappedU256 {
         self.data::<Data>().borrow_index
     }
 
     default fn _borrow_balance_stored(&self, account: AccountId) -> Balance {
         let snapshot = match self.data::<Data>().account_borrows.get(&account) {
-            Some(value) => value,
+            Some(value) => {
+                match value {
+                    0 => return 0,
+                    _ => value,
+                }
+            }
             None => return 0,
         };
-
-        if snapshot.principal == 0 {
-            return 0
-        }
-        let borrow_index = self._borrow_index();
-        let principal_times_index = U256::from(snapshot.principal).mul(U256::from(borrow_index));
-        principal_times_index
-            .div(U256::from(snapshot.interest_index))
-            .as_u128()
+        from_scaled_amount(
+            snapshot,
+            Exp {
+                mantissa: self._borrow_index(),
+            },
+        )
     }
 
     default fn _balance_of(&self, owner: &AccountId) -> Balance {

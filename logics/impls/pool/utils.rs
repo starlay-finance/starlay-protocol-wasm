@@ -10,7 +10,10 @@ use super::super::exp_no_err::{
 };
 pub use crate::traits::pool::*;
 use crate::{
-    impls::exp_no_err::exp_ray_ratio,
+    impls::wad_ray_math::{
+        exp_ray_ratio,
+        Ray,
+    },
     traits::types::WrappedU256,
 };
 use core::ops::{
@@ -51,6 +54,22 @@ pub struct CalculateInterestOutput {
     pub interest_accumulated: Balance,
 }
 
+pub fn scaled_amount_of(amount: Balance, idx: Exp) -> Balance {
+    let divided = Ray {
+        mantissa: WrappedU256::from(U256::from(amount)),
+    }
+    .ray_div(idx.to_ray())
+    .unwrap();
+    U256::from(divided.mantissa).as_u128()
+}
+
+pub fn from_scaled_amount(scaled_amount: Balance, idx: Exp) -> Balance {
+    let multiplied = idx.to_ray().ray_mul(Ray {
+        mantissa: WrappedU256::from(U256::from(scaled_amount)),
+    });
+    U256::from(multiplied.unwrap().mantissa).as_u128()
+}
+
 fn compound_interest(borrow_rate_per_millisec: &Exp, delta: U256) -> Exp {
     if delta.is_zero() {
         return Exp {
@@ -65,8 +84,11 @@ fn compound_interest(borrow_rate_per_millisec: &Exp, delta: U256) -> Exp {
     };
     let base_power_two = borrow_rate_per_millisec
         .to_ray()
-        .mul(borrow_rate_per_millisec.to_ray());
-    let base_power_three = base_power_two.mul(borrow_rate_per_millisec.to_ray());
+        .ray_mul(borrow_rate_per_millisec.to_ray())
+        .unwrap();
+    let base_power_three = base_power_two
+        .ray_mul(borrow_rate_per_millisec.to_ray())
+        .unwrap();
     let second_term_ray = delta
         .mul(delta_minus_one)
         .mul(U256::from(base_power_two.mantissa))
@@ -201,6 +223,47 @@ mod tests {
     use primitive_types::U256;
     fn mantissa() -> U256 {
         U256::from(10).pow(U256::from(18))
+    }
+    #[test]
+    fn test_scaled_amount_of() {
+        struct TestCase {
+            amount: Balance,
+            idx: Exp,
+            want: Balance,
+        }
+        let cases = vec![
+            TestCase {
+                amount: 100,
+                idx: Exp {
+                    mantissa: WrappedU256::from(U256::from(1).mul(mantissa())),
+                },
+                want: 100,
+            },
+            TestCase {
+                amount: 200,
+                idx: Exp {
+                    mantissa: WrappedU256::from(U256::from(1).mul(mantissa())),
+                },
+                want: 200,
+            },
+            TestCase {
+                amount: 100,
+                idx: Exp {
+                    mantissa: WrappedU256::from(U256::from(100).mul(mantissa())),
+                },
+                want: 1,
+            },
+            TestCase {
+                amount: 90,
+                idx: Exp {
+                    mantissa: WrappedU256::from(U256::from(100).mul(mantissa())),
+                },
+                want: 0,
+            },
+        ];
+        for c in cases {
+            assert_eq!(scaled_amount_of(c.amount, c.idx), c.want)
+        }
     }
     #[test]
     fn test_calculate_interest_panic_if_over_borrow_rate_max() {
