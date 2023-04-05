@@ -105,8 +105,7 @@ impl Ray {
                 mantissa: WrappedU256::from(U256::from(0)),
             })
         }
-        if (U256::from(self.mantissa).gt(&U256::max_value().sub(half_ray()).div(another.mantissa)))
-        {
+        if U256::from(self.mantissa).gt(&U256::max_value().sub(half_ray()).div(another.mantissa)) {
             return Err(Error::MathMultiplicationOverflow)
         }
         Ok(Ray {

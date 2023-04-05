@@ -12,7 +12,6 @@ pub use crate::traits::pool::*;
 use crate::{
     impls::wad_ray_math::{
         exp_ray_ratio,
-        ray_scale,
         Ray,
     },
     traits::types::WrappedU256,
@@ -58,11 +57,18 @@ pub struct CalculateInterestOutput {
 pub fn scaled_amount_of(amount: Balance, idx: Exp) -> Balance {
     // TODO: should we use Ray here?
     let divided = Ray {
-        mantissa: WrappedU256::from(U256::from(amount).mul(ray_scale())),
+        mantissa: WrappedU256::from(U256::from(amount)),
     }
     .ray_div(idx.to_ray())
     .unwrap();
-    divided.to_exp().truncate().as_u128()
+    U256::from(divided.mantissa).as_u128()
+}
+
+pub fn from_scaled_amount(scaled_amount: Balance, idx: Exp) -> Balance {
+    let multiplied = idx.to_ray().ray_mul(Ray {
+        mantissa: WrappedU256::from(U256::from(scaled_amount)),
+    });
+    U256::from(multiplied.unwrap().mantissa).as_u128()
 }
 
 fn compound_interest(borrow_rate_per_millisec: &Exp, delta: U256) -> Exp {

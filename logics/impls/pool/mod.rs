@@ -50,6 +50,7 @@ use self::utils::{
     calculate_interest,
     calculate_redeem_values,
     exchange_rate,
+    from_scaled_amount,
     protocol_seize_amount,
     protocol_seize_share_mantissa,
     reserve_factor_max_mantissa,
@@ -249,6 +250,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     default fn borrows_scaled(&self) -> Balance {
         self._borrows_scaled()
     }
+
     default fn accrue_interest(&mut self) -> Result<()> {
         self._accrue_interest()
     }
@@ -626,8 +628,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
     default fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool) {
-        let idx = self._borrow_index();
-        let scaled = scaled_amount_of(amount, Exp { mantissa: idx });
+        let scaled = scaled_amount_of(
+            amount,
+            Exp {
+                mantissa: self._borrow_index(),
+            },
+        );
         let account_borrows_prev = self
             .data::<Data>()
             .account_borrows
@@ -1023,11 +1029,16 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _total_borrows(&self) -> Balance {
-        Exp {
-            mantissa: self._borrow_index(),
-        }
-        .mul_scalar_truncate(self.data::<Data>().borrows_scaled.into())
-        .as_u128()
+        let borrows = self.data::<Data>().borrows_scaled;
+        if borrows == 0 {
+            return 0
+        };
+        from_scaled_amount(
+            self.data::<Data>().borrows_scaled.into(),
+            Exp {
+                mantissa: self._borrow_index(),
+            },
+        )
     }
 
     default fn _borrows_scaled(&self) -> Balance {
@@ -1083,19 +1094,20 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn _borrow_balance_stored(&self, account: AccountId) -> Balance {
         let snapshot = match self.data::<Data>().account_borrows.get(&account) {
-            Some(value) => value,
+            Some(value) => {
+                match value {
+                    0 => return 0,
+                    _ => value,
+                }
+            }
             None => return 0,
         };
-
-        if snapshot == 0 {
-            return 0
-        }
-        let borrow_index = self._borrow_index();
-        Exp {
-            mantissa: borrow_index,
-        }
-        .mul_scalar_truncate(snapshot.into())
-        .as_u128()
+        from_scaled_amount(
+            snapshot,
+            Exp {
+                mantissa: self._borrow_index(),
+            },
+        )
     }
 
     default fn _balance_of(&self, owner: &AccountId) -> Balance {
