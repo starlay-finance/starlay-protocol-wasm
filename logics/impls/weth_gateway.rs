@@ -172,8 +172,8 @@ where
         &mut self,
         lending_pool: AccountId,
         amount: Balance,
-        interes_rate_mode: u128,
-        referral_code: u16,
+        // interes_rate_mode: u128,
+        // referral_code: u16,
     ) -> Result<()> {
         let caller = Self::env().caller();
         // ILendingPool(lendingPool).borrow(
@@ -183,6 +183,11 @@ where
         //     referralCode,
         //     msg.sender
         //   );
+        let borrow_result = PoolRef::borrow(&lending_pool, amount);
+        if borrow_result.is_err() {
+            return Err(WETHGatewayError::from(borrow_result.err().unwrap()))
+        }
+
         let withdraw_result = WETHRef::withdraw(&self.data::<Data>().weth, amount);
         if withdraw_result.is_err() {
             return Err(WETHGatewayError::from(withdraw_result.err().unwrap()))

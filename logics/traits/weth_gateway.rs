@@ -51,8 +51,8 @@ pub trait WETHGateway: Ownable {
         &mut self,
         lending_pool: AccountId,
         amount: Balance,
-        interes_rate_mode: u128,
-        referral_code: u16,
+        // interes_rate_mode: u128,
+        // referral_code: u16,
     ) -> Result<()>;
 
     #[ink(message)]
