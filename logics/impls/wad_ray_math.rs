@@ -37,12 +37,12 @@ impl Wad {
     pub fn wad_mul(&self, another: Wad) -> Result<Wad, Error> {
         let a = U256::from(self.mantissa);
         let b = U256::from(another.mantissa);
-        if (a.eq(&U256::zero()) || b.eq(&U256::zero())) {
+        if a.eq(&U256::zero()) || b.eq(&U256::zero()) {
             return Ok(Wad {
                 mantissa: WrappedU256::from(U256::from(0)),
             })
         }
-        if (a.gt(&U256::max_value().sub(half_exp_scale().div(b)))) {
+        if a.gt(&U256::max_value().sub(half_exp_scale().div(b))) {
             return Err(Error::MathMultiplicationOverflow)
         }
         Ok(Wad {
@@ -56,7 +56,7 @@ impl Wad {
             return Err(Error::MathDivisionByZero)
         }
         let half_another = b.div(U256::from(2));
-        if (U256::from(a).gt(&U256::max_value().sub(half_another).div(exp_scale()))) {
+        if U256::from(a).gt(&U256::max_value().sub(half_another).div(exp_scale())) {
             return Err(Error::MathMultiplicationOverflow)
         }
         Ok(Wad {
@@ -121,7 +121,7 @@ impl Ray {
             return Err(Error::MathDivisionByZero)
         }
         let half_another = U256::from(another.mantissa).div(U256::from(2));
-        if (U256::from(self.mantissa).gt(&U256::max_value().sub(half_another).div(ray_scale()))) {
+        if U256::from(self.mantissa).gt(&U256::max_value().sub(half_another).div(ray_scale())) {
             return Err(Error::MathMultiplicationOverflow)
         }
         Ok(Ray {
@@ -135,11 +135,4 @@ impl Ray {
 }
 
 #[cfg(test)]
-mod tests {
-
-    use super::*;
-    use primitive_types::U256;
-    fn wr(val: u128) -> WrappedU256 {
-        WrappedU256::from(U256::from(val))
-    }
-}
+mod tests {}
