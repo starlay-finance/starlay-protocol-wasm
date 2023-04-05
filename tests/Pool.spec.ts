@@ -147,7 +147,6 @@ describe('Pool spec', () => {
       await shouldNotRevert(token, 'approve', [pool.address, depositAmount])
       const { events } = await shouldNotRevert(pool, 'mint', [depositAmount])
 
-      const dec18 = BigInt(10) ** BigInt(18)
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toBe(balance - depositAmount)
@@ -733,7 +732,7 @@ describe('Pool spec', () => {
         pools: { dai: collateral, usdc: borrowing },
         users,
       } = await setupForShortage()
-      const [borrower, _] = users
+      const [borrower] = users
       const { value } = await borrowing.pool
         .withSigner(borrower)
         .query.liquidateBorrow(borrower.address, 0, collateral.pool.address)
@@ -1162,7 +1161,7 @@ describe('Pool spec', () => {
             toDec18(100_000),
             [],
           )
-        expect(res.value.ok.err.insufficientAllowance).toBeTruthy
+        expect(res.value.ok.err.insufficientAllowance).toBeTruthy()
       }
       await shouldNotRevert(dai.pool.withSigner(userA), 'approve', [
         spender.address,
