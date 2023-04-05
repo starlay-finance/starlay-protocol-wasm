@@ -55,7 +55,6 @@ pub struct CalculateInterestOutput {
 }
 
 pub fn scaled_amount_of(amount: Balance, idx: Exp) -> Balance {
-    // TODO: should we use Ray here?
     let divided = Ray {
         mantissa: WrappedU256::from(U256::from(amount)),
     }
