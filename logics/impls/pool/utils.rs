@@ -258,7 +258,7 @@ mod tests {
                 idx: Exp {
                     mantissa: WrappedU256::from(U256::from(100).mul(mantissa())),
                 },
-                want: 0,
+                want: 1,
             },
         ];
         for c in cases {

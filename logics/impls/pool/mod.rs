@@ -1079,11 +1079,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _total_reserves(&self) -> Balance {
-        Exp {
-            mantissa: self._borrow_index(),
-        }
-        .mul_scalar_truncate(self.data::<Data>().reserves_scaled.into())
-        .as_u128()
+        from_scaled_amount(
+            self.data::<Data>().reserves_scaled.into(),
+            Exp {
+                mantissa: self._borrow_index(),
+            },
+        )
     }
     default fn _reserves_scaled(&self) -> Balance {
         self.data::<Data>().reserves_scaled
