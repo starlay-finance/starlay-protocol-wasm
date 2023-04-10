@@ -5,9 +5,9 @@ import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
   deployDefaultInterestRateModel,
+  deployPSP22Token,
   deployPoolFromAsset,
   deployPriceOracle,
-  deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
 import { hexToUtf8 } from '../scripts/helper/utils'
 import Pool from '../types/contracts/pool'
@@ -148,7 +148,7 @@ describe('Pool spec', () => {
       await shouldNotRevert(token, 'approve', [pool.address, depositAmount])
       const { events } = await shouldNotRevert(pool, 'mint', [depositAmount])
 
-      const dec18 = BigInt(10) ** BigInt(18)
+      // const dec18 = BigInt(10) ** BigInt(18)
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toBe(balance - depositAmount)
@@ -693,7 +693,7 @@ describe('Pool spec', () => {
       )
 
       // check events from Pool (execute seize)
-      const contractEvents = res.result['contractEvents']
+      const contractEvents = res.result.contractEvents
       //// Burn
       const burnEvent = contractEvents.find(
         (e) =>
@@ -941,7 +941,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(userA)
           .query.transfer(userA.address, new BN(1), [])
-        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferNotAllowed')
+        expect(hexToUtf8(res.value.ok.err.custom)).toBe('TransferNotAllowed')
       }
       // case: shortfall of account_liquidity
 
@@ -950,9 +950,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(userA)
           .query.transfer(userB.address, new BN(2), []) // temp: truncated if less than 1 by collateral_factor?
-        expect(hexToUtf8(res.value.ok.err['custom'])).toBe(
-          'InsufficientLiquidity',
-        )
+        expect(hexToUtf8(res.value.ok.err.custom)).toBe('InsufficientLiquidity')
       }
       // case: paused
       await controller.tx.setTransferGuardianPaused(true)
@@ -960,7 +958,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(userA)
           .query.transfer(userB.address, new BN(1), [])
-        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferIsPaused')
+        expect(hexToUtf8(res.value.ok.err.custom)).toBe('TransferIsPaused')
       }
     })
   })
@@ -1140,7 +1138,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(spender)
           .query.transferFrom(userA.address, userA.address, new BN(1), [])
-        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferNotAllowed')
+        expect(hexToUtf8(res.value.ok.err.custom)).toBe('TransferNotAllowed')
       }
       // case: shortfall of account_liquidity
       {
@@ -1148,9 +1146,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(spender)
           .query.transferFrom(userA.address, userB.address, new BN(2), []) // temp: truncated if less than 1 by collateral_factor?
-        expect(hexToUtf8(res.value.ok.err['custom'])).toBe(
-          'InsufficientLiquidity',
-        )
+        expect(hexToUtf8(res.value.ok.err.custom)).toBe('InsufficientLiquidity')
       }
       // case: paused
       await controller.tx.setTransferGuardianPaused(true)
@@ -1158,7 +1154,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(spender)
           .query.transferFrom(userA.address, userB.address, new BN(1), [])
-        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferIsPaused')
+        expect(hexToUtf8(res.value.ok.err.custom)).toBe('TransferIsPaused')
       }
     })
   })

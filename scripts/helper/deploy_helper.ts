@@ -13,6 +13,8 @@ import Controller_factory from '../../types/constructors/controller'
 import DefaultInterestRateModel_factory from '../../types/constructors/default_interest_rate_model'
 import Pool_factory from '../../types/constructors/pool'
 import PSP22Token_factory from '../../types/constructors/psp22_token'
+import WETH_factory from '../../types/constructors/weth'
+import WETHGateway_factory from '../../types/constructors/weth_gateway'
 import DefaultInterestRateModel from '../../types/contracts/default_interest_rate_model'
 import PSP22Token from '../../types/contracts/psp22_token'
 
@@ -21,6 +23,8 @@ import { LastArrayElement } from 'type-fest'
 import Controller from '../../types/contracts/controller'
 import Pool from '../../types/contracts/pool'
 import Token from '../../types/contracts/psp22_token'
+import WETH from '../../types/contracts/weth'
+import WETHGateway from '../../types/contracts/weth_gateway'
 import { ExcludeLastArrayElement } from './utilityTypes'
 import { defaultOption, hexToUtf8, isTest, waitForTx } from './utils'
 
@@ -172,5 +176,33 @@ export const deployPSP22Token = async ({
   const contract = await factory.new(...args, option)
   const result = new PSP22Token(contract.address, signer, api)
   await afterDeployment(`${args[2]}${result.name}`, contract)
+  return result
+}
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export const deployWETHGateway = async ({
+  api,
+  signer,
+  args,
+  option = defaultOption(api),
+}: FactoryArgs<WETHGateway_factory['new']>): Promise<WETHGateway> => {
+  const factory = new WETHGateway_factory(api, signer)
+  const contract = await factory.new(...args, option)
+  const result = new WETHGateway(contract.address, signer, api)
+  await afterDeployment(`${args[0]}${result.name}`, contract)
+  return result
+}
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export const deployWETH = async ({
+  api,
+  signer,
+  args,
+  option = defaultOption(api),
+}: FactoryArgs<WETH_factory['new']>): Promise<WETH> => {
+  const factory = new WETH_factory(api, signer)
+  const contract = await factory.new(...args, option)
+  const result = new WETH(contract.address, signer, api)
+  await afterDeployment(`${result.name}`, contract)
   return result
 }
