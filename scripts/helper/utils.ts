@@ -72,10 +72,13 @@ const toCalldata = (
 
 export const defaultOption = (
   api: ApiPromise,
-): {
-  storageDepositLimit: BN
-  gasLimit: WeightV2
-} => {
+):
+  | {
+      storageDepositLimit: BN
+      gasLimit: WeightV2
+    }
+  | undefined => {
+  if (isTest()) return undefined
   return {
     storageDepositLimit: new BN(10).pow(new BN(18)),
     gasLimit: getGasLimit(api),

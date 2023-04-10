@@ -1,3 +1,4 @@
+/* eslint-disable dot-notation */
 import { ReturnNumber } from '@727-ventures/typechain-types'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { BN } from '@polkadot/util'
@@ -39,12 +40,10 @@ describe('Pool spec', () => {
       args: [],
     })
 
-    // temp: declare params for rate_model
-    const rateModelArg = new BN(100).mul(ONE_ETHER)
     const rateModel = await deployDefaultInterestRateModel({
       api,
       signer: deployer,
-      args: [[rateModelArg], [rateModelArg], [rateModelArg], [rateModelArg]],
+      args: [[0], [0], [0], [0]],
     })
 
     const pools = await preparePoolsWithPreparedTokens({
@@ -510,7 +509,7 @@ describe('Pool spec', () => {
       expect(event.args.accountBorrows.toString()).toEqual(
         toDec6(5_500).toString(),
       )
-      expect(event.args.totalBorrows.toNumber()).toBeGreaterThanOrEqual(
+      expect(event.args.totalBorrows.toNumber()).toEqual(
         toDec6(5_500).toNumber(),
       )
     })
@@ -734,7 +733,7 @@ describe('Pool spec', () => {
         pools: { dai: collateral, usdc: borrowing },
         users,
       } = await setupForShortage()
-      const [borrower, _] = users
+      const [borrower] = users
       const { value } = await borrowing.pool
         .withSigner(borrower)
         .query.liquidateBorrow(borrower.address, 0, collateral.pool.address)
@@ -755,6 +754,40 @@ describe('Pool spec', () => {
         liquidateCloseAmountIsZero: null,
       })
     })
+  })
+
+  it('.seize (cannot call by users)', async () => {
+    const { api, deployer, controller, rateModel, priceOracle, users } =
+      await setup()
+    const { dai, usdc } = await preparePoolsWithPreparedTokens({
+      api,
+      controller,
+      rateModel,
+      manager: deployer,
+    })
+    const toParam = (m: BN) => [m.toString()]
+    for (const sym of [dai, usdc]) {
+      await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
+      await controller.tx.supportMarketWithCollateralFactorMantissa(
+        sym.pool.address,
+        toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
+      )
+    }
+
+    // call dai pool from user
+    const { value: val1 } = await dai.pool.query.seize(
+      deployer.address,
+      users[0].address,
+      toDec18(100),
+    )
+    expect(val1.ok.err).toEqual({ controller: 'MarketNotListed' })
+    // call usdc pool from user
+    const { value: val2 } = await usdc.pool.query.seize(
+      deployer.address,
+      users[0].address,
+      toDec6(100),
+    )
+    expect(val2.ok.err).toEqual({ controller: 'MarketNotListed' })
   })
 
   describe('.transfer', () => {
@@ -1291,6 +1324,131 @@ describe('Pool spec', () => {
         expect(borrowRate.mul(msecPerYear).toString()).toBe(
           '339999959808000000',
         )
+      })
+      it('borrow balance should grow up', async () => {
+        const { pool, users, pools, token } = await setupExtended()
+        const [alice, bob] = users
+        const otherPool = pools.usdt
+        const deposit = new BN(1000).mul(new BN(10).pow(new BN(8)))
+        const borrow = new BN(950).mul(new BN(10).pow(new BN(8)))
+        await token.withSigner(alice).tx.mint(alice.address, deposit)
+        await token.withSigner(alice).tx.approve(pool.address, deposit)
+        await pool.withSigner(alice).tx.mint(deposit)
+        await otherPool.token
+          .withSigner(bob)
+          .tx.mint(bob.address, ONE_ETHER.toString())
+        await otherPool.token
+          .withSigner(bob)
+          .tx.approve(otherPool.pool.address, ONE_ETHER.toString())
+        await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER.toString())
+        await pool.withSigner(bob).tx.borrow(borrow)
+        const balance1 = await (
+          await pool.query.borrowBalanceCurrent(bob.address)
+        ).value.ok
+        // wait 2 sec
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+        await pool.tx.accrueInterest()
+        const balance2 = await (
+          await pool.query.borrowBalanceCurrent(bob.address)
+        ).value.ok
+        expect(balance2.ok.toNumber()).toBeGreaterThan(balance1.ok.toNumber())
+      })
+      it('in repay_borrow_all, a user should repay all borrow balance including accrued interest', async () => {
+        const { pool, users, pools, token } = await setupExtended()
+        const [alice, bob] = users
+        const otherPool = pools.usdt
+        const deposit = new BN(1000).mul(new BN(10).pow(new BN(8)))
+        const borrow = new BN(950).mul(new BN(10).pow(new BN(8)))
+        await token.withSigner(alice).tx.mint(alice.address, deposit)
+        await token.withSigner(alice).tx.approve(pool.address, deposit)
+        await pool.withSigner(alice).tx.mint(deposit)
+        await otherPool.token
+          .withSigner(bob)
+          .tx.mint(bob.address, ONE_ETHER.toString())
+        await otherPool.token
+          .withSigner(bob)
+          .tx.approve(otherPool.pool.address, ONE_ETHER.toString())
+        await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER.toString())
+        await pool.withSigner(bob).tx.borrow(borrow)
+        // wait 2 sec
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+
+        await token.withSigner(bob).tx.mint(bob.address, deposit)
+        await token
+          .withSigner(bob)
+          .tx.approve(pool.address, ONE_ETHER.mul(new BN(100)).toString())
+        await pool.tx.accrueInterest()
+        const tx = await pool.withSigner(bob).tx.repayBorrowAll()
+        expect(BigInt(tx.events[0].args['repayAmount'])).toBeGreaterThan(
+          borrow.toNumber(),
+        )
+        await pool.tx.accrueInterest()
+        expect(
+          await (
+            await pool.query.borrowBalanceCurrent(bob.address)
+          ).value.ok.ok.toNumber(),
+        ).toBe(0)
+      })
+      it('all the borrowed amount can be repayable', async () => {
+        const { pool, users, token: dai } = await setupExtended()
+        const [alice] = users
+        const decimals = SUPPORTED_TOKENS.dai.decimals
+        const deposit = new BN(90).mul(new BN(10).pow(new BN(decimals)))
+        const borrowAmount1 = new BN(50).mul(new BN(10).pow(new BN(decimals)))
+        const borrowAmount2 = new BN(22).mul(new BN(10).pow(new BN(decimals)))
+        const repayAmount = new BN(72).mul(new BN(10).pow(new BN(decimals)))
+        const wait = () => new Promise((resolve) => setTimeout(resolve, 100))
+        await dai
+          .withSigner(alice)
+          .tx.mint(alice.address, deposit.mul(new BN(1000000)))
+        await dai.withSigner(alice).tx.approve(pool.address, deposit)
+        // deposit 90 DAI
+        await pool.withSigner(alice).tx.mint(deposit)
+        const totalBorrows0 = (await pool.query.totalBorrows()).value.ok
+        expect(totalBorrows0.toNumber()).toBe(0)
+        // borrow 50 DAI
+        await wait()
+        await pool.tx.accrueInterest()
+        await pool.withSigner(alice).tx.borrow(borrowAmount1)
+        expect((await pool.query.totalBorrows()).value.ok.toString()).not.toBe(
+          '0',
+        )
+        // borrow 22 DAI
+        await wait()
+        await pool.tx.accrueInterest()
+        await pool.withSigner(alice).tx.borrow(borrowAmount2)
+        expect((await pool.query.totalBorrows()).value.ok.toString()).not.toBe(
+          '0',
+        )
+        // repay 72 DAI
+        await wait()
+        await pool.tx.accrueInterest()
+        await dai
+          .withSigner(alice)
+          .tx.approve(pool.address, ONE_ETHER.mul(new BN(1000)))
+        await pool.withSigner(alice).tx.repayBorrow(repayAmount)
+        expect((await pool.query.totalBorrows()).value.ok.toString()).not.toBe(
+          '0',
+        )
+        // repay all
+        await wait()
+        await pool.tx.accrueInterest()
+        await dai
+          .withSigner(alice)
+          .tx.approve(pool.address, ONE_ETHER.mul(new BN(1000)))
+        await pool.withSigner(alice).tx.repayBorrowAll()
+
+        // confirmations
+        await wait()
+        await pool.tx.accrueInterest()
+        const borrows = await pool.query.borrowsScaled()
+        console.log(borrows.value.ok.toString())
+        expect(
+          (
+            await pool.query.borrowBalanceCurrent(alice.address)
+          ).value.ok.ok.toString(),
+        ).toBe('0')
+        expect((await pool.query.totalBorrows()).value.ok.toString()).toBe('0')
       })
     })
   })

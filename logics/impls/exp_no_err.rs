@@ -13,16 +13,16 @@ use openbrush::traits::String;
 use primitive_types::U256;
 
 use crate::traits::types::WrappedU256;
+
+use super::wad_ray_math::{
+    exp_ray_ratio,
+    Ray,
+};
 pub fn exp_scale() -> U256 {
     U256::from(10_u128.pow(18))
 }
-pub fn ray_scale() -> U256 {
-    U256::from(10_u128.pow(27))
-}
-pub fn exp_ray_ratio() -> U256 {
-    U256::from(10_u128.pow(9))
-}
-fn half_exp_scale() -> U256 {
+
+pub fn half_exp_scale() -> U256 {
     exp_scale().div(2)
 }
 fn mantissa_one() -> U256 {
@@ -32,15 +32,6 @@ fn mantissa_one() -> U256 {
 #[derive(Clone, Debug)]
 pub struct Exp {
     pub mantissa: WrappedU256,
-}
-pub struct Ray {
-    pub mantissa: WrappedU256,
-}
-
-pub fn fraction(one: WrappedU256, another: WrappedU256) -> Ray {
-    Ray {
-        mantissa: WrappedU256::from(U256::from(one).mul(ray_scale()).div(U256::from(another))),
-    }
 }
 
 impl Exp {
@@ -110,44 +101,6 @@ impl Exp {
     }
     fn _trunc(&self) -> U256 {
         U256::from(self.mantissa).div(exp_scale())
-    }
-}
-
-impl Ray {
-    pub fn add(&self, a: Ray) -> Ray {
-        self._op(a, |o, v| o.add(v))
-    }
-    pub fn sub(&self, another: Ray) -> Ray {
-        self._op(another, |o, v| o.sub(v))
-    }
-
-    pub fn to_exp(&self) -> Exp {
-        let half_ratio = exp_ray_ratio().div(2);
-        Exp {
-            mantissa: WrappedU256::from(
-                half_ratio
-                    .add(U256::from(self.mantissa))
-                    .div(exp_ray_ratio()),
-            ),
-        }
-    }
-
-    pub fn mul(&self, another: Ray) -> Ray {
-        if U256::from(self.mantissa).is_zero() || U256::from(another.mantissa).is_zero() {
-            return Ray {
-                mantissa: WrappedU256::from(U256::from(0)),
-            }
-        }
-
-        self._op(another, |o, v| o.mul(v).div(ray_scale()))
-    }
-    fn div(&self, another: Ray) -> Ray {
-        self._op(another, |o, v| o.mul(ray_scale()).div(v))
-    }
-    fn _op(&self, a: Ray, op: fn(one: U256, another: U256) -> U256) -> Ray {
-        Ray {
-            mantissa: WrappedU256::from(op(U256::from(self.mantissa), U256::from(a.mantissa))),
-        }
     }
 }
 

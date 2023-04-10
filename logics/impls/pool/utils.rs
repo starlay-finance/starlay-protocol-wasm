@@ -10,7 +10,10 @@ use super::super::exp_no_err::{
 };
 pub use crate::traits::pool::*;
 use crate::{
-    impls::exp_no_err::exp_ray_ratio,
+    impls::wad_ray_math::{
+        exp_ray_ratio,
+        Ray,
+    },
     traits::types::WrappedU256,
 };
 use core::ops::{
@@ -37,7 +40,7 @@ pub fn protocol_seize_share_mantissa() -> U256 {
 pub struct CalculateInterestInput {
     pub total_borrows: Balance,
     pub total_reserves: Balance,
-    pub borrow_index: Balance,
+    pub borrow_index: U256,
     pub borrow_rate: U256,
     pub old_block_timestamp: Timestamp,
     pub new_block_timestamp: Timestamp,
@@ -45,10 +48,26 @@ pub struct CalculateInterestInput {
 }
 
 pub struct CalculateInterestOutput {
-    pub borrow_index: Balance,
+    pub borrow_index: U256,
     pub total_borrows: Balance,
     pub total_reserves: Balance,
     pub interest_accumulated: Balance,
+}
+
+pub fn scaled_amount_of(amount: Balance, idx: Exp) -> Balance {
+    let divided = Ray {
+        mantissa: WrappedU256::from(U256::from(amount)),
+    }
+    .ray_div(idx.to_ray())
+    .unwrap();
+    U256::from(divided.mantissa).as_u128()
+}
+
+pub fn from_scaled_amount(scaled_amount: Balance, idx: Exp) -> Balance {
+    let multiplied = idx.to_ray().ray_mul(Ray {
+        mantissa: WrappedU256::from(U256::from(scaled_amount)),
+    });
+    U256::from(multiplied.unwrap().mantissa).as_u128()
 }
 
 fn compound_interest(borrow_rate_per_millisec: &Exp, delta: U256) -> Exp {
@@ -65,8 +84,11 @@ fn compound_interest(borrow_rate_per_millisec: &Exp, delta: U256) -> Exp {
     };
     let base_power_two = borrow_rate_per_millisec
         .to_ray()
-        .mul(borrow_rate_per_millisec.to_ray());
-    let base_power_three = base_power_two.mul(borrow_rate_per_millisec.to_ray());
+        .ray_mul(borrow_rate_per_millisec.to_ray())
+        .unwrap();
+    let base_power_three = base_power_two
+        .ray_mul(borrow_rate_per_millisec.to_ray())
+        .unwrap();
     let second_term_ray = delta
         .mul(delta_minus_one)
         .mul(U256::from(base_power_two.mantissa))
@@ -111,7 +133,7 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
     let borrow_index_new = compound_interest_factor
         .mul_scalar_truncate_add_uint(input.borrow_index.into(), input.borrow_index.into());
     Ok(CalculateInterestOutput {
-        borrow_index: borrow_index_new.as_u128(),
+        borrow_index: borrow_index_new,
 
         interest_accumulated: interest_accumulated.as_u128(),
         total_borrows: total_borrows_new,
@@ -203,9 +225,50 @@ mod tests {
         U256::from(10).pow(U256::from(18))
     }
     #[test]
+    fn test_scaled_amount_of() {
+        struct TestCase {
+            amount: Balance,
+            idx: Exp,
+            want: Balance,
+        }
+        let cases = vec![
+            TestCase {
+                amount: 100,
+                idx: Exp {
+                    mantissa: WrappedU256::from(U256::from(1).mul(mantissa())),
+                },
+                want: 100,
+            },
+            TestCase {
+                amount: 200,
+                idx: Exp {
+                    mantissa: WrappedU256::from(U256::from(1).mul(mantissa())),
+                },
+                want: 200,
+            },
+            TestCase {
+                amount: 100,
+                idx: Exp {
+                    mantissa: WrappedU256::from(U256::from(100).mul(mantissa())),
+                },
+                want: 1,
+            },
+            TestCase {
+                amount: 90,
+                idx: Exp {
+                    mantissa: WrappedU256::from(U256::from(100).mul(mantissa())),
+                },
+                want: 1,
+            },
+        ];
+        for c in cases {
+            assert_eq!(scaled_amount_of(c.amount, c.idx), c.want)
+        }
+    }
+    #[test]
     fn test_calculate_interest_panic_if_over_borrow_rate_max() {
         let input = CalculateInterestInput {
-            borrow_index: 0,
+            borrow_index: 0.into(),
             borrow_rate: U256::one().mul(U256::from(10)).pow(U256::from(18)),
             new_block_timestamp: Timestamp::default(),
             old_block_timestamp: Timestamp::default(),
@@ -275,7 +338,7 @@ mod tests {
             CalculateInterestInput {
                 old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + 1000 * 60 * 60 * 24 * 30 * 12, // 1 year
-                borrow_index: 1,
+                borrow_index: 1.into(),
                 borrow_rate: mantissa().div(100000), // 0.001 %
                 reserve_factor_mantissa: mantissa().div(100), // 1 %
                 total_borrows: 10_000 * (10_u128.pow(18)),
@@ -284,7 +347,7 @@ mod tests {
             CalculateInterestInput {
                 old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + 1000 * 60 * 60, // 1 hour
-                borrow_index: 123123123,
+                borrow_index: 123123123.into(),
                 borrow_rate: mantissa().div(1000000),
                 reserve_factor_mantissa: mantissa().div(10),
                 total_borrows: 100_000 * (10_u128.pow(18)),
@@ -293,7 +356,7 @@ mod tests {
             CalculateInterestInput {
                 old_block_timestamp: old_timestamp,
                 new_block_timestamp: old_timestamp + 1000 * 60 * 60,
-                borrow_index: 123123123,
+                borrow_index: 123123123.into(),
                 borrow_rate: mantissa().div(123123),
                 reserve_factor_mantissa: mantissa().div(10).mul(2),
                 total_borrows: 123_456 * (10_u128.pow(18)),
