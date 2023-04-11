@@ -4,10 +4,6 @@ use crate::traits::{
     weth::*,
 };
 use ink::prelude::vec::Vec;
-// use ink_env::call::{
-//     CallBuilder,
-//     FromAccountId,
-// };
 use openbrush::{
     contracts::{
         ownable::*,
@@ -55,10 +51,7 @@ where
     T: Storage<Data> + Storage<ownable::Data>,
 {
     default fn authorize_lending_pool(&mut self, lending_pool: AccountId) -> Result<()> {
-        let approve_result = WETHRef::approve(&self.data::<Data>().weth, lending_pool, u128::MAX);
-        if approve_result.is_err() {
-            return Err(WETHGatewayError::from(approve_result.err().unwrap()))
-        }
+        WETHRef::approve(&self.data::<Data>().weth, lending_pool, u128::MAX)?;
         Ok(())
     }
 
@@ -66,23 +59,12 @@ where
         &mut self,
         lending_pool: AccountId,
         on_behalf_of: AccountId,
-        // referral_code: u16,
     ) -> Result<()> {
         let deposit_value = Self::env().transferred_value();
-        // let weth_contract: WETHRef = FromAccountId::from_account_id(self.data::<Data>().weth);
-        // WETH.deposit{value: msg.value}();
-        // TODO: need to make payable call with transferred_value
-        let deposit_result = WETHRef::deposit_builder(&self.data::<Data>().weth)
+        WETHRef::deposit_builder(&self.data::<Data>().weth)
             .transferred_value(deposit_value)
-            .invoke();
-        if deposit_result.is_err() {
-            return Err(WETHGatewayError::from(deposit_result.err().unwrap()))
-        }
-        // ILendingPool(lendingPool).deposit(address(WETH), msg.value, onBehalfOf, referralCode);
-        let mint_result = PoolRef::mint_to(&lending_pool, on_behalf_of, deposit_value);
-        if mint_result.is_err() {
-            return Err(WETHGatewayError::from(mint_result.err().unwrap()))
-        }
+            .invoke()?;
+        PoolRef::mint_to(&lending_pool, on_behalf_of, deposit_value)?;
 
         Ok(())
     }
@@ -94,7 +76,6 @@ where
         to: AccountId,
     ) -> Result<()> {
         let caller = Self::env().caller();
-        // ILToken lWETH = ILToken(ILendingPool(lendingPool).getReserveData(address(WETH)).lTokenAddress);
         let contract_address = Self::env().account_id();
         let user_balance: Balance = PoolRef::balance_of(&lending_pool, caller);
         let mut amount_to_withdraw: Balance = amount;
@@ -102,26 +83,15 @@ where
         if amount == u128::MAX {
             amount_to_withdraw = user_balance;
         }
-
-        let transfer_result = PoolRef::transfer_from(
+        PoolRef::transfer_from(
             &lending_pool,
             caller,
             contract_address,
             amount_to_withdraw,
             Vec::<u8>::new(),
-        );
-        if transfer_result.is_err() {
-            return Err(WETHGatewayError::from(transfer_result.err().unwrap()))
-        }
-        // ILendingPool(lendingPool).withdraw(address(WETH), amountToWithdraw, address(this));
-        let redeem_result = PoolRef::redeem(&lending_pool, amount_to_withdraw);
-        if redeem_result.is_err() {
-            return Err(WETHGatewayError::from(redeem_result.err().unwrap()))
-        }
-        let withdraw_result = WETHRef::withdraw(&self.data::<Data>().weth, amount_to_withdraw);
-        if withdraw_result.is_err() {
-            return Err(WETHGatewayError::from(withdraw_result.err().unwrap()))
-        }
+        )?;
+        PoolRef::redeem(&lending_pool, amount_to_withdraw)?;
+        WETHRef::withdraw(&self.data::<Data>().weth, amount_to_withdraw)?;
         self._safe_transfer_eth(to, amount_to_withdraw)
     }
 
@@ -129,7 +99,6 @@ where
         &mut self,
         lending_pool: AccountId,
         amount: Balance,
-        // rate_mode: u128,
         on_behalf_of: AccountId,
     ) -> Result<()> {
         let transferred_value = Self::env().transferred_value();
@@ -141,57 +110,24 @@ where
             return Err(WETHGatewayError::InsufficientPayback)
         }
 
-        let deposit_result = WETHRef::deposit_builder(&self.data::<Data>().weth)
+        WETHRef::deposit_builder(&self.data::<Data>().weth)
             .transferred_value(payback_amount)
-            .invoke();
-        if deposit_result.is_err() {
-            return Err(WETHGatewayError::from(deposit_result.err().unwrap()))
-        }
+            .invoke()?;
 
-        let repay_result = PoolRef::repay_borrow_behalf(
-            &self.data::<Data>().weth,
-            on_behalf_of,
-            transferred_value,
-        );
-        if repay_result.is_err() {
-            return Err(WETHGatewayError::from(repay_result.err().unwrap()))
-        }
+        PoolRef::repay_borrow_behalf(&self.data::<Data>().weth, on_behalf_of, transferred_value)?;
 
         let caller = Self::env().caller();
         if transferred_value > payback_amount {
-            let transfer_result =
-                self._safe_transfer_eth(caller, transferred_value - payback_amount);
-            if transfer_result.is_err() {
-                return transfer_result
-            }
+            self._safe_transfer_eth(caller, transferred_value - payback_amount)?;
         }
         Ok(())
     }
 
-    default fn borrow_eth(
-        &mut self,
-        lending_pool: AccountId,
-        amount: Balance,
-        // interes_rate_mode: u128,
-        // referral_code: u16,
-    ) -> Result<()> {
+    default fn borrow_eth(&mut self, lending_pool: AccountId, amount: Balance) -> Result<()> {
         let caller = Self::env().caller();
-        // ILendingPool(lendingPool).borrow(
-        //     address(WETH),
-        //     amount,
-        //     interesRateMode,
-        //     referralCode,
-        //     msg.sender
-        //   );
-        let borrow_result = PoolRef::borrow(&lending_pool, amount);
-        if borrow_result.is_err() {
-            return Err(WETHGatewayError::from(borrow_result.err().unwrap()))
-        }
+        PoolRef::borrow(&lending_pool, amount)?;
+        WETHRef::withdraw(&self.data::<Data>().weth, amount)?;
 
-        let withdraw_result = WETHRef::withdraw(&self.data::<Data>().weth, amount);
-        if withdraw_result.is_err() {
-            return Err(WETHGatewayError::from(withdraw_result.err().unwrap()))
-        }
         self._safe_transfer_eth(caller, amount)
     }
 
@@ -201,10 +137,7 @@ where
         to: AccountId,
         amount: Balance,
     ) -> Result<()> {
-        let transfer_result = PSP22Ref::transfer(&token, to, amount, Vec::<u8>::new());
-        if transfer_result.is_err() {
-            return Err(WETHGatewayError::from(transfer_result.err().unwrap()))
-        }
+        PSP22Ref::transfer(&token, to, amount, Vec::<u8>::new())?;
         Ok(())
     }
 

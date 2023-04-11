@@ -118,7 +118,7 @@ export const deployPoolFromAsset = async ({
   option = defaultOption(api),
   token,
 }: FactoryArgs<Pool_factory['newFromAsset']> & {
-  token: Token
+  token: Token | WETH
 }): Promise<Pool> => {
   const factory = new Pool_factory(api, signer)
 
@@ -204,5 +204,32 @@ export const deployWETH = async ({
   const contract = await factory.new(...args, option)
   const result = new WETH(contract.address, signer, api)
   await afterDeployment(`${result.name}`, contract)
+  return result
+}
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export const deployWETHPool = async ({
+  api,
+  signer,
+  args,
+  option = defaultOption(api),
+  token,
+}: FactoryArgs<Pool_factory['newFromAsset']> & {
+  token: WETH
+}): Promise<Pool> => {
+  const factory = new Pool_factory(api, signer)
+
+  // FIXME: calling token_name or token_symbol on contract will fail
+  const name = `Starlay ${hexToUtf8(
+    (await token.query.tokenName()).value.ok,
+  )}` as unknown as string[]
+  const symbol = `s${hexToUtf8(
+    (await token.query.tokenSymbol()).value.ok,
+  )}` as unknown as string[]
+  const decimals = (await token.query.tokenDecimals()).value.ok
+  const contract = await factory.new(...args, name, symbol, decimals, option)
+
+  const result = new Pool(contract.address, signer, api)
+  await afterDeployment(result.name, contract)
   return result
 }

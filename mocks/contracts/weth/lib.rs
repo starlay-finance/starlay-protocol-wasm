@@ -12,7 +12,10 @@ pub mod contract {
         *,
     };
     use openbrush::{
-        contracts::psp22::extensions::metadata::*,
+        contracts::psp22::extensions::{
+            metadata::*,
+            mintable::*,
+        },
         traits::Storage,
     };
 
@@ -41,6 +44,7 @@ pub mod contract {
 
     impl PSP22 for WETHContract {}
     impl PSP22Metadata for WETHContract {}
+    impl PSP22Mintable for WETHContract {}
     impl WETH for WETHContract {}
 
     impl Internal for WETHContract {
@@ -56,8 +60,8 @@ pub mod contract {
         #[ink(constructor)]
         pub fn new() -> Self {
             let mut _instance = Self::default();
-            _instance.metadata.name = Some("Wrapped Ether".into());
-            _instance.metadata.symbol = Some("WETH".into());
+            _instance.metadata.name = Some("Wrapped Astar".into());
+            _instance.metadata.symbol = Some("WASTR".into());
             _instance.metadata.decimals = 18;
             _instance
         }
