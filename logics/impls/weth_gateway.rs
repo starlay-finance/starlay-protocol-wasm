@@ -64,8 +64,8 @@ where
         WETHRef::deposit_builder(&self.data::<Data>().weth)
             .transferred_value(deposit_value)
             .invoke()?;
+        WETHRef::approve(&self.data::<Data>().weth, lending_pool, deposit_value)?;
         PoolRef::mint_to(&lending_pool, on_behalf_of, deposit_value)?;
-
         Ok(())
     }
 

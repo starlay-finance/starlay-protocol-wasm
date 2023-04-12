@@ -692,7 +692,7 @@ describe('Pool spec', () => {
       )
 
       // check events from Pool (execute seize)
-      const contractEvents = res.result.contractEvents
+      const contractEvents = res.events
       //// Burn
       const burnEvent = contractEvents.find(
         (e) =>
