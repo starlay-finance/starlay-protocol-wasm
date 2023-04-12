@@ -562,7 +562,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         };
 
         let exchange_rate = self._exchange_rate_stored(); // NOTE: need exchange_rate calculation before transfer underlying
-        self._transfer_underlying_from(minter, contract_addr, mint_amount)?;
+        let caller = Self::env().caller();
+        self._transfer_underlying_from(caller, contract_addr, mint_amount)?;
         let minted_tokens = U256::from(mint_amount)
             .mul(exp_scale())
             .div(exchange_rate)

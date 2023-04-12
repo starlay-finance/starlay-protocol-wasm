@@ -11,6 +11,8 @@ import { hexToUtf8 } from '../scripts/helper/utils'
 import { preparePoolsWithPreparedTokens } from './testContractHelper'
 
 describe('WETHGateway spec', () => {
+  const rateModelArg = new BN(100).mul(ONE_ETHER)
+
   const setup = async () => {
     const { api, alice: deployer, bob, charlie, django } = globalThis.setup
     const controller = await deployController({
@@ -25,7 +27,6 @@ describe('WETHGateway spec', () => {
     })
 
     // temp: declare params for rate_model
-    const rateModelArg = new BN(100).mul(ONE_ETHER)
     const rateModel = await deployDefaultInterestRateModel({
       api,
       signer: deployer,
@@ -59,7 +60,7 @@ describe('WETHGateway spec', () => {
     await controller.tx.setPriceOracle(priceOracle.address)
     await controller.tx.setCloseFactorMantissa([ONE_ETHER])
     //// for pool
-    for (const sym of [pools.dai, pools.usdc, pools.usdt]) {
+    for (const sym of [pools.weth]) {
       await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
       await controller.tx.supportMarketWithCollateralFactorMantissa(
         sym.pool.address,
@@ -106,22 +107,18 @@ describe('WETHGateway spec', () => {
       data: { free: beforeBalanceUser0 },
     } = await api.query.system.account(users[0].address)
 
-    try {
-      await wethGateway
-        .withSigner(users[0])
-        .tx.depositEth(pool.address, users[0].address, {
-          value: ONE_ETHER,
-        })
-    } catch (error) {
-      console.log(error)
-    }
+    await wethGateway
+      .withSigner(users[0])
+      .tx.depositEth(pool.address, users[0].address, {
+        value: ONE_ETHER,
+      })
 
     const {
       data: { free: afterBalanceUser0 },
     } = await api.query.system.account(users[0].address)
 
     expect(
-      (await weth.query.balanceOf(wethGateway.address)).value.ok.toString(),
+      (await weth.query.balanceOf(pool.address)).value.ok.toString(),
     ).toEqual(ONE_ETHER.toString())
 
     expect(beforeBalanceUser0.sub(afterBalanceUser0).gt(ONE_ETHER)).toEqual(
@@ -131,20 +128,9 @@ describe('WETHGateway spec', () => {
       beforeBalanceUser0.sub(afterBalanceUser0).lt(new BN(2).mul(ONE_ETHER)),
     ).toEqual(true)
 
-    // expect((await weth.query.balanceOf(wethGateway.address)).value.ok).toEqual(
-    //   ONE_ETHER,
-    // )
-    // expect((await pool.query.balanceOf(users[0].address)).value.ok).toEqual(
-    //   ONE_ETHER,
-    // )
-    // const TWO_ETHER = new BN(2).mul(ONE_ETHER)
-
-    // await wethGateway.query.depositEth(pool.address, bob, {
-    //   value: TWO_ETHER,
-    // })
-
-    // expect((await weth.query.balanceOf(wethGateway.address)).value.ok).toEqual(0)
-    // expect((await pool.query.balanceOf(bob)).value.ok).toEqual(TWO_ETHER)
+    expect(
+      (await pool.query.balanceOf(users[0].address)).value.ok.toString(),
+    ).toEqual(ONE_ETHER.toString())
   })
 
   // it('Withdraw WETH', async () => {
