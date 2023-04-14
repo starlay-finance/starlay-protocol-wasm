@@ -94,7 +94,7 @@ pub trait Internal {
         &self,
         pool: AccountId,
         redeemer: AccountId,
-        redeem_amount: Balance,
+        amount: Balance,
         pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
     fn _redeem_verify(
@@ -102,7 +102,6 @@ pub trait Internal {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
-        redeem_tokens: Balance,
     ) -> Result<()>;
     fn _borrow_allowed(
         &self,
@@ -291,9 +290,8 @@ impl<T: Storage<Data>> Controller for T {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
-        redeem_tokens: Balance,
     ) -> Result<()> {
-        self._redeem_verify(pool, redeemer, redeem_amount, redeem_tokens)
+        self._redeem_verify(pool, redeemer, redeem_amount)
     }
 
     default fn borrow_allowed(
@@ -651,8 +649,7 @@ impl<T: Storage<Data>> Internal for T {
         &self,
         _pool: AccountId,
         _redeemer: AccountId,
-        _redeem_amount: Balance,
-        _redeem_tokens: Balance,
+        _amount: Balance,
     ) -> Result<()> {
         Ok(()) // do nothing
     }
