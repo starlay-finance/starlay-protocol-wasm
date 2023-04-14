@@ -100,6 +100,7 @@ pub trait Internal {
     fn _accrue_interest(&mut self) -> Result<()>;
     fn _accrue_interest_at(&mut self, at: Timestamp) -> Result<()>;
     fn _balance_of(&self, owner: &AccountId) -> Balance;
+
     fn _total_supply(&self) -> Balance;
     // use in PSP22#transfer,transfer_from interface
     // return PSP22Error as Error for this
@@ -527,22 +528,27 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         if src == dst {
             return Err(PSP22Error::Custom(String::from("TransferNotAllowed")))
         }
+        let exchange_rate = self._exchange_rate_stored();
+        let psp22_transfer_amount = U256::from(value)
+            .mul(exchange_rate)
+            .div(exp_scale())
+            .as_u128();
 
         if spender == src {
             // copied from PSP22#transfer
             // ref: https://github.com/727-Ventures/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L75-L79
-            self._transfer_from_to(src, dst, value, data)?;
+            self._transfer_from_to(src, dst, psp22_transfer_amount, data)?;
         } else {
             // copied from PSP22#transfer_from
             // ref: https://github.com/727-Ventures/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L81-L98
             let allowance = self._allowance(&src, &spender);
 
-            if allowance < value {
+            if allowance < psp22_transfer_amount {
                 return Err(PSP22Error::InsufficientAllowance)
             }
 
-            self._approve_from_to(src, spender, allowance - value)?;
-            self._transfer_from_to(src, dst, value, data)?;
+            self._approve_from_to(src, spender, allowance - psp22_transfer_amount)?;
+            self._transfer_from_to(src, dst, psp22_transfer_amount, data)?;
         }
 
         Ok(())
