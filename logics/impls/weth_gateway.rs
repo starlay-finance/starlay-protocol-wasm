@@ -1,4 +1,3 @@
-use super::pool::utils::calculate_redeem_values;
 pub use crate::traits::weth_gateway::*;
 use crate::traits::{
     pool::PoolRef,
@@ -17,8 +16,6 @@ use openbrush::{
         ZERO_ADDRESS,
     },
 };
-use primitive_types::U256;
-
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
@@ -82,27 +79,11 @@ where
             amount_to_withdraw = user_balance;
         }
 
-        let values = calculate_redeem_values(
-            0,
-            amount_to_withdraw,
-            U256::from(PoolRef::exchange_rate_stored(&pool)),
-        );
-
-        if values.is_none() {
-            return Err(WETHGatewayError::from(PoolError::InvalidParameter))
-        }
-        let (redeem_tokens, redeem_amount) = values.unwrap();
-        if (redeem_tokens == 0 && redeem_amount > 0) || (redeem_tokens > 0 && redeem_amount == 0) {
-            return Err(WETHGatewayError::from(
-                PoolError::OnlyEitherRedeemTokensOrRedeemAmountIsZero,
-            ))
-        }
-
         PoolRef::transfer_from(
             &pool,
             caller,
             contract_address,
-            redeem_tokens,
+            amount_to_withdraw,
             Vec::<u8>::new(),
         )?;
         // PoolRef::redeem_underlying(&pool, amount_to_withdraw)?;
