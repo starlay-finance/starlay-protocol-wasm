@@ -147,6 +147,16 @@ pub fn underlying_balance(exchange_rate: Exp, pool_token_balance: Balance) -> Ba
         .as_u128()
 }
 
+pub fn to_pool_token_balance(exchange_rate: Exp, underlying_balance: Balance) -> Balance {
+    if underlying_balance == 0 {
+        return 0
+    }
+    U256::from(underlying_balance)
+        .mul(exp_scale())
+        .div(exchange_rate.mantissa)
+        .as_u128()
+}
+
 // returns liquidator_seize_tokens, protocol_seize_amount and protocol_seize_tokens
 pub fn protocol_seize_amount(
     exchange_rate: Exp,
@@ -223,6 +233,80 @@ mod tests {
     use primitive_types::U256;
     fn mantissa() -> U256 {
         U256::from(10).pow(U256::from(18))
+    }
+
+    #[test]
+    fn test_to_pool_token_balance() {
+        let rate = &123456789_u128;
+        let exchange_rate = Exp {
+            mantissa: WrappedU256::from(U256::from(*rate).mul(mantissa())),
+        };
+        struct TestCase {
+            underlying_balance: Balance,
+        }
+        let cases = vec![
+            TestCase {
+                underlying_balance: 0,
+            },
+            TestCase {
+                underlying_balance: 1,
+            },
+            TestCase {
+                underlying_balance: 100,
+            },
+            TestCase {
+                underlying_balance: 123456789,
+            },
+            TestCase {
+                underlying_balance: 1000000,
+            },
+            TestCase {
+                underlying_balance: 10000000,
+            },
+            TestCase {
+                underlying_balance: 100000000,
+            },
+            TestCase {
+                underlying_balance: 1000000000,
+            },
+            TestCase {
+                underlying_balance: 10000000000,
+            },
+            TestCase {
+                underlying_balance: 100000000000,
+            },
+            TestCase {
+                underlying_balance: 1000000000000,
+            },
+            TestCase {
+                underlying_balance: 10000000000000,
+            },
+            TestCase {
+                underlying_balance: 100000000000000,
+            },
+            TestCase {
+                underlying_balance: 1000000000000000,
+            },
+            TestCase {
+                underlying_balance: 10000000000000000,
+            },
+            TestCase {
+                underlying_balance: 100000000000000000,
+            },
+            TestCase {
+                underlying_balance: 1000000000000000000,
+            },
+            TestCase {
+                underlying_balance: 10000000000000000000,
+            },
+            TestCase {
+                underlying_balance: 100000000000000000000,
+            },
+        ];
+        for case in cases {
+            let got = to_pool_token_balance(exchange_rate.clone(), case.underlying_balance);
+            assert_eq!(got, case.underlying_balance.div(rate));
+        }
     }
     #[test]
     fn test_scaled_amount_of() {
