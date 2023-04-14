@@ -11,6 +11,8 @@ import {
   deployPriceOracle,
 } from '../scripts/helper/deploy_helper'
 import { hexToUtf8 } from '../scripts/helper/utils'
+import { RATE_MODELS } from '../scripts/interest_rates'
+import Contract from '../types/contracts/default_interest_rate_model'
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
 import { Mint, Redeem } from '../types/event-types/pool'
@@ -26,7 +28,7 @@ import {
 } from './testHelpers'
 
 describe('Pool spec', () => {
-  const setup = async () => {
+  const setup = async (model?: Contract) => {
     const { api, alice: deployer, bob, charlie, django } = globalThis.setup
 
     const controller = await deployController({
@@ -40,11 +42,13 @@ describe('Pool spec', () => {
       args: [],
     })
 
-    const rateModel = await deployDefaultInterestRateModel({
-      api,
-      signer: deployer,
-      args: [[0], [0], [0], [0]],
-    })
+    const rateModel = model
+      ? model
+      : await deployDefaultInterestRateModel({
+          api,
+          signer: deployer,
+          args: [[0], [0], [0], [0]],
+        })
 
     const pools = await preparePoolsWithPreparedTokens({
       api,
@@ -228,7 +232,6 @@ describe('Pool spec', () => {
       expectToEmit<Redeem>(events[1], 'Redeem', {
         redeemer: deployer.address,
         redeemAmount,
-        redeemTokens: redeemAmount,
       })
     })
   })
@@ -286,7 +289,6 @@ describe('Pool spec', () => {
       expectToEmit<Redeem>(events[1], 'Redeem', {
         redeemer: deployer.address,
         redeemAmount,
-        redeemTokens: redeemAmount,
       })
     })
   })
@@ -316,12 +318,23 @@ describe('Pool spec', () => {
 
   describe('.redeem_all', () => {
     it('success', async () => {
+      const { api, alice: deployer } = globalThis.setup
+      const daiRateModel = RATE_MODELS.dai
+      const rateModel = await deployDefaultInterestRateModel({
+        api,
+        signer: deployer,
+        args: [
+          [daiRateModel.baseRatePerYear()],
+          [daiRateModel.multiplierPerYearSlope1()],
+          [daiRateModel.multiplierPerYearSlope2()],
+          [daiRateModel.kink()],
+        ],
+      })
       const {
-        deployer,
         pools: {
           usdc: { token, pool },
         },
-      } = await setup()
+      } = await setup(rateModel)
 
       await shouldNotRevert(token, 'mint', [deployer.address, toDec6(60_000)])
       await shouldNotRevert(token, 'approve', [pool.address, toDec6(60_000)])

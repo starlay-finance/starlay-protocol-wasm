@@ -191,12 +191,7 @@ pub trait Internal {
 
     // event emission
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
-    fn _emit_redeem_event(
-        &self,
-        redeemer: AccountId,
-        redeem_amount: Balance,
-        redeem_tokens: Balance,
-    );
+    fn _emit_redeem_event(&self, redeemer: AccountId, redeem_amount: Balance);
     fn _emit_borrow_event(
         &self,
         borrower: AccountId,
@@ -574,7 +569,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
     default fn _redeem(&mut self, redeemer: AccountId, redeem_amount: Balance) -> Result<()> {
         if redeem_amount == 0 {
-            return Err(Error::OnlyEitherRedeemTokensOrRedeemAmountIsZero)
+            return Ok(())
         }
 
         let contract_addr = Self::env().account_id();
@@ -615,7 +610,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         )?;
         self._transfer_underlying(redeemer, redeem_amount)?;
 
-        self._emit_redeem_event(redeemer, redeem_amount, redeem_amount);
+        self._emit_redeem_event(redeemer, redeem_amount);
 
         // skip post-process because nothing is done
         // ControllerRef::redeem_verify(&self._controller(), contract_addr, redeemer, redeem_tokens, redeem_amount)?;
@@ -1168,13 +1163,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         _mint_tokens: Balance,
     ) {
     }
-    default fn _emit_redeem_event(
-        &self,
-        _redeemer: AccountId,
-        _redeem_amount: Balance,
-        _redeem_tokens: Balance,
-    ) {
-    }
+    default fn _emit_redeem_event(&self, _redeemer: AccountId, _redeem_amount: Balance) {}
     default fn _emit_borrow_event(
         &self,
         _borrower: AccountId,
