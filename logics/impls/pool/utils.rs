@@ -141,12 +141,6 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
     })
 }
 
-pub fn underlying_balance(exchange_rate: Exp, pool_token_balance: Balance) -> Balance {
-    exchange_rate
-        .mul_scalar_truncate(pool_token_balance.into())
-        .as_u128()
-}
-
 // returns liquidator_seize_tokens, protocol_seize_amount and protocol_seize_tokens
 pub fn protocol_seize_amount(
     exchange_rate: Exp,

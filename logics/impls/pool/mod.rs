@@ -55,7 +55,6 @@ use self::utils::{
     protocol_seize_share_mantissa,
     reserve_factor_max_mantissa,
     scaled_amount_of,
-    underlying_balance,
     CalculateInterestInput,
     CalculateInterestOutput,
 };
@@ -529,11 +528,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Err(PSP22Error::Custom(String::from("TransferNotAllowed")))
         }
         let exchange_rate = self._exchange_rate_stored();
-        let psp22_transfer_amount = underlying_balance(
+        let psp22_transfer_amount = from_scaled_amount(
+            value,
             Exp {
                 mantissa: exchange_rate.into(),
             },
-            value,
         );
 
         if spender == src {
@@ -1135,11 +1134,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             interest.total_reserves,
             U256::from(self._initial_exchange_rate_mantissa()),
         );
-        underlying_balance(
+        from_scaled_amount(
+            supply,
             Exp {
                 mantissa: rate.into(),
             },
-            supply,
         )
     }
 
@@ -1148,7 +1147,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             mantissa: self._exchange_rate_stored().into(),
         };
         let pool_token_balance = self._principal_balance_of(&account);
-        underlying_balance(exchange_rate, pool_token_balance)
+        from_scaled_amount(pool_token_balance, exchange_rate)
     }
 
     default fn _principal_balance_of(&self, account: &AccountId) -> Balance {
