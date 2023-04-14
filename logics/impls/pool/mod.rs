@@ -48,7 +48,6 @@ use primitive_types::U256;
 mod utils;
 use self::utils::{
     calculate_interest,
-    calculate_redeem_values,
     exchange_rate,
     from_scaled_amount,
     protocol_seize_amount,
@@ -112,12 +111,7 @@ pub trait Internal {
         data: Vec<u8>,
     ) -> core::result::Result<(), PSP22Error>;
     fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()>;
-    fn _redeem(
-        &mut self,
-        redeemer: AccountId,
-        redeem_tokens_in: Balance,
-        redeem_amount_in: Balance,
-    ) -> Result<()>;
+    fn _redeem(&mut self, redeemer: AccountId, amount: Balance) -> Result<()>;
     fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()>;
     fn _repay_borrow(
         &mut self,
@@ -266,19 +260,19 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn redeem(&mut self, redeem_tokens: Balance) -> Result<()> {
         self._accrue_interest()?;
-        self._redeem(Self::env().caller(), redeem_tokens, 0)
+        self._redeem(Self::env().caller(), redeem_tokens)
     }
 
     default fn redeem_underlying(&mut self, redeem_amount: Balance) -> Result<()> {
         self._accrue_interest()?;
-        self._redeem(Self::env().caller(), 0, redeem_amount)
+        self._redeem(Self::env().caller(), redeem_amount)
     }
 
     default fn redeem_all(&mut self) -> Result<()> {
         self._accrue_interest()?;
         let caller = Self::env().caller();
-        let all_tokens_redeemed = self._principal_balance_of(&caller);
-        self._redeem(caller, all_tokens_redeemed, 0)
+        let all_tokens_redeemed = Internal::_balance_of(self, &caller);
+        self._redeem(caller, all_tokens_redeemed)
     }
 
     default fn borrow(&mut self, borrow_amount: Balance) -> Result<()> {
@@ -578,22 +572,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         Ok(())
     }
-    default fn _redeem(
-        &mut self,
-        redeemer: AccountId,
-        redeem_tokens_in: Balance,
-        redeem_amount_in: Balance,
-    ) -> Result<()> {
-        let values = calculate_redeem_values(
-            redeem_tokens_in,
-            redeem_amount_in,
-            self._exchange_rate_stored(),
-        );
-        if values.is_none() {
-            return Err(Error::InvalidParameter)
-        }
-        let (redeem_tokens, redeem_amount) = values.unwrap();
-        if (redeem_tokens == 0 && redeem_amount > 0) || (redeem_tokens > 0 && redeem_amount == 0) {
+    default fn _redeem(&mut self, redeemer: AccountId, redeem_amount: Balance) -> Result<()> {
+        if redeem_amount == 0 {
             return Err(Error::OnlyEitherRedeemTokensOrRedeemAmountIsZero)
         }
 
@@ -612,7 +592,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             &self._controller(),
             contract_addr,
             redeemer,
-            redeem_tokens,
+            redeem_amount,
             Some(pool_attribute),
         )?;
         let current_timestamp = Self::env().block_timestamp();
@@ -624,10 +604,18 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Err(Error::RedeemTransferOutNotPossible)
         }
 
-        self._burn_from(redeemer, redeem_tokens)?;
+        self._burn_from(
+            redeemer,
+            scaled_amount_of(
+                redeem_amount,
+                Exp {
+                    mantissa: exchange_rate.into(),
+                },
+            ),
+        )?;
         self._transfer_underlying(redeemer, redeem_amount)?;
 
-        self._emit_redeem_event(redeemer, redeem_amount, redeem_tokens);
+        self._emit_redeem_event(redeemer, redeem_amount, redeem_amount);
 
         // skip post-process because nothing is done
         // ControllerRef::redeem_verify(&self._controller(), contract_addr, redeemer, redeem_tokens, redeem_amount)?;
