@@ -16,8 +16,6 @@ use openbrush::{
         ZERO_ADDRESS,
     },
 };
-use primitive_types::U256;
-
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
