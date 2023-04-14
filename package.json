@@ -34,8 +34,8 @@
     "deploy:shibuya": "yarn compile:release && ts-node scripts/deploy/index.ts shibuya"
   },
   "resolutions": {
-    "@polkadot/api": "^9.10.3",
-    "@polkadot/api-contract": "^9.10.3"
+    "@polkadot/api": "^9.13.4",
+    "@polkadot/api-contract": "^9.13.4"
   },
   "devDependencies": {
     "dotenv": "^16.0.3",

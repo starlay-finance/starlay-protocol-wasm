@@ -1,3 +1,4 @@
+use super::pool::utils::calculate_redeem_values;
 pub use crate::traits::weth_gateway::*;
 use crate::traits::{
     pool::PoolRef,
@@ -16,6 +17,7 @@ use openbrush::{
         ZERO_ADDRESS,
     },
 };
+use primitive_types::U256;
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug)]
@@ -50,59 +52,73 @@ impl<T> WETHGateway for T
 where
     T: Storage<Data> + Storage<ownable::Data>,
 {
-    default fn authorize_lending_pool(&mut self, lending_pool: AccountId) -> Result<()> {
-        WETHRef::approve(&self.data::<Data>().weth, lending_pool, u128::MAX)?;
+    default fn authorize_pool(&mut self, pool: AccountId) -> Result<()> {
+        WETHRef::approve(&self.data::<Data>().weth, pool, u128::MAX)?;
         Ok(())
     }
 
-    default fn deposit_eth(
-        &mut self,
-        lending_pool: AccountId,
-        on_behalf_of: AccountId,
-    ) -> Result<()> {
+    default fn deposit_eth(&mut self, pool: AccountId, on_behalf_of: AccountId) -> Result<()> {
         let deposit_value = Self::env().transferred_value();
         WETHRef::deposit_builder(&self.data::<Data>().weth)
             .transferred_value(deposit_value)
             .invoke()?;
-        WETHRef::approve(&self.data::<Data>().weth, lending_pool, deposit_value)?;
-        PoolRef::mint_to(&lending_pool, on_behalf_of, deposit_value)?;
+        WETHRef::approve(&self.data::<Data>().weth, pool, deposit_value)?;
+        PoolRef::mint_to(&pool, on_behalf_of, deposit_value)?;
         Ok(())
     }
 
     default fn withdraw_eth(
         &mut self,
-        lending_pool: AccountId,
+        pool: AccountId,
         amount: Balance,
         to: AccountId,
     ) -> Result<()> {
         let caller = Self::env().caller();
         let contract_address = Self::env().account_id();
-        let user_balance: Balance = PoolRef::balance_of(&lending_pool, caller);
+        let user_balance: Balance = PoolRef::balance_of(&pool, caller);
         let mut amount_to_withdraw: Balance = amount;
 
         if amount == u128::MAX {
             amount_to_withdraw = user_balance;
         }
+
+        let values = calculate_redeem_values(
+            0,
+            amount_to_withdraw,
+            U256::from(PoolRef::exchange_rate_stored(&pool)),
+        );
+
+        if values.is_none() {
+            return Err(WETHGatewayError::from(PoolError::InvalidParameter))
+        }
+        let (redeem_tokens, redeem_amount) = values.unwrap();
+        if (redeem_tokens == 0 && redeem_amount > 0) || (redeem_tokens > 0 && redeem_amount == 0) {
+            return Err(WETHGatewayError::from(
+                PoolError::OnlyEitherRedeemTokensOrRedeemAmountIsZero,
+            ))
+        }
+
         PoolRef::transfer_from(
-            &lending_pool,
+            &pool,
             caller,
             contract_address,
-            amount_to_withdraw,
+            redeem_tokens,
             Vec::<u8>::new(),
         )?;
-        PoolRef::redeem(&lending_pool, amount_to_withdraw)?;
-        WETHRef::withdraw(&self.data::<Data>().weth, amount_to_withdraw)?;
-        self._safe_transfer_eth(to, amount_to_withdraw)
+        // PoolRef::redeem_underlying(&pool, amount_to_withdraw)?;
+        // WETHRef::withdraw(&self.data::<Data>().weth, amount_to_withdraw)?;
+        // self._safe_transfer_eth(to, amount_to_withdraw)
+        Ok(())
     }
 
     default fn repay_eth(
         &mut self,
-        lending_pool: AccountId,
+        pool: AccountId,
         amount: Balance,
         on_behalf_of: AccountId,
     ) -> Result<()> {
         let transferred_value = Self::env().transferred_value();
-        let mut payback_amount = PoolRef::borrow_balance_stored(&lending_pool, on_behalf_of);
+        let mut payback_amount = PoolRef::borrow_balance_stored(&pool, on_behalf_of);
         if amount < payback_amount {
             payback_amount = amount;
         }
@@ -123,9 +139,9 @@ where
         Ok(())
     }
 
-    default fn borrow_eth(&mut self, lending_pool: AccountId, amount: Balance) -> Result<()> {
+    default fn borrow_eth(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
         let caller = Self::env().caller();
-        PoolRef::borrow(&lending_pool, amount)?;
+        PoolRef::borrow(&pool, amount)?;
         WETHRef::withdraw(&self.data::<Data>().weth, amount)?;
 
         self._safe_transfer_eth(caller, amount)

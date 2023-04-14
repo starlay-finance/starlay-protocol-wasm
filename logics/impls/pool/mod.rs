@@ -45,7 +45,7 @@ use openbrush::{
 };
 use primitive_types::U256;
 
-mod utils;
+pub mod utils;
 use self::utils::{
     calculate_interest,
     calculate_redeem_values,
@@ -275,7 +275,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn redeem_underlying(&mut self, redeem_amount: Balance) -> Result<()> {
-        self._accrue_interest()?;
+        // self._accrue_interest()?;
         self._redeem(Self::env().caller(), 0, redeem_amount)
     }
 

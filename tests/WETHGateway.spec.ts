@@ -131,32 +131,33 @@ describe('WETHGateway spec', () => {
     expect(
       (await pool.query.balanceOf(users[0].address)).value.ok.toString(),
     ).toEqual(ONE_ETHER.toString())
+
+    expect(
+      (
+        await pool.query.principalBalanceOf(users[0].address)
+      ).value.ok.toString(),
+    ).toEqual(ONE_ETHER.toString())
   })
 
-  // it('Withdraw WETH', async () => {
-  //   const { weth, wethGateway, pools } = await setup()
-  //   const { alice, bob } = globalThis.setup
-  //   const { pool } = pools.dai
+  it('Withdraw WETH', async () => {
+    const { weth, wethGateway, pools, users, api } = await setup()
+    const { pool } = pools.weth
 
-  //   await wethGateway.query.depositEth(pool.address, alice, {
-  //     value: ONE_ETHER,
-  //   })
-  //   const TWO_ETHER = new BN(2).mul(ONE_ETHER)
-  //   await wethGateway.query.depositEth(pool.address, bob, {
-  //     value: TWO_ETHER,
-  //   })
+    await wethGateway
+      .withSigner(users[0])
+      .tx.depositEth(pool.address, users[0].address, {
+        value: ONE_ETHER,
+      })
 
-  //   expect((await weth.query.balanceOf(alice)).value.ok).toEqual(0)
-  //   expect((await pool.query.balanceOf(alice)).value.ok).toEqual(ONE_ETHER)
-  //   expect((await weth.query.balanceOf(bob)).value.ok).toEqual(0)
-  //   expect((await pool.query.balanceOf(bob)).value.ok).toEqual(TWO_ETHER)
-
-  //   const HALF_ETHER = new BN(0.5).mul(ONE_ETHER)
-  //   await wethGateway.query.withdrawEth(pool.address, HALF_ETHER, alice)
-  //   await wethGateway.query.withdrawEth(pool.address, ONE_ETHER, bob)
-  //   expect((await weth.query.balanceOf(alice)).value.ok).toEqual(HALF_ETHER)
-  //   expect((await pool.query.balanceOf(alice)).value.ok).toEqual(HALF_ETHER)
-  //   expect((await weth.query.balanceOf(bob)).value.ok).toEqual(ONE_ETHER)
-  //   expect((await pool.query.balanceOf(bob)).value.ok).toEqual(ONE_ETHER)
-  // })
+    const withdrawAmount = ONE_ETHER.div(new BN(2))
+    await pool
+      .withSigner(users[0])
+      .tx.approve(wethGateway.address, withdrawAmount)
+    await wethGateway
+      .withSigner(users[0])
+      .tx.withdrawEth(pool.address, withdrawAmount, users[0].address)
+    expect(
+      (await weth.query.balanceOf(pool.address)).value.ok.toString(),
+    ).toEqual(withdrawAmount.toString())
+  })
 })

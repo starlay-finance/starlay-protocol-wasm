@@ -10,7 +10,7 @@ use openbrush::{
     },
 };
 
-use super::pool::Error as PoolError;
+pub use super::pool::Error as PoolError;
 
 #[openbrush::wrapper]
 pub type WETHGatewayRef = dyn WETHGateway + Ownable;
@@ -19,12 +19,12 @@ pub type WETHGatewayRef = dyn WETHGateway + Ownable;
 pub trait WETHGateway: Ownable {
     #[ink(message)]
     #[modifiers(only_owner)]
-    fn authorize_lending_pool(&mut self, lending_pool: AccountId) -> Result<()>;
+    fn authorize_pool(&mut self, pool: AccountId) -> Result<()>;
 
     #[ink(message, payable)]
     fn deposit_eth(
         &mut self,
-        lending_pool: AccountId,
+        pool: AccountId,
         on_behalf_of: AccountId,
         // referral_code: u16,
     ) -> Result<()>;
@@ -32,7 +32,7 @@ pub trait WETHGateway: Ownable {
     #[ink(message)]
     fn withdraw_eth(
         &mut self,
-        lending_pool: AccountId,
+        pool: AccountId,
         amount: Balance,
         on_behalf_of: AccountId,
     ) -> Result<()>;
@@ -40,7 +40,7 @@ pub trait WETHGateway: Ownable {
     #[ink(message, payable)]
     fn repay_eth(
         &mut self,
-        lending_pool: AccountId,
+        pool: AccountId,
         amount: Balance,
         // rate_mode: u128,
         on_behalf_of: AccountId,
@@ -49,7 +49,7 @@ pub trait WETHGateway: Ownable {
     #[ink(message)]
     fn borrow_eth(
         &mut self,
-        lending_pool: AccountId,
+        pool: AccountId,
         amount: Balance,
         // interes_rate_mode: u128,
         // referral_code: u16,
