@@ -54,7 +54,6 @@ pub mod contract {
     pub struct Redeem {
         redeemer: AccountId,
         redeem_amount: Balance,
-        redeem_tokens: Balance,
     }
     #[ink(event)]
     pub struct Borrow {
@@ -135,16 +134,10 @@ pub mod contract {
                 mint_tokens,
             })
         }
-        fn _emit_redeem_event(
-            &self,
-            redeemer: AccountId,
-            redeem_amount: Balance,
-            redeem_tokens: Balance,
-        ) {
+        fn _emit_redeem_event(&self, redeemer: AccountId, redeem_amount: Balance) {
             self.env().emit_event(Redeem {
                 redeemer,
                 redeem_amount,
-                redeem_tokens,
             })
         }
         fn _emit_borrow_event(

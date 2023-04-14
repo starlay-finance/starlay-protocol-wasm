@@ -157,7 +157,6 @@ pub trait Pool: PSP22 + PSP22Metadata {
 pub enum Error {
     NotImplemented,
     InvalidParameter,
-    OnlyEitherRedeemTokensOrRedeemAmountIsZero,
     BorrowCashNotAvailable,
     RedeemTransferOutNotPossible,
     LiquidateLiquidatorIsBorrower,
