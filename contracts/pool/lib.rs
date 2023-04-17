@@ -54,7 +54,6 @@ pub mod contract {
     pub struct Redeem {
         redeemer: AccountId,
         redeem_amount: Balance,
-        redeem_tokens: Balance,
     }
     #[ink(event)]
     pub struct Borrow {
@@ -135,16 +134,10 @@ pub mod contract {
                 mint_tokens,
             })
         }
-        fn _emit_redeem_event(
-            &self,
-            redeemer: AccountId,
-            redeem_amount: Balance,
-            redeem_tokens: Balance,
-        ) {
+        fn _emit_redeem_event(&self, redeemer: AccountId, redeem_amount: Balance) {
             self.env().emit_event(Redeem {
                 redeemer,
                 redeem_amount,
-                redeem_tokens,
             })
         }
         fn _emit_borrow_event(
@@ -501,28 +494,6 @@ pub mod contract {
             contract
                 .transfer_from(accounts.bob, accounts.charlie, 0, Vec::new())
                 .unwrap();
-        }
-
-        #[ink::test]
-        #[should_panic(
-            expected = "not implemented: off-chain environment does not support contract invocation"
-        )]
-        fn redeem_underlying_works() {
-            let accounts = default_accounts();
-            set_caller(accounts.bob);
-
-            let dummy_id = AccountId::from([0x01; 32]);
-            let mut contract = PoolContract::new(
-                dummy_id,
-                dummy_id,
-                dummy_id,
-                WrappedU256::from(U256::from(0)),
-                String::from("Token Name"),
-                String::from("symbol"),
-                8,
-            );
-
-            contract.redeem_underlying(0).unwrap();
         }
 
         #[ink::test]

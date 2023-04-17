@@ -141,12 +141,6 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
     })
 }
 
-pub fn underlying_balance(exchange_rate: Exp, pool_token_balance: Balance) -> Balance {
-    exchange_rate
-        .mul_scalar_truncate(pool_token_balance.into())
-        .as_u128()
-}
-
 // returns liquidator_seize_tokens, protocol_seize_amount and protocol_seize_tokens
 pub fn protocol_seize_amount(
     exchange_rate: Exp,
@@ -183,38 +177,6 @@ pub fn exchange_rate(
         .div(U256::from(total_supply))
 }
 
-pub fn calculate_redeem_values(
-    redeem_tokens_in: Balance,
-    redeem_amount_in: Balance,
-    exchange_rate: U256,
-) -> Option<(Balance, Balance)> {
-    let exchange_rate_exp = Exp {
-        mantissa: WrappedU256::from(exchange_rate),
-    };
-    let (redeem_tokens, redeem_amount) = match (redeem_tokens_in, redeem_amount_in) {
-        (_, _) if redeem_tokens_in > 0 && redeem_amount_in > 0 => return None,
-        (tokens, _) if tokens > 0 => {
-            (
-                tokens,
-                exchange_rate_exp
-                    .mul_scalar_truncate(U256::from(tokens))
-                    .as_u128(),
-            )
-        }
-        (_, amount) if amount > 0 => {
-            (
-                U256::from(amount)
-                    .mul(exp_scale())
-                    .div(exchange_rate)
-                    .as_u128(),
-                amount,
-            )
-        }
-        _ => return None,
-    };
-    return Some((redeem_tokens, redeem_amount))
-}
-
 #[cfg(test)]
 mod tests {
     use super::Exp;
@@ -224,6 +186,7 @@ mod tests {
     fn mantissa() -> U256 {
         U256::from(10).pow(U256::from(18))
     }
+
     #[test]
     fn test_scaled_amount_of() {
         struct TestCase {

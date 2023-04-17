@@ -49,7 +49,6 @@ pub trait Controller {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
-        redeem_tokens: Balance,
     ) -> Result<()>;
 
     /// Checks if the account should be allowed to borrow the underlying asset of the given market
