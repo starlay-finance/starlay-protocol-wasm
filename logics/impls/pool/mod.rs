@@ -677,6 +677,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
     default fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
         let contract_addr = Self::env().account_id();
+        let caller = Self::env().caller();
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(borrower);
         let pool_attribute = PoolAttributes {
@@ -707,7 +708,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let account_borrows_new = account_borrows_prev + borrow_amount;
         let total_borrows_new = self._total_borrows() + borrow_amount;
 
-        self._transfer_underlying(borrower, borrow_amount)?;
+        self._transfer_underlying(caller, borrow_amount)?;
         self._increase_debt(borrower, borrow_amount, false);
 
         self._emit_borrow_event(

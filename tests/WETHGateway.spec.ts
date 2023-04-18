@@ -52,6 +52,7 @@ describe('WETHGateway spec', () => {
       rateModel,
       manager: deployer,
       wethToken: weth,
+      gateway: wethGateway.address,
     })
 
     const users = [bob, charlie, django]
@@ -82,7 +83,8 @@ describe('WETHGateway spec', () => {
   }
 
   it('instantiate', async () => {
-    const { weth, wethGateway } = await setup()
+    const { weth, wethGateway, pools } = await setup()
+    const { pool } = pools.weth
     expect(weth.address).not.toBe(ZERO_ADDRESS)
     expect(wethGateway.address).not.toBe(ZERO_ADDRESS)
 
@@ -97,6 +99,7 @@ describe('WETHGateway spec', () => {
       'WASTR',
     )
     expect((await weth.query.tokenDecimals()).value.ok).toEqual(18)
+    expect((await pool.query.gateway()).value.ok).toEqual(wethGateway.address)
   })
 
   it('Deposit WETH', async () => {
@@ -174,7 +177,7 @@ describe('WETHGateway spec', () => {
   })
 
   it('Borrow WETH', async () => {
-    const { weth, wethGateway, pools, users, api } = await setup()
+    const { wethGateway, pools, users, api } = await setup()
     const { pool } = pools.weth
 
     const depositAmount = ONE_ETHER.mul(new BN(2))
@@ -189,38 +192,23 @@ describe('WETHGateway spec', () => {
         value: depositAmount,
       })
 
+    const {
+      data: { free: beforeUserBalance },
+    } = await api.query.system.account(users[0].address)
     const borrowAmount = ONE_ETHER.div(new BN(5))
     await wethGateway
       .withSigner(users[0])
       .tx.borrowEth(pool.address, borrowAmount)
+    const {
+      data: { free: afterUserBalance },
+    } = await api.query.system.account(users[0].address)
 
-    // const [accountBalance, accountBorrowBalance, exchangeRate] = (
-    //   await pool.query.getAccountSnapshot(users[0].address)
-    // ).value.ok
+    expect(afterUserBalance.sub(beforeUserBalance).gt(new BN(0))).toEqual(true)
 
-    // const totalBorrows = (await pool.query.totalBorrows()).value.ok
-    // const underlying = (await pool.query.underlying()).value.ok
-
-    // expect(underlying).toEqual(weth.address)
-
-    // const result = (
-    //   await controller.query.getHypotheticalAccountLiquidity2(
-    //     users[0].address,
-    //     pool.address,
-    //     0,
-    //     borrowAmount,
-    //     {
-    //       underlying: underlying,
-    //       decimals: 18,
-    //       accountBalance: accountBalance.toString(),
-    //       accountBorrowBalance: accountBorrowBalance.toString(),
-    //       exchangeRate: [exchangeRate.toString()],
-    //       totalBorrows: totalBorrows.toString(),
-    //     },
-    //   )
-    // ).value.ok
-    // console.log(result)
-
-    expect(1).toEqual(1)
+    expect(
+      (
+        await pool.query.borrowBalanceStored(users[0].address)
+      ).value.ok.toString(),
+    ).toEqual(borrowAmount.toString())
   })
 })
