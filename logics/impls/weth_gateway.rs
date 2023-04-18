@@ -105,13 +105,11 @@ where
         if transferred_value < payback_amount {
             return Err(WETHGatewayError::InsufficientPayback)
         }
-
         WETHRef::deposit_builder(&self.data::<Data>().weth)
             .transferred_value(payback_amount)
             .invoke()?;
-
-        PoolRef::repay_borrow_behalf(&self.data::<Data>().weth, on_behalf_of, transferred_value)?;
-
+        WETHRef::approve(&self.data::<Data>().weth, pool, payback_amount)?;
+        PoolRef::repay_borrow_behalf(&pool, on_behalf_of, payback_amount)?;
         let caller = Self::env().caller();
         if transferred_value > payback_amount {
             self._safe_transfer_eth(caller, transferred_value - payback_amount)?;

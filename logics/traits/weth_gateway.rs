@@ -26,7 +26,6 @@ pub trait WETHGateway: Ownable {
         &mut self,
         pool: AccountId,
         on_behalf_of: AccountId,
-        // referral_code: u16,
     ) -> Result<()>;
 
     #[ink(message)]
@@ -42,7 +41,6 @@ pub trait WETHGateway: Ownable {
         &mut self,
         pool: AccountId,
         amount: Balance,
-        // rate_mode: u128,
         on_behalf_of: AccountId,
     ) -> Result<()>;
 
@@ -51,8 +49,6 @@ pub trait WETHGateway: Ownable {
         &mut self,
         pool: AccountId,
         amount: Balance,
-        // interes_rate_mode: u128,
-        // referral_code: u16,
     ) -> Result<()>;
 
     #[ink(message)]

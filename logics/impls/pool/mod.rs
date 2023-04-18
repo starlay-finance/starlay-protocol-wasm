@@ -316,6 +316,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
 
+    #[modifiers(only_gateway)]
     default fn repay_borrow_behalf(
         &mut self,
         borrower: AccountId,

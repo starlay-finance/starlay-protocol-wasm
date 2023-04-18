@@ -104,15 +104,6 @@ pub mod contract {
 
     impl Pool for PoolContract {
         #[ink(message)]
-        fn repay_borrow_behalf(
-            &mut self,
-            _borrower: AccountId,
-            _repay_amount: Balance,
-        ) -> Result<()> {
-            Err(Error::NotImplemented)
-        }
-
-        #[ink(message)]
         fn set_controller(&mut self, _new_controller: AccountId) -> Result<()> {
             Err(Error::NotImplemented)
         }
