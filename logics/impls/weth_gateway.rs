@@ -121,7 +121,7 @@ where
 
     default fn borrow_eth(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
         let caller = Self::env().caller();
-        PoolRef::borrow(&pool, amount)?;
+        PoolRef::borrow_for(&pool, caller, amount)?;
         WETHRef::withdraw(&self.data::<Data>().weth, amount)?;
 
         self._safe_transfer_eth(caller, amount)

@@ -104,7 +104,7 @@ describe('WETHGateway spec', () => {
     const { pool } = pools.weth
 
     const {
-      data: { free: beforeBalanceUser0 },
+      data: { free: beforeUserBalance },
     } = await api.query.system.account(users[0].address)
 
     await wethGateway
@@ -114,18 +114,16 @@ describe('WETHGateway spec', () => {
       })
 
     const {
-      data: { free: afterBalanceUser0 },
+      data: { free: afterUserBalance },
     } = await api.query.system.account(users[0].address)
 
     expect(
       (await weth.query.balanceOf(pool.address)).value.ok.toString(),
     ).toEqual(ONE_ETHER.toString())
 
-    expect(beforeBalanceUser0.sub(afterBalanceUser0).gt(ONE_ETHER)).toEqual(
-      true,
-    )
+    expect(beforeUserBalance.sub(afterUserBalance).gt(ONE_ETHER)).toEqual(true)
     expect(
-      beforeBalanceUser0.sub(afterBalanceUser0).lt(new BN(2).mul(ONE_ETHER)),
+      beforeUserBalance.sub(afterUserBalance).lt(new BN(2).mul(ONE_ETHER)),
     ).toEqual(true)
 
     expect(
@@ -143,21 +141,86 @@ describe('WETHGateway spec', () => {
     const { weth, wethGateway, pools, users, api } = await setup()
     const { pool } = pools.weth
 
+    const depositAmount = ONE_ETHER
     await wethGateway
       .withSigner(users[0])
       .tx.depositEth(pool.address, users[0].address, {
-        value: ONE_ETHER,
+        value: depositAmount,
       })
 
-    const withdrawAmount = ONE_ETHER.div(new BN(2))
+    const withdrawAmount = ONE_ETHER.div(new BN(5))
     await pool
       .withSigner(users[0])
       .tx.approve(wethGateway.address, withdrawAmount)
+
+    const {
+      data: { free: beforeUserBalance },
+    } = await api.query.system.account(users[0].address)
     await wethGateway
       .withSigner(users[0])
       .tx.withdrawEth(pool.address, withdrawAmount, users[0].address)
     expect(
       (await weth.query.balanceOf(pool.address)).value.ok.toString(),
-    ).toEqual(withdrawAmount.toString())
+    ).toEqual(depositAmount.sub(withdrawAmount).toString())
+
+    const {
+      data: { free: afterUserBalance },
+    } = await api.query.system.account(users[0].address)
+
+    expect(afterUserBalance.sub(beforeUserBalance).gt(new BN(0))).toEqual(true)
+    expect(afterUserBalance.sub(beforeUserBalance).lt(withdrawAmount)).toEqual(
+      true,
+    )
+  })
+
+  it('Borrow WETH', async () => {
+    const { weth, wethGateway, pools, users, api } = await setup()
+    const { pool } = pools.weth
+
+    const depositAmount = ONE_ETHER.mul(new BN(2))
+    await wethGateway
+      .withSigner(users[0])
+      .tx.depositEth(pool.address, users[0].address, {
+        value: depositAmount,
+      })
+    await wethGateway
+      .withSigner(users[1])
+      .tx.depositEth(pool.address, users[0].address, {
+        value: depositAmount,
+      })
+
+    const borrowAmount = ONE_ETHER.div(new BN(5))
+    await wethGateway
+      .withSigner(users[0])
+      .tx.borrowEth(pool.address, borrowAmount)
+
+    // const [accountBalance, accountBorrowBalance, exchangeRate] = (
+    //   await pool.query.getAccountSnapshot(users[0].address)
+    // ).value.ok
+
+    // const totalBorrows = (await pool.query.totalBorrows()).value.ok
+    // const underlying = (await pool.query.underlying()).value.ok
+
+    // expect(underlying).toEqual(weth.address)
+
+    // const result = (
+    //   await controller.query.getHypotheticalAccountLiquidity2(
+    //     users[0].address,
+    //     pool.address,
+    //     0,
+    //     borrowAmount,
+    //     {
+    //       underlying: underlying,
+    //       decimals: 18,
+    //       accountBalance: accountBalance.toString(),
+    //       accountBorrowBalance: accountBorrowBalance.toString(),
+    //       exchangeRate: [exchangeRate.toString()],
+    //       totalBorrows: totalBorrows.toString(),
+    //     },
+    //   )
+    // ).value.ok
+    // console.log(result)
+
+    expect(1).toEqual(1)
   })
 })

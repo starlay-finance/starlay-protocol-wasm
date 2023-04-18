@@ -30,6 +30,7 @@ pub mod contract {
             AccountIdExt,
             Storage,
             String,
+            ZERO_ADDRESS,
         },
     };
 
@@ -278,6 +279,39 @@ pub mod contract {
                 Self::env().caller(),
                 rate_model,
                 initial_exchange_rate_mantissa,
+                ZERO_ADDRESS.into(),
+                name,
+                symbol,
+                decimals,
+            );
+            instance
+        }
+
+        #[ink(constructor)]
+        pub fn new_with_gateway(
+            underlying: AccountId,
+            controller: AccountId,
+            rate_model: AccountId,
+            initial_exchange_rate_mantissa: WrappedU256,
+            gateway: AccountId,
+            name: String,
+            symbol: String,
+            decimals: u8,
+        ) -> Self {
+            if underlying.is_zero() {
+                panic!("underlying is zero address");
+            }
+            if controller.is_zero() {
+                panic!("controller is zero address");
+            }
+            let mut instance = Self::default();
+            instance._initialize(
+                underlying,
+                controller,
+                Self::env().caller(),
+                rate_model,
+                initial_exchange_rate_mantissa,
+                gateway,
                 name,
                 symbol,
                 decimals,
@@ -315,6 +349,7 @@ pub mod contract {
                 Self::env().caller(),
                 rate_model,
                 initial_exchange_rate_mantissa,
+                ZERO_ADDRESS.into(),
                 name,
                 symbol,
                 decimals,
@@ -329,6 +364,7 @@ pub mod contract {
             manager: AccountId,
             rate_model: AccountId,
             initial_exchange_rate_mantissa: WrappedU256,
+            gateway: AccountId,
             name: String,
             symbol: String,
             decimals: u8,
@@ -337,6 +373,7 @@ pub mod contract {
             self.pool.controller = controller;
             self.pool.manager = manager;
             self.pool.rate_model = rate_model;
+            self.pool.gateway = gateway;
             self.pool.initial_exchange_rate_mantissa = initial_exchange_rate_mantissa;
             self.pool.accrual_block_timestamp = Self::env().block_timestamp();
             self.metadata.name = Some(name);

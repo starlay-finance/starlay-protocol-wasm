@@ -54,6 +54,10 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn borrow(&mut self, borrow_amount: Balance) -> Result<()>;
 
+    /// borrows assets from the protocol to Borrower
+    #[ink(message)]
+    fn borrow_for(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()>;
+
     /// Sender repays their own borrow
     #[ink(message)]
     fn repay_borrow(&mut self, repay_amount: Balance) -> Result<()>;
@@ -150,6 +154,8 @@ pub trait Pool: PSP22 + PSP22Metadata {
     fn initial_exchange_rate_mantissa(&self) -> WrappedU256;
     #[ink(message)]
     fn reserve_factor_mantissa(&self) -> WrappedU256;
+    #[ink(message)]
+    fn gateway(&self) -> AccountId;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -169,6 +175,7 @@ pub enum Error {
     SetReserveFactorBoundsCheck,
     CannotSweepUnderlyingToken,
     CallerIsNotManager,
+    CallerIsNotGateway,
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),
