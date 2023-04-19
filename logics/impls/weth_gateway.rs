@@ -33,16 +33,35 @@ impl Default for Data {
 
 pub trait Internal {
     fn _safe_transfer_eth(&self, to: AccountId, value: Balance) -> Result<()>;
+    fn _emit_deposit_eth_event_(&self, pool: AccountId, from: AccountId, value: Balance);
+    fn _emit_withdraw_eth_event_(&self, pool: AccountId, to: AccountId, value: Balance);
+    fn _emit_borrow_eth_event_(&self, pool: AccountId, to: AccountId, value: Balance);
+    fn _emit_repay_eth_event_(&self, pool: AccountId, from: AccountId, value: Balance);
 }
 
 impl<T: Storage<Data> + Storage<ownable::Data>> Internal for T {
     default fn _safe_transfer_eth(&self, to: AccountId, value: Balance) -> Result<()> {
         let transfer_result = Self::env().transfer(to, value);
         if transfer_result.is_err() {
-            return Err(WETHGatewayError::SafeETHTransferFailed)
+            return Err(Error::SafeETHTransferFailed)
         }
         Ok(())
     }
+
+    default fn _emit_deposit_eth_event_(
+        &self,
+        _pool: AccountId,
+        _from: AccountId,
+        _value: Balance,
+    ) {
+    }
+
+    default fn _emit_withdraw_eth_event_(&self, _pool: AccountId, _to: AccountId, _value: Balance) {
+    }
+
+    default fn _emit_borrow_eth_event_(&self, _pool: AccountId, _to: AccountId, _value: Balance) {}
+
+    default fn _emit_repay_eth_event_(&self, _pool: AccountId, _from: AccountId, _value: Balance) {}
 }
 
 impl<T> WETHGateway for T
@@ -54,22 +73,19 @@ where
         Ok(())
     }
 
-    default fn deposit_eth(&mut self, pool: AccountId, on_behalf_of: AccountId) -> Result<()> {
+    default fn deposit_eth(&mut self, pool: AccountId) -> Result<()> {
         let deposit_value = Self::env().transferred_value();
+        let caller = Self::env().caller();
         WETHRef::deposit_builder(&self.data::<Data>().weth)
             .transferred_value(deposit_value)
             .invoke()?;
         WETHRef::approve(&self.data::<Data>().weth, pool, deposit_value)?;
-        PoolRef::mint_to(&pool, on_behalf_of, deposit_value)?;
+        PoolRef::mint_to(&pool, caller, deposit_value)?;
+        self._emit_deposit_eth_event_(pool, caller, deposit_value);
         Ok(())
     }
 
-    default fn withdraw_eth(
-        &mut self,
-        pool: AccountId,
-        amount: Balance,
-        to: AccountId,
-    ) -> Result<()> {
+    default fn withdraw_eth(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
         let caller = Self::env().caller();
         let contract_address = Self::env().account_id();
         let user_balance: Balance = PoolRef::balance_of(&pool, caller);
@@ -88,29 +104,26 @@ where
         )?;
         PoolRef::redeem_underlying(&pool, amount_to_withdraw)?;
         WETHRef::withdraw(&self.data::<Data>().weth, amount_to_withdraw)?;
-        self._safe_transfer_eth(to, amount_to_withdraw)
+        self._emit_withdraw_eth_event_(pool, caller, amount_to_withdraw);
+        self._safe_transfer_eth(caller, amount_to_withdraw)
     }
 
-    default fn repay_eth(
-        &mut self,
-        pool: AccountId,
-        amount: Balance,
-        on_behalf_of: AccountId,
-    ) -> Result<()> {
+    default fn repay_eth(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
         let transferred_value = Self::env().transferred_value();
-        let mut payback_amount = PoolRef::borrow_balance_stored(&pool, on_behalf_of);
+        let caller = Self::env().caller();
+        let mut payback_amount = PoolRef::borrow_balance_current(&pool, caller)?;
         if amount < payback_amount {
             payback_amount = amount;
         }
         if transferred_value < payback_amount {
-            return Err(WETHGatewayError::InsufficientPayback)
+            return Err(Error::InsufficientPayback)
         }
         WETHRef::deposit_builder(&self.data::<Data>().weth)
             .transferred_value(payback_amount)
             .invoke()?;
         WETHRef::approve(&self.data::<Data>().weth, pool, payback_amount)?;
-        PoolRef::repay_borrow_behalf(&pool, on_behalf_of, payback_amount)?;
-        let caller = Self::env().caller();
+        PoolRef::repay_borrow_behalf(&pool, caller, payback_amount)?;
+        self._emit_repay_eth_event_(pool, caller, payback_amount);
         if transferred_value > payback_amount {
             self._safe_transfer_eth(caller, transferred_value - payback_amount)?;
         }
@@ -121,7 +134,7 @@ where
         let caller = Self::env().caller();
         PoolRef::borrow_for(&pool, caller, amount)?;
         WETHRef::withdraw(&self.data::<Data>().weth, amount)?;
-
+        self._emit_borrow_eth_event_(pool, caller, amount);
         self._safe_transfer_eth(caller, amount)
     }
 

@@ -22,34 +22,16 @@ pub trait WETHGateway: Ownable {
     fn authorize_pool(&mut self, pool: AccountId) -> Result<()>;
 
     #[ink(message, payable)]
-    fn deposit_eth(
-        &mut self,
-        pool: AccountId,
-        on_behalf_of: AccountId,
-    ) -> Result<()>;
+    fn deposit_eth(&mut self, pool: AccountId) -> Result<()>;
 
     #[ink(message)]
-    fn withdraw_eth(
-        &mut self,
-        pool: AccountId,
-        amount: Balance,
-        on_behalf_of: AccountId,
-    ) -> Result<()>;
+    fn withdraw_eth(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
 
     #[ink(message, payable)]
-    fn repay_eth(
-        &mut self,
-        pool: AccountId,
-        amount: Balance,
-        on_behalf_of: AccountId,
-    ) -> Result<()>;
+    fn repay_eth(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
 
     #[ink(message)]
-    fn borrow_eth(
-        &mut self,
-        pool: AccountId,
-        amount: Balance,
-    ) -> Result<()>;
+    fn borrow_eth(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
 
     #[ink(message)]
     #[modifiers(only_owner)]
@@ -70,23 +52,23 @@ pub trait WETHGateway: Ownable {
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
-pub enum WETHGatewayError {
+pub enum Error {
     SafeETHTransferFailed,
     InsufficientPayback,
     Pool(PoolError),
     PSP22(PSP22Error),
 }
 
-impl From<PSP22Error> for WETHGatewayError {
+impl From<PSP22Error> for Error {
     fn from(error: PSP22Error) -> Self {
-        WETHGatewayError::PSP22(error)
+        Error::PSP22(error)
     }
 }
 
-impl From<PoolError> for WETHGatewayError {
+impl From<PoolError> for Error {
     fn from(error: PoolError) -> Self {
-        WETHGatewayError::Pool(error)
+        Error::Pool(error)
     }
 }
 
-pub type Result<T> = core::result::Result<T, WETHGatewayError>;
+pub type Result<T> = core::result::Result<T, Error>;

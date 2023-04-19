@@ -110,11 +110,9 @@ describe('WETHGateway spec', () => {
       data: { free: beforeUserBalance },
     } = await api.query.system.account(users[0].address)
 
-    await wethGateway
-      .withSigner(users[0])
-      .tx.depositEth(pool.address, users[0].address, {
-        value: ONE_ETHER,
-      })
+    await wethGateway.withSigner(users[0]).tx.depositEth(pool.address, {
+      value: ONE_ETHER,
+    })
 
     const {
       data: { free: afterUserBalance },
@@ -145,11 +143,9 @@ describe('WETHGateway spec', () => {
     const { pool } = pools.weth
 
     const depositAmount = ONE_ETHER
-    await wethGateway
-      .withSigner(users[0])
-      .tx.depositEth(pool.address, users[0].address, {
-        value: depositAmount,
-      })
+    await wethGateway.withSigner(users[0]).tx.depositEth(pool.address, {
+      value: depositAmount,
+    })
 
     const withdrawAmount = ONE_ETHER.div(new BN(5))
     await pool
@@ -161,7 +157,7 @@ describe('WETHGateway spec', () => {
     } = await api.query.system.account(users[0].address)
     await wethGateway
       .withSigner(users[0])
-      .tx.withdrawEth(pool.address, withdrawAmount, users[0].address)
+      .tx.withdrawEth(pool.address, withdrawAmount)
     expect(
       (await weth.query.balanceOf(pool.address)).value.ok.toString(),
     ).toEqual(depositAmount.sub(withdrawAmount).toString())
@@ -181,16 +177,12 @@ describe('WETHGateway spec', () => {
     const { pool } = pools.weth
 
     const depositAmount = ONE_ETHER.mul(new BN(2))
-    await wethGateway
-      .withSigner(users[0])
-      .tx.depositEth(pool.address, users[0].address, {
-        value: depositAmount,
-      })
-    await wethGateway
-      .withSigner(users[1])
-      .tx.depositEth(pool.address, users[0].address, {
-        value: depositAmount,
-      })
+    await wethGateway.withSigner(users[0]).tx.depositEth(pool.address, {
+      value: depositAmount,
+    })
+    await wethGateway.withSigner(users[1]).tx.depositEth(pool.address, {
+      value: depositAmount,
+    })
 
     const {
       data: { free: beforeUserBalance },
@@ -220,16 +212,12 @@ describe('WETHGateway spec', () => {
     const { pool } = pools.weth
 
     const depositAmount = ONE_ETHER.mul(new BN(2))
-    await wethGateway
-      .withSigner(users[0])
-      .tx.depositEth(pool.address, users[0].address, {
-        value: depositAmount,
-      })
-    await wethGateway
-      .withSigner(users[1])
-      .tx.depositEth(pool.address, users[0].address, {
-        value: depositAmount,
-      })
+    await wethGateway.withSigner(users[0]).tx.depositEth(pool.address, {
+      value: depositAmount,
+    })
+    await wethGateway.withSigner(users[1]).tx.depositEth(pool.address, {
+      value: depositAmount,
+    })
 
     const borrowAmount = ONE_ETHER.div(new BN(2))
     await wethGateway
@@ -249,7 +237,7 @@ describe('WETHGateway spec', () => {
     } = await api.query.system.account(users[0].address)
     await wethGateway
       .withSigner(users[0])
-      .tx.repayEth(pool.address, repayAmount, users[0].address, {
+      .tx.repayEth(pool.address, repayAmount, {
         value: repayAmount,
       })
     const {
@@ -259,13 +247,28 @@ describe('WETHGateway spec', () => {
     expect(beforeUserBalance.sub(afterUserBalance).gt(repayAmount)).toEqual(
       true,
     )
-    expect((await pool.query.totalBorrows()).value.ok.toString()).toEqual(
-      borrowAmount.sub(repayAmount).toString(),
-    )
     expect(
-      (
-        await pool.query.borrowBalanceStored(users[0].address)
-      ).value.ok.toString(),
-    ).toEqual(borrowAmount.sub(repayAmount).toString())
+      (await weth.query.balanceOf(pool.address)).value.ok.toString(),
+    ).toEqual(
+      depositAmount
+        .mul(new BN(2))
+        .sub(borrowAmount)
+        .add(repayAmount)
+        .toString(),
+    )
+
+    // Consider Interest.
+    expect(
+      new BN((await pool.query.totalBorrows()).value.ok.toString()).gt(
+        borrowAmount.sub(repayAmount),
+      ),
+    ).toEqual(true)
+    expect(
+      new BN(
+        (
+          await pool.query.borrowBalanceStored(users[0].address)
+        ).value.ok.toString(),
+      ).gt(borrowAmount.sub(repayAmount)),
+    ).toEqual(true)
   })
 })
