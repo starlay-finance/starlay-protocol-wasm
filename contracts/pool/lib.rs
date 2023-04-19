@@ -525,30 +525,6 @@ pub mod contract {
         }
 
         #[ink::test]
-        fn repay_borrow_behalf_works() {
-            let accounts = default_accounts();
-            set_caller(accounts.bob);
-
-            let dummy_id = AccountId::from([0x01; 32]);
-            let mut contract = PoolContract::new(
-                dummy_id,
-                dummy_id,
-                dummy_id,
-                WrappedU256::from(U256::from(0)),
-                String::from("Token Name"),
-                String::from("symbol"),
-                8,
-            );
-
-            assert_eq!(
-                contract
-                    .repay_borrow_behalf(accounts.charlie, 0)
-                    .unwrap_err(),
-                Error::NotImplemented
-            )
-        }
-
-        #[ink::test]
         fn set_controller_works() {
             let accounts = default_accounts();
             set_caller(accounts.bob);
