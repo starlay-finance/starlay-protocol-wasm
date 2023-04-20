@@ -47,6 +47,7 @@ use primitive_types::U256;
 
 mod utils;
 use self::utils::{
+    balance_decrease_allowed,
     calculate_interest,
     exchange_rate,
     from_scaled_amount,
@@ -74,6 +75,7 @@ pub struct Data {
     pub borrow_index: WrappedU256,
     pub initial_exchange_rate_mantissa: WrappedU256,
     pub reserve_factor_mantissa: WrappedU256,
+    pub liquidation_threshold: WrappedU256,
 }
 
 impl Default for Data {
@@ -90,6 +92,7 @@ impl Default for Data {
             borrow_index: exp_scale().into(),
             initial_exchange_rate_mantissa: WrappedU256::from(U256::zero()),
             reserve_factor_mantissa: WrappedU256::from(U256::zero()),
+            liquidation_threshold: WrappedU256::from(U256::zero()),
         }
     }
 }
@@ -144,6 +147,7 @@ pub trait Internal {
     fn _add_reserves(&mut self, amount: Balance) -> Result<()>;
     fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()>;
     fn _sweep_token(&mut self, asset: AccountId) -> Result<()>;
+    fn _set_liquidation_threshold(&mut self, new_liquidation_threshold: WrappedU256) -> Result<()>;
 
     // utilities
     fn _transfer_underlying_from(
@@ -188,7 +192,7 @@ pub trait Internal {
     fn _exchange_rate_stored(&self) -> U256;
     fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput>;
     fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool);
-
+    fn _liquidation_threshold(&self) -> WrappedU256;
     // event emission
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
     fn _emit_redeem_event(&self, redeemer: AccountId, redeem_amount: Balance);
@@ -366,6 +370,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._sweep_token(asset)
     }
 
+    default fn set_liquidation_threshold(
+        &mut self,
+        new_liquidation_threshold: WrappedU256,
+    ) -> Result<()> {
+        self._set_liquidation_threshold(new_liquidation_threshold)
+    }
+
     default fn underlying(&self) -> AccountId {
         self._underlying()
     }
@@ -441,6 +452,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn reserve_factor_mantissa(&self) -> WrappedU256 {
         self._reserve_factor_mantissa()
+    }
+
+    default fn liquidation_threshold(&self) -> WrappedU256 {
+        self._liquidation_threshold()
     }
 }
 
@@ -573,6 +588,18 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         }
 
         let contract_addr = Self::env().account_id();
+        if !balance_decrease_allowed(
+            self._liquidation_threshold(),
+            PSP22Metadata::token_decimals(self),
+            contract_addr,
+            redeemer,
+            redeem_amount,
+            0,
+            ControllerRef::oracle(&self._controller()),
+        ) {
+            return Err(Error::RedeemTransferOutNotPossible)
+        }
+
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(redeemer);
         let pool_attribute = PoolAttributes {
@@ -617,6 +644,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         Ok(())
     }
+
     default fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool) {
         let scaled = scaled_amount_of(
             amount,
@@ -641,8 +669,21 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             self.data::<Data>().borrows_scaled += scaled
         }
     }
+
     default fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
         let contract_addr = Self::env().account_id();
+        if !balance_decrease_allowed(
+            self._liquidation_threshold(),
+            PSP22Metadata::token_decimals(self),
+            contract_addr,
+            borrower,
+            borrow_amount,
+            0,
+            ControllerRef::oracle(&self._controller()),
+        ) {
+            return Err(Error::RedeemTransferOutNotPossible)
+        }
+
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(borrower);
         let pool_attribute = PoolAttributes {
@@ -975,6 +1016,14 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
 
+    default fn _set_liquidation_threshold(
+        &mut self,
+        new_liquidation_threshold: WrappedU256,
+    ) -> Result<()> {
+        self.data::<Data>().liquidation_threshold = new_liquidation_threshold;
+        Ok(())
+    }
+
     // utilities
     default fn _transfer_underlying_from(
         &self,
@@ -1153,6 +1202,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             self._total_reserves(),
             U256::from(self._initial_exchange_rate_mantissa()),
         )
+    }
+
+    default fn _liquidation_threshold(&self) -> WrappedU256 {
+        self.data::<Data>().liquidation_threshold
     }
 
     // event emission

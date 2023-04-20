@@ -1,4 +1,5 @@
 use openbrush::traits::{
+    AccountId,
     Balance,
     Timestamp,
 };
@@ -8,13 +9,22 @@ use super::super::exp_no_err::{
     exp_scale,
     Exp,
 };
-pub use crate::traits::pool::*;
+pub use crate::traits::{
+    pool::*,
+    price_oracle::PriceOracleRef,
+};
 use crate::{
     impls::wad_ray_math::{
         exp_ray_ratio,
         Ray,
     },
-    traits::types::WrappedU256,
+    traits::{
+        math::{
+            PercentMath,
+            WadRayMath,
+        },
+        types::WrappedU256,
+    },
 };
 use core::ops::{
     Add,
@@ -53,6 +63,8 @@ pub struct CalculateInterestOutput {
     pub total_reserves: Balance,
     pub interest_accumulated: Balance,
 }
+
+pub const HEALTH_FACTOR_LIQUIDATION_THRESHOLD: u128 = 10_u128.pow(18);
 
 pub fn scaled_amount_of(amount: Balance, idx: Exp) -> Balance {
     let divided = Ray {
@@ -177,7 +189,79 @@ pub fn exchange_rate(
         .div(U256::from(total_supply))
 }
 
+pub fn balance_decrease_allowed(
+    liquidation_threshold: WrappedU256,
+    decimals: u8,
+    asset: AccountId,
+    user: AccountId,
+    amount: Balance,
+    // reserves_data: &Mapping<AccountId, Balance>,
+    // user_config: unknown,
+    // reserves: &Mapping<U256, AccountId>,
+    reserves_count: u128,
+    oracle: AccountId,
+) -> bool {
+    // if (!userConfig.isBorrowingAny() || !userConfig.isUsingAsCollateral(reservesData[asset].id)) {
+    //     return true;
+    //   }
+    if liquidation_threshold == WrappedU256::from(0) {
+        return true
+    }
+
+    // let (totalCollateralInETH, totalDebtInETH, _, avgLiquidationThreshold) = calculateUserAccountData()
+    let (total_collateral_in_eth, total_debt_in_eth, _, avg_liquidation_threshold) =
+        (U256::from(0), U256::from(0), U256::from(0), U256::from(0));
+
+    if total_debt_in_eth == U256::from(0) {
+        return true
+    }
+
+    let asset_price = PriceOracleRef::get_price(&oracle, asset);
+
+    if let None | Some(0) = asset_price {
+        return false
+    }
+
+    let amount_to_decrease_in_eth = U256::from(asset_price.unwrap())
+        .mul(U256::from(amount))
+        .div(U256::from(10).pow(U256::from(decimals)));
+
+    let collateral_balance_after_decrease = total_collateral_in_eth.sub(amount_to_decrease_in_eth);
+
+    if collateral_balance_after_decrease == U256::from(0) {
+        return false
+    }
+
+    let liquidation_threshold_after_decrease = total_collateral_in_eth
+        .mul(avg_liquidation_threshold)
+        .sub(amount_to_decrease_in_eth.mul(U256::from(liquidation_threshold)))
+        .div(collateral_balance_after_decrease);
+
+    let health_factor_after_decrease = calculate_health_factor_from_balances(
+        collateral_balance_after_decrease,
+        total_debt_in_eth,
+        liquidation_threshold_after_decrease,
+    );
+
+    health_factor_after_decrease >= U256::from(HEALTH_FACTOR_LIQUIDATION_THRESHOLD)
+}
+
+pub fn calculate_health_factor_from_balances(
+    total_collateral_in_eth: U256,
+    total_debt_in_eth: U256,
+    liquidation_threshold: U256,
+) -> U256 {
+    if total_debt_in_eth == U256::from(0) {
+        return U256::MAX
+    }
+
+    total_collateral_in_eth
+        .percent_mul(liquidation_threshold)
+        .wad_div(total_debt_in_eth)
+}
+
 #[cfg(test)]
+
 mod tests {
     use super::Exp;
 

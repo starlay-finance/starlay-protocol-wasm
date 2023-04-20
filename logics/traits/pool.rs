@@ -99,6 +99,10 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn set_interest_rate_model(&mut self, new_interest_rate_model: AccountId) -> Result<()>;
 
+    /// Set Liquidation Threshold
+    #[ink(message)]
+    fn set_liquidation_threshold(&mut self, new_liquidation_threshold: WrappedU256) -> Result<()>;
+
     /// The sender adds to reserves.
     #[ink(message)]
     fn add_reserves(&mut self, amount: Balance) -> Result<()>;
@@ -146,6 +150,8 @@ pub trait Pool: PSP22 + PSP22Metadata {
     fn initial_exchange_rate_mantissa(&self) -> WrappedU256;
     #[ink(message)]
     fn reserve_factor_mantissa(&self) -> WrappedU256;
+    #[ink(message)]
+    fn liquidation_threshold(&self) -> WrappedU256;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
