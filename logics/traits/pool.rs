@@ -154,8 +154,6 @@ pub trait Pool: PSP22 + PSP22Metadata {
     fn initial_exchange_rate_mantissa(&self) -> WrappedU256;
     #[ink(message)]
     fn reserve_factor_mantissa(&self) -> WrappedU256;
-    #[ink(message)]
-    fn gateway(&self) -> AccountId;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -175,7 +173,6 @@ pub enum Error {
     SetReserveFactorBoundsCheck,
     CannotSweepUnderlyingToken,
     CallerIsNotManager,
-    CallerIsNotGateway,
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),

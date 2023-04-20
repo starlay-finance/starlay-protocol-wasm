@@ -113,7 +113,6 @@ export const preparePoolWithWETH = async ({
   rateModel,
   manager,
   token,
-  gateway,
 }: {
   api: ApiPromise
   metadata: Metadata
@@ -121,7 +120,6 @@ export const preparePoolWithWETH = async ({
   rateModel: DefaultInterestRateModel
   manager: KeyringPair
   token: WETH
-  gateway: string
 }): Promise<WrappedPoolContracts> => {
   const pool = await deployPoolFromAsset({
     api,
@@ -133,7 +131,6 @@ export const preparePoolWithWETH = async ({
       [ONE_ETHER.toString()],
     ],
     token,
-    gateway,
   })
 
   return { metadata, token, pool }
@@ -145,14 +142,12 @@ export const preparePoolsWithPreparedTokens = async ({
   rateModel,
   manager,
   wethToken = undefined,
-  gateway = undefined,
 }: {
   api: ApiPromise
   controller: Controller
   rateModel: DefaultInterestRateModel
   manager: KeyringPair
   wethToken?: WETH
-  gateway?: string
 }): Promise<Pools> => {
   const dai = await preparePoolWithMockToken({
     api,
@@ -186,7 +181,6 @@ export const preparePoolsWithPreparedTokens = async ({
     rateModel,
     manager,
     token: wethToken,
-    gateway,
   })
   return { dai, usdc, usdt, weth }
 }

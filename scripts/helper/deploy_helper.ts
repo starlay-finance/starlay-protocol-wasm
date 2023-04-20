@@ -117,10 +117,8 @@ export const deployPoolFromAsset = async ({
   args,
   option = defaultOption(api),
   token,
-  gateway,
 }: FactoryArgs<Pool_factory['newFromAsset']> & {
   token: Token | WETH
-  gateway?: string
 }): Promise<Pool> => {
   const factory = new Pool_factory(api, signer)
 
@@ -132,19 +130,7 @@ export const deployPoolFromAsset = async ({
     (await token.query.tokenSymbol()).value.ok,
   )}` as unknown as string[]
   const decimals = (await token.query.tokenDecimals()).value.ok
-  let contract
-  if (gateway) {
-    contract = await factory.newWithGateway(
-      ...args,
-      gateway,
-      name,
-      symbol,
-      decimals,
-      option,
-    )
-  } else {
-    contract = await factory.new(...args, name, symbol, decimals, option)
-  }
+  const contract = await factory.new(...args, name, symbol, decimals, option)
 
   const result = new Pool(contract.address, signer, api)
   await afterDeployment(result.name, contract)

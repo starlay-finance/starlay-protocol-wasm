@@ -52,7 +52,6 @@ describe('WETHGateway spec', () => {
       rateModel,
       manager: deployer,
       wethToken: weth,
-      gateway: wethGateway.address,
     })
 
     const users = [bob, charlie, django]
@@ -83,8 +82,7 @@ describe('WETHGateway spec', () => {
   }
 
   it('instantiate', async () => {
-    const { weth, wethGateway, pools } = await setup()
-    const { pool } = pools.weth
+    const { weth, wethGateway } = await setup()
     expect(weth.address).not.toBe(ZERO_ADDRESS)
     expect(wethGateway.address).not.toBe(ZERO_ADDRESS)
 
@@ -99,7 +97,6 @@ describe('WETHGateway spec', () => {
       'WASTR',
     )
     expect((await weth.query.tokenDecimals()).value.ok).toEqual(18)
-    expect((await pool.query.gateway()).value.ok).toEqual(wethGateway.address)
   })
 
   it('Deposit WETH', async () => {

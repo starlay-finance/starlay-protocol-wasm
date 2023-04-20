@@ -528,86 +528,86 @@ describe('Pool spec', () => {
     })
   })
 
-  // describe('.repay_borrow_behalf', () => {
-  //   let deployer: KeyringPair
-  //   let pools: Pools
-  //   let users: KeyringPair[]
+  describe('.repay_borrow_behalf', () => {
+    let deployer: KeyringPair
+    let pools: Pools
+    let users: KeyringPair[]
 
-  //   beforeAll(async () => {
-  //     ;({ deployer, users, pools } = await setup())
-  //   })
+    beforeAll(async () => {
+      ;({ deployer, users, pools } = await setup())
+    })
 
-  //   it('preparations', async () => {
-  //     const { dai, usdc } = pools
+    it('preparations', async () => {
+      const { dai, usdc } = pools
 
-  //     // add liquidity to usdc pool
-  //     await usdc.token.tx.mint(deployer.address, toDec6(10_000))
-  //     await usdc.token.tx.approve(usdc.pool.address, toDec6(10_000))
-  //     await usdc.pool.tx.mint(toDec6(10_000))
-  //     expect(
-  //       BigInt(
-  //         (
-  //           await usdc.pool.query.balanceOf(deployer.address)
-  //         ).value.ok.toString(),
-  //       ).toString(),
-  //     ).toEqual(toDec6(10_000).toString())
+      // add liquidity to usdc pool
+      await usdc.token.tx.mint(deployer.address, toDec6(10_000))
+      await usdc.token.tx.approve(usdc.pool.address, toDec6(10_000))
+      await usdc.pool.tx.mint(toDec6(10_000))
+      expect(
+        BigInt(
+          (
+            await usdc.pool.query.balanceOf(deployer.address)
+          ).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec6(10_000).toString())
 
-  //     // mint to dai pool for collateral
-  //     const [user1] = users
-  //     await dai.token.tx.mint(user1.address, toDec18(20_000))
-  //     await dai.token
-  //       .withSigner(user1)
-  //       .tx.approve(dai.pool.address, toDec18(20_000))
-  //     await dai.pool.withSigner(user1).tx.mint(toDec18(20_000))
-  //     expect(
-  //       BigInt(
-  //         (await dai.pool.query.balanceOf(user1.address)).value.ok.toString(),
-  //       ).toString(),
-  //     ).toEqual(toDec18(20_000).toString())
+      // mint to dai pool for collateral
+      const [user1] = users
+      await dai.token.tx.mint(user1.address, toDec18(20_000))
+      await dai.token
+        .withSigner(user1)
+        .tx.approve(dai.pool.address, toDec18(20_000))
+      await dai.pool.withSigner(user1).tx.mint(toDec18(20_000))
+      expect(
+        BigInt(
+          (await dai.pool.query.balanceOf(user1.address)).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec18(20_000).toString())
 
-  //     // borrow usdc
-  //     await usdc.pool.withSigner(user1).tx.borrow(toDec6(10_000))
-  //     expect(
-  //       BigInt(
-  //         (await usdc.token.query.balanceOf(user1.address)).value.ok.toString(),
-  //       ).toString(),
-  //     ).toEqual(toDec6(10_000).toString())
-  //   })
+      // borrow usdc
+      await usdc.pool.withSigner(user1).tx.borrow(toDec6(10_000))
+      expect(
+        BigInt(
+          (await usdc.token.query.balanceOf(user1.address)).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec6(10_000).toString())
+    })
 
-  //   it('execute', async () => {
-  //     const { token, pool } = pools.usdc
-  //     const [user1] = users
-  //     await token.withSigner(user1).tx.approve(pool.address, toDec6(4_500))
-  //     const { events } = await pool
-  //       .withSigner(user1)
-  //       .tx.repayBorrowBehalf(user1.address, toDec6(4_500))
+    it('execute', async () => {
+      const { token, pool } = pools.usdc
+      const [user1] = users
+      await token.withSigner(user1).tx.approve(pool.address, toDec6(4_500))
+      const { events } = await pool
+        .withSigner(user1)
+        .tx.repayBorrowBehalf(user1.address, toDec6(4_500))
 
-  //     expect(
-  //       BigInt(
-  //         (await token.query.balanceOf(user1.address)).value.ok.toString(),
-  //       ).toString(),
-  //     ).toEqual(toDec6(5_500).toString())
-  //     expect(
-  //       BigInt(
-  //         (await token.query.balanceOf(pool.address)).value.ok.toString(),
-  //       ).toString(),
-  //     ).toEqual(toDec6(4_500).toString())
+      expect(
+        BigInt(
+          (await token.query.balanceOf(user1.address)).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec6(5_500).toString())
+      expect(
+        BigInt(
+          (await token.query.balanceOf(pool.address)).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec6(4_500).toString())
 
-  //     const event = events[0]
-  //     expect(event.name).toEqual('RepayBorrow')
-  //     expect(event.args.payer).toEqual(user1.address)
-  //     expect(event.args.borrower).toEqual(user1.address)
-  //     expect(event.args.repayAmount.toString()).toEqual(
-  //       toDec6(4_500).toString(),
-  //     )
-  //     expect(event.args.accountBorrows.toString()).toEqual(
-  //       toDec6(5_500).toString(),
-  //     )
-  //     expect(event.args.totalBorrows.toNumber()).toEqual(
-  //       toDec6(5_500).toNumber(),
-  //     )
-  //   })
-  // })
+      const event = events[0]
+      expect(event.name).toEqual('RepayBorrow')
+      expect(event.args.payer).toEqual(user1.address)
+      expect(event.args.borrower).toEqual(user1.address)
+      expect(event.args.repayAmount.toString()).toEqual(
+        toDec6(4_500).toString(),
+      )
+      expect(event.args.accountBorrows.toString()).toEqual(
+        toDec6(5_500).toString(),
+      )
+      expect(event.args.totalBorrows.toNumber()).toEqual(
+        toDec6(5_500).toNumber(),
+      )
+    })
+  })
 
   describe('.repay_borrow_all', () => {
     it('success', async () => {
@@ -776,18 +776,14 @@ describe('Pool spec', () => {
       const contractEvents = res.events
       //// Burn
       const burnEvent = contractEvents.find(
-        (e) =>
-          e.name == 'Transfer' &&
-          e.from == borrower.address,
+        (e) => e.name == 'Transfer' && e.from == borrower.address,
       )
       expect(burnEvent.from).toBe(borrower.address.toString())
       expect(burnEvent.to).toBe('')
       expect(BigInt(burnEvent.value)).toBe(5400n * dec18)
       //// Mint
       const mintEvent = contractEvents.find(
-        (e) =>
-          e.name == 'Transfer' &&
-          e.to == liquidator.address,
+        (e) => e.name == 'Transfer' && e.to == liquidator.address,
       )
       expect(mintEvent.from).toBe('')
       expect(mintEvent.to).toBe(liquidator.address.toString())

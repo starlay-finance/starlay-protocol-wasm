@@ -33,8 +33,8 @@ use openbrush::{
         PSP22Error,
         PSP22Ref,
     },
-    modifier_definition,
-    modifiers,
+    // modifier_definition,
+    // modifiers,
     storage::Mapping,
     traits::{
         AccountId,
@@ -69,7 +69,6 @@ pub struct Data {
     pub controller: AccountId,
     pub manager: AccountId,
     pub rate_model: AccountId,
-    pub gateway: AccountId,
     pub borrows_scaled: Balance,
     pub reserves_scaled: Balance,
     pub account_borrows: Mapping<AccountId, Balance>,
@@ -86,7 +85,6 @@ impl Default for Data {
             controller: ZERO_ADDRESS.into(),
             manager: ZERO_ADDRESS.into(),
             rate_model: ZERO_ADDRESS.into(),
-            gateway: ZERO_ADDRESS.into(),
             borrows_scaled: Default::default(),
             reserves_scaled: Default::default(),
             account_borrows: Default::default(),
@@ -235,19 +233,6 @@ pub trait Internal {
     fn _emit_new_controller_event(&self, old: AccountId, new: AccountId);
     fn _emit_new_interest_rate_model_event(&self, old: AccountId, new: AccountId);
     fn _emit_new_reserve_factor_event(&self, old: WrappedU256, new: WrappedU256);
-    fn _gateway(&self) -> AccountId;
-}
-
-#[modifier_definition]
-pub fn only_gateway<T, F, R>(instance: &mut T, body: F) -> Result<R>
-where
-    T: Storage<Data>,
-    F: FnOnce(&mut T) -> Result<R>,
-{
-    if instance.data().gateway != T::env().caller() {
-        return Err(Error::CallerIsNotGateway)
-    }
-    body(instance)
 }
 
 impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metadata::Data>> Pool
@@ -266,7 +251,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._mint(Self::env().caller(), mint_amount)
     }
 
-    #[modifiers(only_gateway)]
     default fn mint_to(&mut self, mint_account: AccountId, mint_amount: Balance) -> Result<()> {
         self._accrue_interest()?;
         self._mint(mint_account, mint_amount)
@@ -298,7 +282,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._borrow(Self::env().caller(), borrow_amount)
     }
 
-    #[modifiers(only_gateway)]
     default fn borrow_for(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
         self._accrue_interest()?;
         self._borrow(borrower, borrow_amount)
@@ -316,7 +299,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
 
-    #[modifiers(only_gateway)]
     default fn repay_borrow_behalf(
         &mut self,
         borrower: AccountId,
@@ -471,10 +453,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn reserve_factor_mantissa(&self) -> WrappedU256 {
         self._reserve_factor_mantissa()
-    }
-
-    default fn gateway(&self) -> AccountId {
-        self._gateway()
     }
 }
 
@@ -1253,10 +1231,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     default fn _emit_new_controller_event(&self, _old: AccountId, _new: AccountId) {}
     default fn _emit_new_interest_rate_model_event(&self, _old: AccountId, _new: AccountId) {}
     default fn _emit_new_reserve_factor_event(&self, _old: WrappedU256, _new: WrappedU256) {}
-
-    default fn _gateway(&self) -> AccountId {
-        self.data::<Data>().gateway
-    }
 }
 
 pub fn to_psp22_error(e: PSP22Error) -> Error {

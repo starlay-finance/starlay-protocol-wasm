@@ -24,7 +24,6 @@
     "compile": "typechain-compiler --toolchain nightly-2023-03-05 --nt && yarn generate",
     "compile:release": "typechain-compiler --release --toolchain nightly-2023-03-05 --nt && yarn generate",
     "test:typechain": "jest --testPathPattern \".spec.ts$\" --runInBand",
-    "test:weth": "jest tests/WETHGateway.spec.ts --runInBand",
     "test:single": "jest",
     "test": "yarn compile && yarn test:typechain",
     "generate": "typechain-polkadot --in artifacts --out types --plugins typechain/plugins",
