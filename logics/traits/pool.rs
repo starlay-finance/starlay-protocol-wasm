@@ -119,6 +119,25 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn sweep_token(&mut self, asset: AccountId) -> Result<()>;
 
+    #[ink(message)]
+    fn approve_delegate(&mut self, delegatee: AccountId, amount: Balance) -> Result<()>;
+
+    #[ink(message)]
+    fn increase_delegate_allowance(
+        &mut self,
+        owner: AccountId,
+        delegatee: AccountId,
+        amount: Balance,
+    ) -> Result<()>;
+
+    #[ink(message)]
+    fn decrease_delegate_allowance(
+        &mut self,
+        owner: AccountId,
+        delegatee: AccountId,
+        amount: Balance,
+    ) -> Result<()>;
+
     // view functions
     #[ink(message)]
     fn underlying(&self) -> AccountId;
@@ -154,6 +173,8 @@ pub trait Pool: PSP22 + PSP22Metadata {
     fn initial_exchange_rate_mantissa(&self) -> WrappedU256;
     #[ink(message)]
     fn reserve_factor_mantissa(&self) -> WrappedU256;
+    #[ink(message)]
+    fn delegate_allowance(&self, owner: AccountId, delegatee: AccountId) -> Balance;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -173,6 +194,9 @@ pub enum Error {
     SetReserveFactorBoundsCheck,
     CannotSweepUnderlyingToken,
     CallerIsNotManager,
+    ZeroOwnerAddress,
+    ZeroDelegateeAddress,
+    InsufficientDelegateAllowance,
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),

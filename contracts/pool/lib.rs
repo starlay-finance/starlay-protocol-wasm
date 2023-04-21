@@ -101,6 +101,15 @@ pub mod contract {
         value: Balance,
     }
 
+    #[ink(event)]
+    pub struct DelegateApproval {
+        #[ink(topic)]
+        owner: AccountId,
+        #[ink(topic)]
+        delegatee: AccountId,
+        amount: Balance,
+    }
+
     impl Pool for PoolContract {
         #[ink(message)]
         fn set_controller(&mut self, _new_controller: AccountId) -> Result<()> {
@@ -187,6 +196,19 @@ pub mod contract {
                 benefactor,
                 add_amount,
                 new_total_reserves,
+            })
+        }
+
+        fn _emit_delegate_approval_event(
+            &self,
+            owner: AccountId,
+            delegatee: AccountId,
+            amount: Balance,
+        ) {
+            self.env().emit_event(DelegateApproval {
+                owner,
+                delegatee,
+                amount,
             })
         }
     }

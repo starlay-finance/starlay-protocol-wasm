@@ -33,11 +33,15 @@ use openbrush::{
         PSP22Error,
         PSP22Ref,
     },
-    // modifier_definition,
-    // modifiers,
-    storage::Mapping,
+    modifier_definition,
+    modifiers,
+    storage::{
+        Mapping,
+        TypeGuard,
+    },
     traits::{
         AccountId,
+        AccountIdExt,
         Balance,
         Storage,
         String,
@@ -76,6 +80,13 @@ pub struct Data {
     pub borrow_index: WrappedU256,
     pub initial_exchange_rate_mantissa: WrappedU256,
     pub reserve_factor_mantissa: WrappedU256,
+    pub delegate_allowance: Mapping<(AccountId, AccountId), Balance, AllowancesKey>,
+}
+
+pub struct AllowancesKey;
+
+impl<'a> TypeGuard<'a> for AllowancesKey {
+    type Type = &'a (&'a AccountId, &'a AccountId);
 }
 
 impl Default for Data {
@@ -88,6 +99,7 @@ impl Default for Data {
             borrows_scaled: Default::default(),
             reserves_scaled: Default::default(),
             account_borrows: Default::default(),
+            delegate_allowance: Default::default(),
             accrual_block_timestamp: 0,
             borrow_index: exp_scale().into(),
             initial_exchange_rate_mantissa: WrappedU256::from(U256::zero()),
@@ -146,6 +158,12 @@ pub trait Internal {
     fn _add_reserves(&mut self, amount: Balance) -> Result<()>;
     fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()>;
     fn _sweep_token(&mut self, asset: AccountId) -> Result<()>;
+    fn _approve_delegate(
+        &mut self,
+        owner: AccountId,
+        delegatee: AccountId,
+        amount: Balance,
+    ) -> Result<()>;
 
     // utilities
     fn _transfer_underlying_from(
@@ -190,7 +208,7 @@ pub trait Internal {
     fn _exchange_rate_stored(&self) -> U256;
     fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput>;
     fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool);
-
+    fn _delegate_allowance(&self, owner: &AccountId, delegatee: &AccountId) -> Balance;
     // event emission
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
     fn _emit_redeem_event(&self, redeemer: AccountId, redeem_amount: Balance);
@@ -233,6 +251,33 @@ pub trait Internal {
     fn _emit_new_controller_event(&self, old: AccountId, new: AccountId);
     fn _emit_new_interest_rate_model_event(&self, old: AccountId, new: AccountId);
     fn _emit_new_reserve_factor_event(&self, old: WrappedU256, new: WrappedU256);
+    fn _emit_delegate_approval_event(
+        &self,
+        owner: AccountId,
+        delegatee: AccountId,
+        amount: Balance,
+    );
+}
+
+#[modifier_definition]
+pub fn delegated_allowed<T, F, R>(
+    instance: &mut T,
+    body: F,
+    owner: AccountId,
+    amount: Balance,
+) -> Result<R>
+where
+    T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metadata::Data>,
+    F: FnOnce(&mut T) -> Result<R>,
+{
+    let delegatee = T::env().caller();
+    if delegatee != owner {
+        let delegate_allowance = instance._delegate_allowance(&owner, &delegatee);
+        if delegate_allowance < amount {
+            return Err(Error::InsufficientDelegateAllowance)
+        }
+    }
+    body(instance)
 }
 
 impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metadata::Data>> Pool
@@ -282,6 +327,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._borrow(Self::env().caller(), borrow_amount)
     }
 
+    #[modifiers(delegated_allowed(borrower, borrow_amount))]
     default fn borrow_for(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
         self._accrue_interest()?;
         self._borrow(borrower, borrow_amount)
@@ -378,6 +424,38 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._sweep_token(asset)
     }
 
+    default fn approve_delegate(&mut self, delegatee: AccountId, amount: Balance) -> Result<()> {
+        self._approve_delegate(Self::env().caller(), delegatee, amount)
+    }
+
+    default fn increase_delegate_allowance(
+        &mut self,
+        owner: AccountId,
+        delegatee: AccountId,
+        amount: Balance,
+    ) -> Result<()> {
+        self._approve_delegate(
+            owner,
+            delegatee,
+            self._delegate_allowance(&owner, &delegatee) + amount,
+        )
+    }
+
+    default fn decrease_delegate_allowance(
+        &mut self,
+        owner: AccountId,
+        delegatee: AccountId,
+        amount: Balance,
+    ) -> Result<()> {
+        let delegate_allowance = self._delegate_allowance(&owner, &delegatee);
+
+        if delegate_allowance < amount {
+            return Err(Error::InsufficientDelegateAllowance)
+        }
+
+        self._approve_delegate(owner, delegatee, delegate_allowance - amount)
+    }
+
     default fn underlying(&self) -> AccountId {
         self._underlying()
     }
@@ -454,6 +532,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     default fn reserve_factor_mantissa(&self) -> WrappedU256 {
         self._reserve_factor_mantissa()
     }
+
+    default fn delegate_allowance(&self, owner: AccountId, delegatee: AccountId) -> Balance {
+        self._delegate_allowance(&owner, &delegatee)
+    }
 }
 
 impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metadata::Data>> Internal
@@ -480,7 +562,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
 
-    fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput> {
+    default fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput> {
         let cash = self._get_cash_prior();
         let borrows = self._total_borrows();
         let reserves = self._total_reserves();
@@ -497,6 +579,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             reserve_factor_mantissa: self._reserve_factor_mantissa().into(),
         })
     }
+
     default fn _transfer_tokens(
         &mut self,
         spender: AccountId,
@@ -555,6 +638,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         Ok(())
     }
+
     default fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()> {
         let contract_addr = Self::env().account_id();
         ControllerRef::mint_allowed(&self._controller(), contract_addr, minter, mint_amount)?;
@@ -580,6 +664,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         Ok(())
     }
+
     default fn _redeem(&mut self, redeemer: AccountId, redeem_amount: Balance) -> Result<()> {
         if redeem_amount == 0 {
             return Ok(())
@@ -630,6 +715,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         Ok(())
     }
+
     default fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool) {
         let scaled = scaled_amount_of(
             amount,
@@ -654,6 +740,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             self.data::<Data>().borrows_scaled += scaled
         }
     }
+
     default fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
         let contract_addr = Self::env().account_id();
         let caller = Self::env().caller();
@@ -748,6 +835,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         Ok(repay_amount_final)
     }
+
     default fn _liquidate_borrow(
         &mut self,
         liquidator: AccountId,
@@ -844,6 +932,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         Ok(())
     }
+
     default fn _seize(
         &mut self,
         seizer_token: AccountId,
@@ -986,6 +1075,27 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         let balance = PSP22Ref::balance_of(&asset, Self::env().account_id());
         PSP22Ref::transfer(&asset, Self::env().caller(), balance, Vec::<u8>::new())?;
+        Ok(())
+    }
+
+    default fn _approve_delegate(
+        &mut self,
+        owner: AccountId,
+        delegatee: AccountId,
+        amount: Balance,
+    ) -> Result<()> {
+        if owner.is_zero() {
+            return Err(Error::ZeroOwnerAddress)
+        }
+        if delegatee.is_zero() {
+            return Err(Error::ZeroDelegateeAddress)
+        }
+
+        self.data::<Data>()
+            .delegate_allowance
+            .insert(&(&owner, &delegatee), &amount);
+
+        self._emit_delegate_approval_event(owner, delegatee, amount);
         Ok(())
     }
 
@@ -1169,6 +1279,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         )
     }
 
+    default fn _delegate_allowance(&self, owner: &AccountId, delegatee: &AccountId) -> Balance {
+        self.data::<Data>()
+            .delegate_allowance
+            .get(&(owner, delegatee))
+            .unwrap_or(0)
+    }
+
     // event emission
     default fn _emit_mint_event(
         &self,
@@ -1231,6 +1348,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     default fn _emit_new_controller_event(&self, _old: AccountId, _new: AccountId) {}
     default fn _emit_new_interest_rate_model_event(&self, _old: AccountId, _new: AccountId) {}
     default fn _emit_new_reserve_factor_event(&self, _old: WrappedU256, _new: WrappedU256) {}
+    default fn _emit_delegate_approval_event(
+        &self,
+        _owner: AccountId,
+        _delegatee: AccountId,
+        _amount: Balance,
+    ) {
+    }
 }
 
 pub fn to_psp22_error(e: PSP22Error) -> Error {
