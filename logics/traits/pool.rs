@@ -34,6 +34,10 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn mint(&mut self, mint_amount: Balance) -> Result<()>;
 
+    /// Sender supplies assets into the market and receives pool tokens in exchange
+    #[ink(message)]
+    fn mint_to(&mut self, mint_account: AccountId, mint_amount: Balance) -> Result<()>;
+
     /// Sender redeems pool tokens in exchange for the underlying asset
     #[ink(message)]
     fn redeem(&mut self, redeem_tokens: Balance) -> Result<()>;
@@ -49,6 +53,10 @@ pub trait Pool: PSP22 + PSP22Metadata {
     /// Sender borrows assets from the protocol to their own address
     #[ink(message)]
     fn borrow(&mut self, borrow_amount: Balance) -> Result<()>;
+
+    /// borrows assets from the protocol to Borrower
+    #[ink(message)]
+    fn borrow_for(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()>;
 
     /// Sender repays their own borrow
     #[ink(message)]
@@ -111,6 +119,25 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn sweep_token(&mut self, asset: AccountId) -> Result<()>;
 
+    #[ink(message)]
+    fn approve_delegate(&mut self, delegatee: AccountId, amount: Balance) -> Result<()>;
+
+    #[ink(message)]
+    fn increase_delegate_allowance(
+        &mut self,
+        owner: AccountId,
+        delegatee: AccountId,
+        amount: Balance,
+    ) -> Result<()>;
+
+    #[ink(message)]
+    fn decrease_delegate_allowance(
+        &mut self,
+        owner: AccountId,
+        delegatee: AccountId,
+        amount: Balance,
+    ) -> Result<()>;
+
     // view functions
     #[ink(message)]
     fn underlying(&self) -> AccountId;
@@ -146,6 +173,8 @@ pub trait Pool: PSP22 + PSP22Metadata {
     fn initial_exchange_rate_mantissa(&self) -> WrappedU256;
     #[ink(message)]
     fn reserve_factor_mantissa(&self) -> WrappedU256;
+    #[ink(message)]
+    fn delegate_allowance(&self, owner: AccountId, delegatee: AccountId) -> Balance;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -165,6 +194,9 @@ pub enum Error {
     SetReserveFactorBoundsCheck,
     CannotSweepUnderlyingToken,
     CallerIsNotManager,
+    ZeroOwnerAddress,
+    ZeroDelegateeAddress,
+    InsufficientDelegateAllowance,
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),

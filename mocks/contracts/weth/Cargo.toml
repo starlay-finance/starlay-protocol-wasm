@@ -1,6 +1,6 @@
 [package]
-name = "logics"
-version = "0.0.1"
+name = "weth"
+version = "2.1.0"
 authors = ["Starlay Finance"]
 edition = "2021"
 
@@ -15,27 +15,16 @@ scale-info = { version = "2.3", default-features = false, features = [
 ], optional = true }
 
 openbrush = { tag = "3.1.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false, features = [
-    "psp22", "ownable"
+    "psp22",
 ] }
-primitive-types = { version = "0.11.1", default-features = false, features = [
-    "codec",
-] }
+logics = { path = "../../../logics", default-features = false }
 
 [lib]
+name = "weth"
 path = "lib.rs"
-crate-type = ["rlib"]
+crate-type = ["cdylib"]
 
 [features]
 default = ["std"]
-std = [
-    "ink/std",
-    "scale/std",
-    "scale-info/std",
-    "openbrush/std",
-    "openbrush/std",
-    "primitive-types/std",
-    "primitive-types/scale-info",
-]
-
-[profile.release]
-overflow-checks = false
+std = ["ink/std", "scale/std", "scale-info/std", "openbrush/std"]
+ink-as-dependency = []
