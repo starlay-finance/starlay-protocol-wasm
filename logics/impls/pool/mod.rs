@@ -587,21 +587,21 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Ok(())
         }
 
+        let (account_balance, account_borrow_balance, exchange_rate) =
+            self.get_account_snapshot(redeemer);
         let contract_addr = Self::env().account_id();
         if !balance_decrease_allowed(
             self._liquidation_threshold(),
             PSP22Metadata::token_decimals(self),
+            self._controller(),
             contract_addr,
             redeemer,
-            redeem_amount,
-            0,
+            account_borrow_balance,
             ControllerRef::oracle(&self._controller()),
         ) {
             return Err(Error::RedeemTransferOutNotPossible)
         }
 
-        let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(redeemer);
         let pool_attribute = PoolAttributes {
             underlying: self._underlying(),
             decimals: self.token_decimals(),
@@ -672,20 +672,20 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
         let contract_addr = Self::env().account_id();
+        let (account_balance, account_borrow_balance, exchange_rate) =
+            self.get_account_snapshot(borrower);
         if !balance_decrease_allowed(
             self._liquidation_threshold(),
             PSP22Metadata::token_decimals(self),
+            self._controller(),
             contract_addr,
             borrower,
             borrow_amount,
-            0,
             ControllerRef::oracle(&self._controller()),
         ) {
             return Err(Error::RedeemTransferOutNotPossible)
         }
 
-        let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(borrower);
         let pool_attribute = PoolAttributes {
             underlying: self._underlying(),
             decimals: self.token_decimals(),
