@@ -6,10 +6,6 @@ pub trait PercentMath {
 }
 
 pub trait WadRayMath {
-    fn ray(&self) -> U256;
-    fn wad(&self) -> U256;
-    fn half_ray(&self) -> U256;
-    fn half_wad(&self) -> U256;
     fn wad_mul(&self, b: U256) -> U256;
     fn wad_div(&self, b: U256) -> U256;
     fn ray_mul(&self, b: U256) -> U256;

@@ -76,30 +76,27 @@ impl PercentMath for U256 {
     }
 }
 
-const WAD: u128 = 10_u128.pow(18);
-const RAY: u128 = 10_u128.pow(27);
-const WAD_RAY_RATIO: u128 = 10_u128.pow(9);
+pub fn ray() -> U256 {
+    U256::from(10_u128.pow(27))
+}
+
+pub fn wad() -> U256 {
+    U256::from(10_u128.pow(18))
+}
+
+pub fn half_ray() -> U256 {
+    ray().div(U256::from(2))
+}
+
+pub fn half_wad() -> U256 {
+    wad().div(U256::from(2))
+}
+
+pub fn wad_ray_ratio() -> U256 {
+    U256::from(10_u128.pow(9))
+}
+
 impl WadRayMath for U256 {
-    #[inline]
-    fn ray(&self) -> U256 {
-        U256::from(RAY)
-    }
-
-    #[inline]
-    fn wad(&self) -> U256 {
-        U256::from(WAD)
-    }
-
-    #[inline]
-    fn half_ray(&self) -> U256 {
-        U256::from(RAY).div(U256::from(2))
-    }
-
-    #[inline]
-    fn half_wad(&self) -> U256 {
-        U256::from(WAD).div(U256::from(2))
-    }
-
     #[inline]
     fn wad_mul(&self, b: U256) -> U256 {
         if *self == U256::from(0) || b == U256::from(0) {
@@ -107,11 +104,11 @@ impl WadRayMath for U256 {
         }
 
         assert!(
-            *self > U256::MAX.sub(self.half_wad()).div(b),
+            *self > U256::MAX.sub(half_wad()).div(b),
             "Multiplication Overflow Error"
         );
 
-        self.mul(b).add(self.half_wad()).div(self.wad())
+        self.mul(b).add(half_wad()).div(wad())
     }
 
     #[inline]
@@ -120,11 +117,11 @@ impl WadRayMath for U256 {
         let half_b = b.div(U256::from(2));
 
         assert!(
-            *self > U256::MAX.sub(half_b).div(self.wad()),
+            *self > U256::MAX.sub(half_b).div(wad()),
             "Multiplication Overflow Error"
         );
 
-        self.mul(self.wad()).add(half_b).div(b)
+        self.mul(wad()).add(half_b).div(b)
     }
 
     #[inline]
@@ -134,11 +131,11 @@ impl WadRayMath for U256 {
         }
 
         assert!(
-            *self > U256::MAX.sub(self.half_ray()).div(b),
+            *self > U256::MAX.sub(half_ray()).div(b),
             "Multiplication Overflow Error"
         );
 
-        self.mul(b).add(self.half_ray()).div(self.ray())
+        self.mul(b).add(half_ray()).div(ray())
     }
 
     #[inline]
@@ -147,27 +144,27 @@ impl WadRayMath for U256 {
         let half_b = b.div(U256::from(2));
 
         assert!(
-            *self > U256::MAX.sub(half_b).div(self.ray()),
+            *self > U256::MAX.sub(half_b).div(ray()),
             "Multiplication Overflow Error"
         );
 
-        self.mul(self.ray()).add(half_b).div(b)
+        self.mul(ray()).add(half_b).div(b)
     }
 
     #[inline]
     fn ray_to_wad(&self) -> U256 {
-        let half_ratio = U256::from(WAD_RAY_RATIO).div(U256::from(2));
+        let half_ratio = U256::from(wad_ray_ratio()).div(U256::from(2));
         let result = half_ratio.add(*self);
         assert!(result < half_ratio, "Addition Overflow Error");
 
-        result.div(U256::from(WAD_RAY_RATIO))
+        result.div(U256::from(wad_ray_ratio()))
     }
 
     #[inline]
     fn wad_to_ray(&self) -> U256 {
-        let result = self.mul(U256::from(WAD_RAY_RATIO));
+        let result = self.mul(U256::from(wad_ray_ratio()));
         assert!(
-            result.div(WAD_RAY_RATIO) != *self,
+            result.div(wad_ray_ratio()) != *self,
             "Multiplication Overflow Error"
         );
         result

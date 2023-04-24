@@ -1,11 +1,3 @@
-use openbrush::traits::{
-    AccountId,
-    Balance,
-    Timestamp,
-    ZERO_ADDRESS,
-};
-use primitive_types::U256;
-use ink::prelude::vec::Vec;
 use super::super::exp_no_err::{
     exp_scale,
     Exp,
@@ -34,6 +26,14 @@ use core::ops::{
     Mul,
     Sub,
 };
+use ink::prelude::vec::Vec;
+use openbrush::traits::{
+    AccountId,
+    Balance,
+    Timestamp,
+    ZERO_ADDRESS,
+};
+use primitive_types::U256;
 
 pub fn borrow_rate_max_mantissa() -> U256 {
     // .0005% / time
