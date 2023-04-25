@@ -126,6 +126,7 @@ describe('Pool spec', () => {
           controller.address,
           rateModel.address,
           [ONE_ETHER.div(new BN(2)).toString()], // pool = underlying * 2
+          [new BN(8000).toString()],
         ],
         token,
       })
@@ -1232,6 +1233,7 @@ describe('Pool spec', () => {
             controller.address,
             rateModel.address,
             [initialExchangeRate.toString()],
+            [new BN(8000).toString()],
           ],
           token: newToken,
         })
@@ -1289,6 +1291,7 @@ describe('Pool spec', () => {
           controller.address,
           rateModel.address,
           [ONE_ETHER.toString()],
+          [new BN(8000).toString()],
         ],
         token: token,
       })

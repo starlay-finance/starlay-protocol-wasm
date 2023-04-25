@@ -101,6 +101,7 @@ const deployAndSetupPool = async (
       controller.address,
       interestRateModel.address,
       [config.riskParameter.initialExchangeRateMantissa],
+      [config.riskParameter.liquidationThreshold],
       [collateralNamePrefix + config.name],
       [collateralSymbolPrefix + config.symbol],
       config.decimals,

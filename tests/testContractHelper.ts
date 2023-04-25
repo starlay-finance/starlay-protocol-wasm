@@ -1,5 +1,6 @@
 import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
+import { BN } from '@polkadot/util'
 import { ONE_ETHER } from '../scripts/helper/constants'
 import {
   deployPoolFromAsset,
@@ -77,6 +78,7 @@ export const preparePoolWithMockToken = async ({
       controller.address,
       rateModel.address,
       [ONE_ETHER.toString()],
+      [new BN(8000).toString()],
     ],
     token,
   })
