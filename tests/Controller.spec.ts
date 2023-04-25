@@ -229,7 +229,7 @@ describe('Controller spec', () => {
         ZERO_ADDRESS,
         0,
       )
-      expect(value.ok.ok).toBeNull
+      expect(value.ok.ok).toBeNull()
     })
   })
 
@@ -314,10 +314,7 @@ describe('Controller spec', () => {
 
   describe('.seize_allowed', () => {
     it('check pause status', async () => {
-      const {
-        controller,
-        pools: { dai },
-      } = await setupWithPools()
+      const { controller } = await setupWithPools()
       await controller.tx.setSeizeGuardianPaused(true)
       const { value } = await controller.query.seizeAllowed(
         ZERO_ADDRESS,
@@ -411,9 +408,7 @@ describe('Controller spec', () => {
       const res = await usdc.pool
         .withSigner(sender)
         .query.transfer(receiver.address, toDec6(50_000).add(new BN(1)), [])
-      expect(hexToUtf8(res.value.ok.err['custom'])).toBe(
-        'InsufficientLiquidity',
-      )
+      expect(hexToUtf8(res.value.ok.err.custom)).toBe('InsufficientLiquidity')
     }
   })
 

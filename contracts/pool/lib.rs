@@ -101,16 +101,16 @@ pub mod contract {
         value: Balance,
     }
 
-    impl Pool for PoolContract {
-        #[ink(message)]
-        fn repay_borrow_behalf(
-            &mut self,
-            _borrower: AccountId,
-            _repay_amount: Balance,
-        ) -> Result<()> {
-            Err(Error::NotImplemented)
-        }
+    #[ink(event)]
+    pub struct DelegateApproval {
+        #[ink(topic)]
+        owner: AccountId,
+        #[ink(topic)]
+        delegatee: AccountId,
+        amount: Balance,
+    }
 
+    impl Pool for PoolContract {
         #[ink(message)]
         fn set_controller(&mut self, _new_controller: AccountId) -> Result<()> {
             Err(Error::NotImplemented)
@@ -196,6 +196,19 @@ pub mod contract {
                 benefactor,
                 add_amount,
                 new_total_reserves,
+            })
+        }
+
+        fn _emit_delegate_approval_event(
+            &self,
+            owner: AccountId,
+            delegatee: AccountId,
+            amount: Balance,
+        ) {
+            self.env().emit_event(DelegateApproval {
+                owner,
+                delegatee,
+                amount,
             })
         }
     }
@@ -509,32 +522,6 @@ pub mod contract {
             contract
                 .transfer_from(accounts.bob, accounts.charlie, 0, Vec::new())
                 .unwrap();
-        }
-
-        #[ink::test]
-        fn repay_borrow_behalf_works() {
-            let accounts = default_accounts();
-            set_caller(accounts.bob);
-
-            let dummy_id = AccountId::from([0x01; 32]);
-            let liquidation_threshold = WrappedU256::from(8000);
-            let mut contract = PoolContract::new(
-                dummy_id,
-                dummy_id,
-                dummy_id,
-                WrappedU256::from(U256::from(0)),
-                liquidation_threshold,
-                String::from("Token Name"),
-                String::from("symbol"),
-                8,
-            );
-
-            assert_eq!(
-                contract
-                    .repay_borrow_behalf(accounts.charlie, 0)
-                    .unwrap_err(),
-                Error::NotImplemented
-            )
         }
 
         #[ink::test]

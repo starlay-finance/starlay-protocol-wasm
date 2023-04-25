@@ -27,8 +27,12 @@ export default class WrappedU256DataOverridePlugin implements TypechainPlugin {
     absPathToOutput: string,
   ): void {
     const path = `${absPathToOutput}/${this.outputDir}/${fileName}.${this.ext}`
-    const json = JSON.parse(readFileSync(path).toString())
-    replaceRecursive(json, 'WrappedU256', { name: 'ReturnNumber' })
+    const maybeJson = readFileSync(path).toString()
+    const shouldBeJson =
+      maybeJson.lastIndexOf(',') == maybeJson.length - 3
+        ? maybeJson.slice(0, maybeJson.length - 3).concat('}')
+        : maybeJson
+    const json = JSON.parse(shouldBeJson)
 
     writeFileSync(
       absPathToOutput,

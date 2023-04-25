@@ -19,15 +19,15 @@ const param = (col: number, res: number, threshold: number): RiskParameter => {
 }
 
 export const RISK_PARAMETERS: iAssetBase<RiskParameter> = {
-  wastr: param(40, 20, 80),
-  dot: param(65, 20, 80),
-  usdc: param(80, 10, 80),
-  usdt: param(80, 10, 80),
-  dai: param(80, 10, 80),
-  busd: param(80, 10, 80),
-  weth: param(80, 10, 80),
-  wbtc: param(70, 10, 80),
-  matic: param(40, 20, 80),
-  bnb: param(40, 20, 80),
-  wsdn: param(40, 20, 80),
+  wastr: param(40, 20, 100),
+  dot: param(65, 20, 100),
+  usdc: param(80, 10, 100),
+  usdt: param(80, 10, 100),
+  dai: param(80, 10, 100),
+  busd: param(80, 10, 100),
+  weth: param(80, 10, 100),
+  wbtc: param(70, 10, 100),
+  matic: param(40, 20, 100),
+  bnb: param(40, 20, 100),
+  wsdn: param(40, 20, 100),
 }

@@ -152,6 +152,7 @@ describe('Pool spec', () => {
       await shouldNotRevert(token, 'approve', [pool.address, depositAmount])
       const { events } = await shouldNotRevert(pool, 'mint', [depositAmount])
 
+      // const dec18 = BigInt(10) ** BigInt(18)
       expect(
         (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toBe(balance - depositAmount)
@@ -528,17 +529,85 @@ describe('Pool spec', () => {
     })
   })
 
-  it('.repay_borrow_behalf', async () => {
-    const {
-      pools: {
-        dai: { pool },
-      },
-      users,
-    } = await setup()
-    const { value } = await pool
-      .withSigner(users[0])
-      .query.repayBorrowBehalf(users[1].address, 0)
-    expect(value.ok.err).toStrictEqual({ notImplemented: null })
+  describe('.repay_borrow_behalf', () => {
+    let deployer: KeyringPair
+    let pools: Pools
+    let users: KeyringPair[]
+
+    beforeAll(async () => {
+      ;({ deployer, users, pools } = await setup())
+    })
+
+    it('preparations', async () => {
+      const { dai, usdc } = pools
+
+      // add liquidity to usdc pool
+      await usdc.token.tx.mint(deployer.address, toDec6(10_000))
+      await usdc.token.tx.approve(usdc.pool.address, toDec6(10_000))
+      await usdc.pool.tx.mint(toDec6(10_000))
+      expect(
+        BigInt(
+          (
+            await usdc.pool.query.balanceOf(deployer.address)
+          ).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec6(10_000).toString())
+
+      // mint to dai pool for collateral
+      const [user1] = users
+      await dai.token.tx.mint(user1.address, toDec18(20_000))
+      await dai.token
+        .withSigner(user1)
+        .tx.approve(dai.pool.address, toDec18(20_000))
+      await dai.pool.withSigner(user1).tx.mint(toDec18(20_000))
+      expect(
+        BigInt(
+          (await dai.pool.query.balanceOf(user1.address)).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec18(20_000).toString())
+
+      // borrow usdc
+      await usdc.pool.withSigner(user1).tx.borrow(toDec6(10_000))
+      expect(
+        BigInt(
+          (await usdc.token.query.balanceOf(user1.address)).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec6(10_000).toString())
+    })
+
+    it('execute', async () => {
+      const { token, pool } = pools.usdc
+      const [user1] = users
+      await token.withSigner(user1).tx.approve(pool.address, toDec6(4_500))
+      const { events } = await pool
+        .withSigner(user1)
+        .tx.repayBorrowBehalf(user1.address, toDec6(4_500))
+
+      expect(
+        BigInt(
+          (await token.query.balanceOf(user1.address)).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec6(5_500).toString())
+      expect(
+        BigInt(
+          (await token.query.balanceOf(pool.address)).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec6(4_500).toString())
+
+      const event = events[0]
+      expect(event.name).toEqual('RepayBorrow')
+      expect(event.args.payer).toEqual(user1.address)
+      expect(event.args.borrower).toEqual(user1.address)
+      expect(event.args.repayAmount.toString()).toEqual(
+        toDec6(4_500).toString(),
+      )
+      expect(event.args.accountBorrows.toString()).toEqual(
+        toDec6(5_500).toString(),
+      )
+      expect(event.args.totalBorrows.toNumber()).toEqual(
+        toDec6(5_500).toNumber(),
+      )
+    })
   })
 
   describe('.repay_borrow_all', () => {
@@ -705,38 +774,34 @@ describe('Pool spec', () => {
       )
 
       // check events from Pool (execute seize)
-      const contractEvents = res.result['contractEvents']
+      const contractEvents = res.events
       //// Burn
       const burnEvent = contractEvents.find(
-        (e) =>
-          e.event.identifier == 'Transfer' &&
-          e.args[0].toString() == borrower.address,
+        (e) => e.name == 'Transfer' && e.from == borrower.address,
       )
-      expect(burnEvent.args[0].toString()).toBe(borrower.address.toString())
-      expect(burnEvent.args[1].toString()).toBe('')
-      expect(BigInt(burnEvent.args[2].toString())).toBe(5400n * dec18)
+      expect(burnEvent.from).toBe(borrower.address.toString())
+      expect(burnEvent.to).toBe('')
+      expect(BigInt(burnEvent.value)).toBe(5400n * dec18)
       //// Mint
       const mintEvent = contractEvents.find(
-        (e) =>
-          e.event.identifier == 'Transfer' &&
-          e.args[1].toString() == liquidator.address,
+        (e) => e.name == 'Transfer' && e.to == liquidator.address,
       )
-      expect(mintEvent.args[0].toString()).toBe('')
-      expect(mintEvent.args[1].toString()).toBe(liquidator.address.toString())
-      const minted = BigInt(mintEvent.args[2].toString())
+      expect(mintEvent.from).toBe('')
+      expect(mintEvent.to).toBe(liquidator.address.toString())
+      const minted = BigInt(mintEvent.value)
       expect(minted).toBeGreaterThanOrEqual(5248n * dec18)
       expect(minted).toBeLessThanOrEqual(5249n * dec18)
       //// ReserveAdded
       const reservesAddedEvent = contractEvents.find(
-        (e) => e.event.identifier == 'ReservesAdded',
+        (e) => e.name == 'ReservesAdded',
       )
-      expect(reservesAddedEvent.args[0].toString()).toBe(
+      expect(reservesAddedEvent.benefactor).toBe(
         collateral.pool.address.toString(),
       )
-      const addedAmount = BigInt(reservesAddedEvent.args[1].toString())
+      const addedAmount = BigInt(reservesAddedEvent.add_amount)
       expect(addedAmount).toBeGreaterThanOrEqual(151n * dec18)
       expect(addedAmount).toBeLessThanOrEqual(152n * dec18)
-      const totalReserves = BigInt(reservesAddedEvent.args[2].toString())
+      const totalReserves = BigInt(reservesAddedEvent.new_total_reserves)
       expect(totalReserves).toBeGreaterThanOrEqual(151n * dec18)
       expect(totalReserves).toBeLessThanOrEqual(152n * dec18)
     })
@@ -987,7 +1052,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(userA)
           .query.transfer(userA.address, new BN(1), [])
-        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferNotAllowed')
+        expect(hexToUtf8(res.value.ok.err.custom)).toBe('TransferNotAllowed')
       }
       // case: shortfall of account_liquidity
 
@@ -996,9 +1061,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(userA)
           .query.transfer(userB.address, new BN(2), []) // temp: truncated if less than 1 by collateral_factor?
-        expect(hexToUtf8(res.value.ok.err['custom'])).toBe(
-          'InsufficientLiquidity',
-        )
+        expect(hexToUtf8(res.value.ok.err.custom)).toBe('InsufficientLiquidity')
       }
       // case: paused
       await controller.tx.setTransferGuardianPaused(true)
@@ -1006,7 +1069,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(userA)
           .query.transfer(userB.address, new BN(1), [])
-        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferIsPaused')
+        expect(hexToUtf8(res.value.ok.err.custom)).toBe('TransferIsPaused')
       }
     })
   })
@@ -1175,7 +1238,7 @@ describe('Pool spec', () => {
             toDec18(100_000),
             [],
           )
-        expect(res.value.ok.err.insufficientAllowance).toBeTruthy
+        expect(res.value.ok.err.insufficientAllowance).toBeTruthy()
       }
       await shouldNotRevert(dai.pool.withSigner(userA), 'approve', [
         spender.address,
@@ -1186,7 +1249,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(spender)
           .query.transferFrom(userA.address, userA.address, new BN(1), [])
-        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferNotAllowed')
+        expect(hexToUtf8(res.value.ok.err.custom)).toBe('TransferNotAllowed')
       }
       // case: shortfall of account_liquidity
       {
@@ -1194,9 +1257,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(spender)
           .query.transferFrom(userA.address, userB.address, new BN(2), []) // temp: truncated if less than 1 by collateral_factor?
-        expect(hexToUtf8(res.value.ok.err['custom'])).toBe(
-          'InsufficientLiquidity',
-        )
+        expect(hexToUtf8(res.value.ok.err.custom)).toBe('InsufficientLiquidity')
       }
       // case: paused
       await controller.tx.setTransferGuardianPaused(true)
@@ -1204,7 +1265,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(spender)
           .query.transferFrom(userA.address, userB.address, new BN(1), [])
-        expect(hexToUtf8(res.value.ok.err['custom'])).toBe('TransferIsPaused')
+        expect(hexToUtf8(res.value.ok.err.custom)).toBe('TransferIsPaused')
       }
     })
   })
