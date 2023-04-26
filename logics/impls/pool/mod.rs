@@ -689,17 +689,17 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(redeemer);
         let contract_addr = Self::env().account_id();
-        // if !balance_decrease_allowed(
-        //     self._liquidation_threshold(),
-        //     PSP22Metadata::token_decimals(self),
-        //     self._controller(),
-        //     contract_addr,
-        //     redeemer,
-        //     account_borrow_balance,
-        //     ControllerRef::oracle(&self._controller()),
-        // ) {
-        //     return Err(Error::RedeemTransferOutNotPossible)
-        // }
+        if !balance_decrease_allowed(
+            self._liquidation_threshold(),
+            PSP22Metadata::token_decimals(self),
+            self._controller(),
+            contract_addr,
+            redeemer,
+            account_borrow_balance,
+            ControllerRef::oracle(&self._controller()),
+        ) {
+            return Err(Error::RedeemTransferOutNotPossible)
+        }
 
         let pool_attribute = PoolAttributes {
             underlying: self._underlying(),
@@ -774,17 +774,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let caller = Self::env().caller();
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(borrower);
-        // if !balance_decrease_allowed(
-        //     self._liquidation_threshold(),
-        //     PSP22Metadata::token_decimals(self),
-        //     self._controller(),
-        //     contract_addr,
-        //     borrower,
-        //     borrow_amount,
-        //     ControllerRef::oracle(&self._controller()),
-        // ) {
-        //     return Err(Error::RedeemTransferOutNotPossible)
-        // }
 
         let pool_attribute = PoolAttributes {
             underlying: self._underlying(),

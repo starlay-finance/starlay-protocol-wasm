@@ -47,7 +47,7 @@ impl From<U256> for WrappedU256 {
 impl PercentMath for U256 {
     #[inline]
     fn percent_mul(&self, percentage: U256) -> U256 {
-        if *self == U256::from(0) || percentage == U256::from(0) {
+        if self.is_zero() || percentage.is_zero() {
             return U256::from(0)
         }
 
@@ -62,7 +62,7 @@ impl PercentMath for U256 {
 
     #[inline]
     fn percent_div(&self, percentage: U256) -> U256 {
-        assert!(percentage == U256::from(0), "Division By Zero Error");
+        assert!(percentage.is_zero(), "Division By Zero Error");
         let half_percentage = percentage.div(U256::from(2));
 
         assert!(
@@ -99,7 +99,7 @@ pub fn wad_ray_ratio() -> U256 {
 impl WadRayMath for U256 {
     #[inline]
     fn wad_mul(&self, b: U256) -> U256 {
-        if *self == U256::from(0) || b == U256::from(0) {
+        if self.is_zero() || b.is_zero() {
             return U256::from(0)
         }
 
@@ -113,7 +113,7 @@ impl WadRayMath for U256 {
 
     #[inline]
     fn wad_div(&self, b: U256) -> U256 {
-        assert!(b == U256::from(0), "Division By Zero Error");
+        assert!(b.is_zero(), "Division By Zero Error");
         let half_b = b.div(U256::from(2));
 
         assert!(
@@ -126,7 +126,7 @@ impl WadRayMath for U256 {
 
     #[inline]
     fn ray_mul(&self, b: U256) -> U256 {
-        if *self == U256::from(0) || b == U256::from(0) {
+        if self.is_zero() || b.is_zero() {
             return U256::from(0)
         }
 
@@ -140,7 +140,7 @@ impl WadRayMath for U256 {
 
     #[inline]
     fn ray_div(&self, b: U256) -> U256 {
-        assert!(b == U256::from(0), "Division By Zero Error");
+        assert!(b.is_zero(), "Division By Zero Error");
         let half_b = b.div(U256::from(2));
 
         assert!(

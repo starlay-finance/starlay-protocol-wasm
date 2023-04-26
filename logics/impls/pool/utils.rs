@@ -211,8 +211,15 @@ pub fn balance_decrease_allowed(
 
     let (total_collateral_in_eth, total_debt_in_eth, _, avg_liquidation_threshold, _) =
         calculate_user_account_data(user, controller, oracle);
+    // (
+    //     U256::from(0),
+    //     U256::from(0),
+    //     U256::from(0),
+    //     U256::from(0),
+    //     U256::MAX,
+    // );
 
-    if total_debt_in_eth == U256::from(0) {
+    if total_debt_in_eth.is_zero() {
         return true
     }
 
@@ -228,7 +235,7 @@ pub fn balance_decrease_allowed(
 
     let collateral_balance_after_decrease = total_collateral_in_eth.sub(amount_to_decrease_in_eth);
 
-    if collateral_balance_after_decrease == U256::from(0) {
+    if collateral_balance_after_decrease.is_zero() {
         return false
     }
 
@@ -274,7 +281,13 @@ fn calculate_user_account_data(
             continue
         }
 
-        let ltv = ControllerRef::collateral_factor_mantissa(&controller, *asset).unwrap();
+        let collateral_factor_mantissa: Option<WrappedU256> =
+            ControllerRef::collateral_factor_mantissa(&controller, *asset);
+        if collateral_factor_mantissa.is_none() {
+            continue
+        }
+        let ltv = U256::from(collateral_factor_mantissa.unwrap());
+
         let liquidation_threshold = PoolRef::liquidation_threshold(asset);
         let decimals = PoolRef::token_decimals(asset);
         let token_unit = 10_u128.pow(decimals.into());
@@ -300,15 +313,16 @@ fn calculate_user_account_data(
         }
     }
 
-    avg_ltv = if total_collateral_in_eth > U256::from(0) {
+    avg_ltv = if total_collateral_in_eth.is_zero() {
+        U256::from(0)
+    } else {
         avg_ltv.div(total_collateral_in_eth)
-    } else {
-        U256::from(0)
     };
-    avg_liquidation_threshold = if total_collateral_in_eth > U256::from(0) {
-        avg_liquidation_threshold.div(total_collateral_in_eth)
-    } else {
+
+    avg_liquidation_threshold = if total_collateral_in_eth.is_zero() {
         U256::from(0)
+    } else {
+        avg_liquidation_threshold.div(total_collateral_in_eth)
     };
 
     let health_factor = calculate_health_factor_from_balances(
@@ -316,7 +330,7 @@ fn calculate_user_account_data(
         total_debt_in_eth,
         avg_liquidation_threshold,
     );
-    return (
+    (
         total_collateral_in_eth,
         total_debt_in_eth,
         avg_ltv,
@@ -330,7 +344,7 @@ pub fn calculate_health_factor_from_balances(
     total_debt_in_eth: U256,
     liquidation_threshold: U256,
 ) -> U256 {
-    if total_debt_in_eth == U256::from(0) {
+    if total_debt_in_eth.is_zero() {
         return U256::MAX
     }
 
