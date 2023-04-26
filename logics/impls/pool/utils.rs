@@ -211,13 +211,6 @@ pub fn balance_decrease_allowed(
 
     let (total_collateral_in_eth, total_debt_in_eth, _, avg_liquidation_threshold, _) =
         calculate_user_account_data(user, controller, oracle);
-    // (
-    //     U256::from(0),
-    //     U256::from(0),
-    //     U256::from(0),
-    //     U256::from(0),
-    //     U256::MAX,
-    // );
 
     if total_debt_in_eth.is_zero() {
         return true
