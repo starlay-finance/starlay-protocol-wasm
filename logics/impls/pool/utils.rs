@@ -192,7 +192,7 @@ pub fn exchange_rate(
 }
 
 pub fn balance_decrease_allowed(
-    liquidation_threshold: WrappedU256,
+    liquidation_threshold: u128,
     decimals: u8,
     controller: AccountId,
     asset: AccountId,
@@ -205,7 +205,7 @@ pub fn balance_decrease_allowed(
         return true
     }
 
-    if liquidation_threshold == WrappedU256::from(0) {
+    if liquidation_threshold == 0 {
         return true
     }
 
@@ -289,7 +289,7 @@ fn calculate_user_account_data(
         let (compounded_liquidity_balance, borrow_balance_stored, _) =
             PoolRef::get_account_snapshot(asset, user);
 
-        if liquidation_threshold != WrappedU256::from(0) && compounded_liquidity_balance > 0 {
+        if liquidation_threshold != 0 && compounded_liquidity_balance > 0 {
             let liquidity_balance_eth = U256::from(unit_price)
                 .mul(U256::from(compounded_liquidity_balance))
                 .div(U256::from(token_unit));

@@ -109,7 +109,7 @@ pub trait Pool: PSP22 + PSP22Metadata {
 
     /// Set Liquidation Threshold
     #[ink(message)]
-    fn set_liquidation_threshold(&mut self, new_liquidation_threshold: WrappedU256) -> Result<()>;
+    fn set_liquidation_threshold(&mut self, new_liquidation_threshold: u128) -> Result<()>;
 
     /// The sender adds to reserves.
     #[ink(message)]
@@ -178,7 +178,7 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn reserve_factor_mantissa(&self) -> WrappedU256;
     #[ink(message)]
-    fn liquidation_threshold(&self) -> WrappedU256;
+    fn liquidation_threshold(&self) -> u128;
     #[ink(message)]
     fn delegate_allowance(&self, owner: AccountId, delegatee: AccountId) -> Balance;
 }

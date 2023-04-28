@@ -32,7 +32,6 @@ pub mod contract {
             String,
         },
     };
-    use primitive_types::U256;
 
     #[ink(storage)]
     #[derive(Default, Storage)]
@@ -356,7 +355,7 @@ pub mod contract {
             self.pool.manager = manager;
             self.pool.rate_model = rate_model;
             self.pool.initial_exchange_rate_mantissa = initial_exchange_rate_mantissa;
-            self.pool.liquidation_threshold = WrappedU256::from(U256::from(liquidation_threshold));
+            self.pool.liquidation_threshold = liquidation_threshold;
             self.pool.accrual_block_timestamp = Self::env().block_timestamp();
             self.metadata.name = Some(name);
             self.metadata.symbol = Some(symbol);
@@ -433,10 +432,7 @@ pub mod contract {
                 WrappedU256::from(U256::from(0))
             );
             assert_eq!(contract.total_borrows(), 0);
-            assert_eq!(
-                contract.liquidation_threshold(),
-                WrappedU256::from(U256::from(liquidation_threshold))
-            );
+            assert_eq!(contract.liquidation_threshold(), liquidation_threshold);
         }
 
         #[ink::test]
@@ -680,12 +676,8 @@ pub mod contract {
             );
 
             liquidation_threshold = 8000;
-            let _ = contract
-                .set_liquidation_threshold(WrappedU256::from(U256::from(liquidation_threshold)));
-            assert_eq!(
-                contract.liquidation_threshold(),
-                WrappedU256::from(U256::from(liquidation_threshold))
-            );
+            let _ = contract.set_liquidation_threshold(liquidation_threshold);
+            assert_eq!(contract.liquidation_threshold(), liquidation_threshold);
         }
     }
 }

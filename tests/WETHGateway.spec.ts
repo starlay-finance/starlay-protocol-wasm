@@ -9,6 +9,7 @@ import {
 } from '../scripts/helper/deploy_helper'
 import { hexToUtf8 } from '../scripts/helper/utils'
 import { preparePoolsWithPreparedTokens } from './testContractHelper'
+import { shouldNotRevert } from './testHelpers'
 
 describe('WETHGateway spec', () => {
   const rateModelArg = new BN(100).mul(ONE_ETHER)
@@ -107,9 +108,12 @@ describe('WETHGateway spec', () => {
       data: { free: beforeUserBalance },
     } = await api.query.system.account(users[0].address)
 
-    await wethGateway.withSigner(users[0]).tx.depositEth(pool.address, {
-      value: ONE_ETHER,
-    })
+    await shouldNotRevert(wethGateway.withSigner(users[0]), 'depositEth', [
+      pool.address,
+      {
+        value: ONE_ETHER,
+      },
+    ])
 
     const {
       data: { free: afterUserBalance },
@@ -140,21 +144,27 @@ describe('WETHGateway spec', () => {
     const { pool } = pools.weth
 
     const depositAmount = ONE_ETHER
-    await wethGateway.withSigner(users[0]).tx.depositEth(pool.address, {
-      value: depositAmount,
-    })
+    await shouldNotRevert(wethGateway.withSigner(users[0]), 'depositEth', [
+      pool.address,
+      {
+        value: depositAmount,
+      },
+    ])
 
     const withdrawAmount = ONE_ETHER.div(new BN(5))
-    await pool
-      .withSigner(users[0])
-      .tx.approve(wethGateway.address, withdrawAmount)
+    await shouldNotRevert(pool.withSigner(users[0]), 'approve', [
+      wethGateway.address,
+      withdrawAmount,
+    ])
 
     const {
       data: { free: beforeUserBalance },
     } = await api.query.system.account(users[0].address)
-    await wethGateway
-      .withSigner(users[0])
-      .tx.withdrawEth(pool.address, withdrawAmount)
+    await shouldNotRevert(wethGateway.withSigner(users[0]), 'withdrawEth', [
+      pool.address,
+      withdrawAmount,
+    ])
+
     expect(
       (await weth.query.balanceOf(pool.address)).value.ok.toString(),
     ).toEqual(depositAmount.sub(withdrawAmount).toString())
@@ -175,23 +185,31 @@ describe('WETHGateway spec', () => {
       const { pool } = pools.weth
 
       const depositAmount = ONE_ETHER.mul(new BN(2))
-      await wethGateway.withSigner(users[0]).tx.depositEth(pool.address, {
-        value: depositAmount,
-      })
-      await wethGateway.withSigner(users[1]).tx.depositEth(pool.address, {
-        value: depositAmount,
-      })
+      await shouldNotRevert(wethGateway.withSigner(users[0]), 'depositEth', [
+        pool.address,
+        {
+          value: depositAmount,
+        },
+      ])
+      await shouldNotRevert(wethGateway.withSigner(users[1]), 'depositEth', [
+        pool.address,
+        {
+          value: depositAmount,
+        },
+      ])
 
       const borrowAmount = ONE_ETHER.div(new BN(5))
-      await pool
-        .withSigner(users[0])
-        .tx.approveDelegate(wethGateway.address, borrowAmount)
+      await shouldNotRevert(pool.withSigner(users[0]), 'approveDelegate', [
+        wethGateway.address,
+        borrowAmount,
+      ])
       const {
         data: { free: beforeUserBalance },
       } = await api.query.system.account(users[0].address)
-      await wethGateway
-        .withSigner(users[0])
-        .tx.borrowEth(pool.address, borrowAmount)
+      await shouldNotRevert(wethGateway.withSigner(users[0]), 'borrowEth', [
+        pool.address,
+        borrowAmount,
+      ])
       const {
         data: { free: afterUserBalance },
       } = await api.query.system.account(users[0].address)
@@ -215,12 +233,18 @@ describe('WETHGateway spec', () => {
       const { pool } = pools.weth
 
       const depositAmount = ONE_ETHER.mul(new BN(2))
-      await wethGateway.withSigner(users[0]).tx.depositEth(pool.address, {
-        value: depositAmount,
-      })
-      await wethGateway.withSigner(users[1]).tx.depositEth(pool.address, {
-        value: depositAmount,
-      })
+      await shouldNotRevert(wethGateway.withSigner(users[0]), 'depositEth', [
+        pool.address,
+        {
+          value: depositAmount,
+        },
+      ])
+      await shouldNotRevert(wethGateway.withSigner(users[1]), 'depositEth', [
+        pool.address,
+        {
+          value: depositAmount,
+        },
+      ])
 
       const borrowAmount = ONE_ETHER.div(new BN(5))
       const result = await wethGateway
@@ -238,20 +262,28 @@ describe('WETHGateway spec', () => {
     const { pool } = pools.weth
 
     const depositAmount = ONE_ETHER.mul(new BN(2))
-    await wethGateway.withSigner(users[0]).tx.depositEth(pool.address, {
-      value: depositAmount,
-    })
-    await wethGateway.withSigner(users[1]).tx.depositEth(pool.address, {
-      value: depositAmount,
-    })
+    await shouldNotRevert(wethGateway.withSigner(users[0]), 'depositEth', [
+      pool.address,
+      {
+        value: depositAmount,
+      },
+    ])
+    await shouldNotRevert(wethGateway.withSigner(users[1]), 'depositEth', [
+      pool.address,
+      {
+        value: depositAmount,
+      },
+    ])
 
     const borrowAmount = ONE_ETHER.div(new BN(2))
-    await pool
-      .withSigner(users[0])
-      .tx.approveDelegate(wethGateway.address, borrowAmount)
-    await wethGateway
-      .withSigner(users[0])
-      .tx.borrowEth(pool.address, borrowAmount)
+    await shouldNotRevert(pool.withSigner(users[0]), 'approveDelegate', [
+      wethGateway.address,
+      borrowAmount,
+    ])
+    await shouldNotRevert(wethGateway.withSigner(users[0]), 'borrowEth', [
+      pool.address,
+      borrowAmount,
+    ])
 
     expect(
       (
@@ -260,15 +292,20 @@ describe('WETHGateway spec', () => {
     ).toEqual(borrowAmount.toString())
 
     const repayAmount = ONE_ETHER.div(new BN(5))
-    await weth.withSigner(users[0]).tx.approve(wethGateway.address, repayAmount)
+    await shouldNotRevert(weth.withSigner(users[0]), 'approve', [
+      wethGateway.address,
+      repayAmount,
+    ])
     const {
       data: { free: beforeUserBalance },
     } = await api.query.system.account(users[0].address)
-    await wethGateway
-      .withSigner(users[0])
-      .tx.repayEth(pool.address, repayAmount, {
+    await shouldNotRevert(wethGateway.withSigner(users[0]), 'repayEth', [
+      pool.address,
+      repayAmount,
+      {
         value: repayAmount,
-      })
+      },
+    ])
     const {
       data: { free: afterUserBalance },
     } = await api.query.system.account(users[0].address)

@@ -81,7 +81,7 @@ pub struct Data {
     pub borrow_index: WrappedU256,
     pub initial_exchange_rate_mantissa: WrappedU256,
     pub reserve_factor_mantissa: WrappedU256,
-    pub liquidation_threshold: WrappedU256,
+    pub liquidation_threshold: u128,
     pub delegate_allowance: Mapping<(AccountId, AccountId), Balance, AllowancesKey>,
 }
 
@@ -106,7 +106,7 @@ impl Default for Data {
             borrow_index: exp_scale().into(),
             initial_exchange_rate_mantissa: WrappedU256::from(U256::zero()),
             reserve_factor_mantissa: WrappedU256::from(U256::zero()),
-            liquidation_threshold: WrappedU256::from(U256::zero()),
+            liquidation_threshold: 0,
         }
     }
 }
@@ -161,7 +161,7 @@ pub trait Internal {
     fn _add_reserves(&mut self, amount: Balance) -> Result<()>;
     fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()>;
     fn _sweep_token(&mut self, asset: AccountId) -> Result<()>;
-    fn _set_liquidation_threshold(&mut self, new_liquidation_threshold: WrappedU256) -> Result<()>;
+    fn _set_liquidation_threshold(&mut self, new_liquidation_threshold: u128) -> Result<()>;
     fn _approve_delegate(
         &mut self,
         owner: AccountId,
@@ -212,7 +212,7 @@ pub trait Internal {
     fn _exchange_rate_stored(&self) -> U256;
     fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput>;
     fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool);
-    fn _liquidation_threshold(&self) -> WrappedU256;
+    fn _liquidation_threshold(&self) -> u128;
     fn _delegate_allowance(&self, owner: &AccountId, delegatee: &AccountId) -> Balance;
     // event emission
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
@@ -429,10 +429,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._sweep_token(asset)
     }
 
-    default fn set_liquidation_threshold(
-        &mut self,
-        new_liquidation_threshold: WrappedU256,
-    ) -> Result<()> {
+    default fn set_liquidation_threshold(&mut self, new_liquidation_threshold: u128) -> Result<()> {
         self._set_liquidation_threshold(new_liquidation_threshold)
     }
 
@@ -545,7 +542,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._reserve_factor_mantissa()
     }
 
-    default fn liquidation_threshold(&self) -> WrappedU256 {
+    default fn liquidation_threshold(&self) -> u128 {
         self._liquidation_threshold()
     }
 
@@ -1109,7 +1106,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn _set_liquidation_threshold(
         &mut self,
-        new_liquidation_threshold: WrappedU256,
+        new_liquidation_threshold: u128,
     ) -> Result<()> {
         self.data::<Data>().liquidation_threshold = new_liquidation_threshold;
         Ok(())
@@ -1316,7 +1313,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         )
     }
 
-    default fn _liquidation_threshold(&self) -> WrappedU256 {
+    default fn _liquidation_threshold(&self) -> u128 {
         self.data::<Data>().liquidation_threshold
     }
 
