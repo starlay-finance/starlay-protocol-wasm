@@ -2,17 +2,14 @@ use super::super::exp_no_err::{
     exp_scale,
     Exp,
 };
-pub use crate::traits::{
-    pool::*,
-    price_oracle::PriceOracleRef,
-};
+pub use crate::traits::pool::*;
 use crate::{
     impls::wad_ray_math::{
         exp_ray_ratio,
         Ray,
     },
     traits::{
-        controller::ControllerRef,
+        controller::AccountData,
         math::{
             PercentMath,
             WadRayMath,
@@ -31,7 +28,6 @@ use openbrush::traits::{
     AccountId,
     Balance,
     Timestamp,
-    ZERO_ADDRESS,
 };
 use primitive_types::U256;
 
@@ -194,13 +190,11 @@ pub fn exchange_rate(
 pub fn balance_decrease_allowed(
     liquidation_threshold: u128,
     decimals: u8,
-    controller: AccountId,
-    asset: AccountId,
-    user: AccountId,
+    asset_price: Option<u128>,
+    account_assets: Vec<AccountId>,
+    account_data: AccountData,
     amount: Balance,
-    oracle: AccountId,
 ) -> bool {
-    let account_assets: Vec<AccountId> = ControllerRef::account_assets(&controller, user);
     if account_assets.is_empty() {
         return true
     }
@@ -209,14 +203,13 @@ pub fn balance_decrease_allowed(
         return true
     }
 
-    let (total_collateral_in_eth, total_debt_in_eth, _, avg_liquidation_threshold, _) =
-        calculate_user_account_data(user, controller, oracle);
+    let total_collateral_in_eth = account_data.total_collateral_in_eth;
+    let total_debt_in_eth = account_data.total_debt_in_eth;
+    let avg_liquidation_threshold = account_data.avg_liquidation_threshold;
 
     if total_debt_in_eth.is_zero() {
         return true
     }
-
-    let asset_price = PriceOracleRef::get_price(&oracle, asset);
 
     if let None | Some(0) = asset_price {
         return false
@@ -244,92 +237,6 @@ pub fn balance_decrease_allowed(
     );
 
     health_factor_after_decrease >= U256::from(HEALTH_FACTOR_LIQUIDATION_THRESHOLD)
-}
-
-fn calculate_user_account_data(
-    user: AccountId,
-    controller: AccountId,
-    oracle: AccountId,
-) -> (U256, U256, U256, U256, U256) {
-    let account_assets: Vec<AccountId> = ControllerRef::account_assets(&controller, user);
-    if account_assets.is_empty() {
-        return (
-            U256::from(0),
-            U256::from(0),
-            U256::from(0),
-            U256::from(0),
-            U256::MAX,
-        )
-    }
-    let mut account_assets_iter = account_assets.into_iter();
-
-    let markets: Vec<AccountId> = ControllerRef::markets(&controller);
-    let mut total_collateral_in_eth = U256::from(0);
-    let mut avg_ltv = U256::from(0);
-    let mut avg_liquidation_threshold = U256::from(0);
-    let mut total_debt_in_eth = U256::from(0);
-    for asset in markets.iter() {
-        let result = account_assets_iter.find(|&x| x == *asset);
-        if result.is_none() || result.unwrap() == ZERO_ADDRESS.into() {
-            continue
-        }
-
-        let collateral_factor_mantissa: Option<WrappedU256> =
-            ControllerRef::collateral_factor_mantissa(&controller, *asset);
-        if collateral_factor_mantissa.is_none() {
-            continue
-        }
-        let ltv = U256::from(collateral_factor_mantissa.unwrap());
-
-        let liquidation_threshold = PoolRef::liquidation_threshold(asset);
-        let decimals = PoolRef::token_decimals(asset);
-        let token_unit = 10_u128.pow(decimals.into());
-        let unit_price = PriceOracleRef::get_price(&oracle, *asset).unwrap();
-
-        let (compounded_liquidity_balance, borrow_balance_stored, _) =
-            PoolRef::get_account_snapshot(asset, user);
-
-        if liquidation_threshold != 0 && compounded_liquidity_balance > 0 {
-            let liquidity_balance_eth = U256::from(unit_price)
-                .mul(U256::from(compounded_liquidity_balance))
-                .div(U256::from(token_unit));
-            total_collateral_in_eth = total_collateral_in_eth.add(liquidity_balance_eth);
-            avg_ltv = avg_ltv.add(liquidity_balance_eth.mul(U256::from(ltv)));
-            avg_liquidation_threshold = avg_liquidation_threshold
-                .add(liquidity_balance_eth.mul(U256::from(liquidation_threshold)));
-        }
-
-        if borrow_balance_stored != 0 {
-            let compounded_borrow_balance = PoolRef::principal_balance_of(asset, user);
-            total_debt_in_eth =
-                total_debt_in_eth.add(unit_price.mul(compounded_borrow_balance).div(token_unit));
-        }
-    }
-
-    avg_ltv = if total_collateral_in_eth.is_zero() {
-        U256::from(0)
-    } else {
-        avg_ltv.div(total_collateral_in_eth)
-    };
-
-    avg_liquidation_threshold = if total_collateral_in_eth.is_zero() {
-        U256::from(0)
-    } else {
-        avg_liquidation_threshold.div(total_collateral_in_eth)
-    };
-
-    let health_factor = calculate_health_factor_from_balances(
-        total_collateral_in_eth,
-        total_debt_in_eth,
-        avg_liquidation_threshold,
-    );
-    (
-        total_collateral_in_eth,
-        total_debt_in_eth,
-        avg_ltv,
-        avg_liquidation_threshold,
-        health_factor,
-    )
 }
 
 pub fn calculate_health_factor_from_balances(

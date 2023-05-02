@@ -281,6 +281,10 @@ pub trait Controller {
     #[ink(message)]
     fn account_assets(&self, account: AccountId) -> Vec<AccountId>;
 
+    /// Returns User account data
+    #[ink(message)]
+    fn calculate_user_account_data(&self, account: AccountId) -> AccountData;
+
     /// Determine the current account liquidity with respect to collateral requirements
     #[ink(message)]
     fn get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)>;
@@ -312,6 +316,16 @@ pub struct PoolAttributes {
 pub struct PoolAttributesForSeizeCalculation {
     pub underlying: AccountId,
     pub decimals: u8,
+}
+
+#[derive(Clone, Decode, Encode)]
+#[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+pub struct AccountData {
+    pub total_collateral_in_eth: U256,
+    pub total_debt_in_eth: U256,
+    pub avg_ltv: U256,
+    pub avg_liquidation_threshold: U256,
+    pub health_factor: U256,
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]

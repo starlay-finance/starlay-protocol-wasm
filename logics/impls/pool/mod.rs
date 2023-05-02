@@ -10,6 +10,7 @@ use super::{
 };
 use crate::traits::{
     controller,
+    price_oracle::PriceOracleRef,
     types::WrappedU256,
 };
 pub use crate::traits::{
@@ -686,14 +687,20 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(redeemer);
         let contract_addr = Self::env().account_id();
+        let controller = self.controller();
+        let asset_price =
+            PriceOracleRef::get_price(&ControllerRef::oracle(&controller), contract_addr);
+        let account_assets: Vec<AccountId> = ControllerRef::account_assets(&controller, redeemer);
+        let account_data: controller::AccountData =
+            ControllerRef::calculate_user_account_data(&controller, redeemer);
+
         if !balance_decrease_allowed(
             self._liquidation_threshold(),
             PSP22Metadata::token_decimals(self),
-            self._controller(),
-            contract_addr,
-            redeemer,
-            account_borrow_balance,
-            ControllerRef::oracle(&self._controller()),
+            asset_price,
+            account_assets,
+            account_data,
+            redeem_amount,
         ) {
             return Err(Error::RedeemTransferOutNotPossible)
         }
