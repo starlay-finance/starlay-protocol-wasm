@@ -4,7 +4,13 @@ use crate::{
         exp_scale,
         Exp,
     },
-    traits::types::WrappedU256,
+    traits::{
+        math::{
+            PercentMath,
+            WadRayMath,
+        },
+        types::WrappedU256,
+    },
 };
 use core::ops::{
     Add,
@@ -17,6 +23,8 @@ use openbrush::traits::{
     Balance,
 };
 use primitive_types::U256;
+
+pub const HEALTH_FACTOR_LIQUIDATION_THRESHOLD: u128 = 10_u128.pow(18);
 
 pub struct LiquidateCalculateSeizeTokensInput {
     pub price_borrowed_mantissa: U256,
@@ -162,6 +170,20 @@ pub fn get_hypothetical_account_liquidity_per_asset(
         flatten_collateral,
         flatten_borrow_plus_effect,
     )
+}
+
+pub fn calculate_health_factor_from_balances(
+    total_collateral_in_eth: U256,
+    total_debt_in_eth: U256,
+    liquidation_threshold: U256,
+) -> U256 {
+    if total_debt_in_eth.is_zero() {
+        return U256::MAX
+    }
+
+    total_collateral_in_eth
+        .percent_mul(liquidation_threshold)
+        .wad_div(total_debt_in_eth)
 }
 
 #[cfg(test)]

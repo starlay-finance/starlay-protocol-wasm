@@ -8,14 +8,7 @@ use crate::{
         exp_ray_ratio,
         Ray,
     },
-    traits::{
-        controller::AccountData,
-        math::{
-            PercentMath,
-            WadRayMath,
-        },
-        types::WrappedU256,
-    },
+    traits::types::WrappedU256,
 };
 use core::ops::{
     Add,
@@ -23,9 +16,7 @@ use core::ops::{
     Mul,
     Sub,
 };
-use ink::prelude::vec::Vec;
 use openbrush::traits::{
-    AccountId,
     Balance,
     Timestamp,
 };
@@ -61,8 +52,6 @@ pub struct CalculateInterestOutput {
     pub total_reserves: Balance,
     pub interest_accumulated: Balance,
 }
-
-pub const HEALTH_FACTOR_LIQUIDATION_THRESHOLD: u128 = 10_u128.pow(18);
 
 pub fn scaled_amount_of(amount: Balance, idx: Exp) -> Balance {
     let divided = Ray {
@@ -185,72 +174,6 @@ pub fn exchange_rate(
     U256::from(cash_plus_borrows_minus_reserves)
         .mul(exp_scale())
         .div(U256::from(total_supply))
-}
-
-pub fn balance_decrease_allowed(
-    liquidation_threshold: u128,
-    decimals: u8,
-    asset_price: Option<u128>,
-    account_assets: Vec<AccountId>,
-    account_data: AccountData,
-    amount: Balance,
-) -> bool {
-    if account_assets.is_empty() {
-        return true
-    }
-
-    if liquidation_threshold == 0 {
-        return true
-    }
-
-    let total_collateral_in_eth = account_data.total_collateral_in_eth;
-    let total_debt_in_eth = account_data.total_debt_in_eth;
-    let avg_liquidation_threshold = account_data.avg_liquidation_threshold;
-
-    if total_debt_in_eth.is_zero() {
-        return true
-    }
-
-    if let None | Some(0) = asset_price {
-        return false
-    }
-
-    let amount_to_decrease_in_eth = U256::from(asset_price.unwrap())
-        .mul(U256::from(amount))
-        .div(U256::from(10).pow(U256::from(decimals)));
-
-    let collateral_balance_after_decrease = total_collateral_in_eth.sub(amount_to_decrease_in_eth);
-
-    if collateral_balance_after_decrease.is_zero() {
-        return false
-    }
-
-    let liquidation_threshold_after_decrease = total_collateral_in_eth
-        .mul(avg_liquidation_threshold)
-        .sub(amount_to_decrease_in_eth.mul(U256::from(liquidation_threshold)))
-        .div(collateral_balance_after_decrease);
-
-    let health_factor_after_decrease = calculate_health_factor_from_balances(
-        collateral_balance_after_decrease,
-        total_debt_in_eth,
-        liquidation_threshold_after_decrease,
-    );
-
-    health_factor_after_decrease >= U256::from(HEALTH_FACTOR_LIQUIDATION_THRESHOLD)
-}
-
-pub fn calculate_health_factor_from_balances(
-    total_collateral_in_eth: U256,
-    total_debt_in_eth: U256,
-    liquidation_threshold: U256,
-) -> U256 {
-    if total_debt_in_eth.is_zero() {
-        return U256::MAX
-    }
-
-    total_collateral_in_eth
-        .percent_mul(liquidation_threshold)
-        .wad_div(total_debt_in_eth)
 }
 
 #[cfg(test)]

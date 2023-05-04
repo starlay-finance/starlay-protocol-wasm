@@ -285,6 +285,13 @@ pub trait Controller {
     #[ink(message)]
     fn calculate_user_account_data(&self, account: AccountId) -> AccountData;
 
+    #[ink(message)]
+    fn balance_decrease_allowed(
+        &self,
+        pool_attributes: PoolAttributesForWithdrawValidation,
+        account: AccountId,
+        amount: Balance,
+    ) -> bool;
     /// Determine the current account liquidity with respect to collateral requirements
     #[ink(message)]
     fn get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)>;
@@ -316,6 +323,14 @@ pub struct PoolAttributes {
 pub struct PoolAttributesForSeizeCalculation {
     pub underlying: AccountId,
     pub decimals: u8,
+}
+
+#[derive(Clone, Decode, Encode)]
+#[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+pub struct PoolAttributesForWithdrawValidation {
+    pub underlying: AccountId,
+    pub decimals: u8,
+    pub liquidation_threshold: u128,
 }
 
 #[derive(Clone, Decode, Encode)]

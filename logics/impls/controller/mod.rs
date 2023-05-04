@@ -3,12 +3,9 @@ pub use crate::traits::{
     controller::*,
     pool::PoolRef,
 };
-use crate::{
-    impls::pool::utils::calculate_health_factor_from_balances,
-    traits::{
-        price_oracle::PriceOracleRef,
-        types::WrappedU256,
-    },
+use crate::traits::{
+    price_oracle::PriceOracleRef,
+    types::WrappedU256,
 };
 use core::ops::{
     Add,
@@ -18,6 +15,7 @@ use core::ops::{
 };
 use ink::prelude::vec::Vec;
 use openbrush::{
+    contracts::psp22::extensions::metadata::PSP22MetadataRef,
     storage::Mapping,
     traits::{
         AccountId,
@@ -31,12 +29,14 @@ use primitive_types::U256;
 
 mod utils;
 use self::utils::{
+    calculate_health_factor_from_balances,
     collateral_factor_max_mantissa,
     get_hypothetical_account_liquidity,
     liquidate_calculate_seize_tokens,
     GetHypotheticalAccountLiquidityInput,
     HypotheticalAccountLiquidityCalculationParam,
     LiquidateCalculateSeizeTokensInput,
+    HEALTH_FACTOR_LIQUIDATION_THRESHOLD,
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
@@ -84,6 +84,16 @@ impl Default for PoolAttributes {
             account_borrow_balance: Default::default(),
             exchange_rate: Default::default(),
             total_borrows: Default::default(),
+        }
+    }
+}
+
+impl Default for PoolAttributesForWithdrawValidation {
+    fn default() -> Self {
+        PoolAttributesForWithdrawValidation {
+            underlying: ZERO_ADDRESS.into(),
+            decimals: Default::default(),
+            liquidation_threshold: Default::default(),
         }
     }
 }
@@ -247,6 +257,12 @@ pub trait Internal {
         caller_pool: Option<(AccountId, PoolAttributes)>,
     ) -> Result<(U256, U256)>;
     fn _calculate_user_account_data(&self, account: AccountId) -> AccountData;
+    fn _balance_decrease_allowed(
+        &self,
+        pool_attributes: PoolAttributesForWithdrawValidation,
+        account: AccountId,
+        amount: Balance,
+    ) -> bool;
 
     // event emission
     fn _emit_market_listed_event(&self, pool: AccountId);
@@ -604,6 +620,15 @@ impl<T: Storage<Data>> Controller for T {
 
     default fn calculate_user_account_data(&self, account: AccountId) -> AccountData {
         self._calculate_user_account_data(account)
+    }
+
+    default fn balance_decrease_allowed(
+        &self,
+        pool_attributes: PoolAttributesForWithdrawValidation,
+        account: AccountId,
+        amount: Balance,
+    ) -> bool {
+        self._balance_decrease_allowed(pool_attributes, account, amount)
     }
 }
 
@@ -1204,9 +1229,9 @@ impl<T: Storage<Data>> Internal for T {
             let ltv = U256::from(collateral_factor_mantissa.unwrap());
 
             let liquidation_threshold = PoolRef::liquidation_threshold(asset);
-            let decimals = PoolRef::token_decimals(asset);
+            let decimals = PSP22MetadataRef::token_decimals(&PoolRef::underlying(asset));
             let token_unit = 10_u128.pow(decimals.into());
-            let unit_price = PriceOracleRef::get_price(&self._oracle(), *asset).unwrap();
+            let unit_price = PriceOracleRef::get_underlying_price(&self._oracle(), *asset).unwrap();
 
             let (compounded_liquidity_balance, borrow_balance_stored, _) =
                 PoolRef::get_account_snapshot(asset, account);
@@ -1252,6 +1277,63 @@ impl<T: Storage<Data>> Internal for T {
             avg_liquidation_threshold,
             health_factor,
         }
+    }
+
+    default fn _balance_decrease_allowed(
+        &self,
+        pool_attributes: PoolAttributesForWithdrawValidation,
+        account: AccountId,
+        amount: Balance,
+    ) -> bool {
+        let account_assets: Vec<AccountId> = self._account_assets(account, ZERO_ADDRESS.into());
+        if account_assets.is_empty() {
+            return true
+        }
+
+        let liquidation_threshold = pool_attributes.liquidation_threshold;
+        if liquidation_threshold == 0 {
+            return true
+        }
+
+        let account_data = self._calculate_user_account_data(account);
+
+        let total_collateral_in_eth = account_data.total_collateral_in_eth;
+        let total_debt_in_eth = account_data.total_debt_in_eth;
+        let avg_liquidation_threshold = account_data.avg_liquidation_threshold;
+
+        if total_debt_in_eth.is_zero() {
+            return true
+        }
+
+        let asset_price = PriceOracleRef::get_price(&self._oracle(), pool_attributes.underlying);
+        if let None | Some(0) = asset_price {
+            return false
+        }
+
+        let decimals = pool_attributes.decimals;
+        let amount_to_decrease_in_eth = U256::from(asset_price.unwrap())
+            .mul(U256::from(amount))
+            .div(U256::from(10).pow(U256::from(decimals)));
+
+        let collateral_balance_after_decrease =
+            total_collateral_in_eth.sub(amount_to_decrease_in_eth);
+
+        if collateral_balance_after_decrease.is_zero() {
+            return false
+        }
+
+        let liquidation_threshold_after_decrease = total_collateral_in_eth
+            .mul(avg_liquidation_threshold)
+            .sub(amount_to_decrease_in_eth.mul(U256::from(liquidation_threshold)))
+            .div(collateral_balance_after_decrease);
+
+        let health_factor_after_decrease = calculate_health_factor_from_balances(
+            collateral_balance_after_decrease,
+            total_debt_in_eth,
+            liquidation_threshold_after_decrease,
+        );
+
+        health_factor_after_decrease >= U256::from(HEALTH_FACTOR_LIQUIDATION_THRESHOLD)
     }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}

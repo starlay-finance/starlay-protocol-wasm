@@ -1595,7 +1595,7 @@ describe('Pool spec', () => {
 
     const deployerUsdcDeposited = 20_000
     const user0UsdcDeposited = 10_000
-    const UsdcMinted = deployerUsdcDeposited + user0UsdcDeposited
+    // const usdcMinted = deployerUsdcDeposited + user0UsdcDeposited
     it('preparations - deposit USDC', async () => {
       await shouldNotRevert(usdc.token, 'mint', [
         deployer.address,
@@ -1634,7 +1634,7 @@ describe('Pool spec', () => {
 
     const deployerUsdtDeposited = 20_000
     const user0UsdtDeposited = 20_000
-    const UsdtMinted = deployerUsdtDeposited + user0UsdtDeposited
+    // const usdtMinted = deployerUsdtDeposited + user0UsdtDeposited
     it('preparations - deposit USDT', async () => {
       await shouldNotRevert(usdt.token, 'mint', [
         deployer.address,

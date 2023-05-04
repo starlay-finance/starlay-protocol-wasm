@@ -2,6 +2,7 @@ use super::{
     controller::{
         PoolAttributes,
         PoolAttributesForSeizeCalculation,
+        PoolAttributesForWithdrawValidation,
     },
     exp_no_err::{
         exp_scale,
@@ -10,7 +11,6 @@ use super::{
 };
 use crate::traits::{
     controller,
-    price_oracle::PriceOracleRef,
     types::WrappedU256,
 };
 pub use crate::traits::{
@@ -54,7 +54,6 @@ use primitive_types::U256;
 
 pub mod utils;
 use self::utils::{
-    balance_decrease_allowed,
     calculate_interest,
     exchange_rate,
     from_scaled_amount,
@@ -107,7 +106,7 @@ impl Default for Data {
             borrow_index: exp_scale().into(),
             initial_exchange_rate_mantissa: WrappedU256::from(U256::zero()),
             reserve_factor_mantissa: WrappedU256::from(U256::zero()),
-            liquidation_threshold: 0,
+            liquidation_threshold: 10000,
         }
     }
 }
@@ -686,22 +685,19 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(redeemer);
-        let contract_addr = Self::env().account_id();
-        let controller = self.controller();
-        let asset_price =
-            PriceOracleRef::get_price(&ControllerRef::oracle(&controller), contract_addr);
-        let account_assets: Vec<AccountId> = ControllerRef::account_assets(&controller, redeemer);
-        let account_data: controller::AccountData =
-            ControllerRef::calculate_user_account_data(&controller, redeemer);
 
-        if !balance_decrease_allowed(
-            self._liquidation_threshold(),
-            PSP22Metadata::token_decimals(self),
-            asset_price,
-            account_assets,
-            account_data,
+        let pool_attributes = PoolAttributesForWithdrawValidation {
+            underlying: self._underlying(),
+            liquidation_threshold: self._liquidation_threshold(),
+            decimals: self.token_decimals(),
+        };
+        if ControllerRef::balance_decrease_allowed(
+            &self.controller(),
+            pool_attributes,
+            redeemer,
             redeem_amount,
-        ) {
+        ) == false
+        {
             return Err(Error::RedeemTransferOutNotPossible)
         }
 
@@ -713,6 +709,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             exchange_rate,
             total_borrows: self._total_borrows(),
         };
+        let contract_addr = Self::env().account_id();
         ControllerRef::redeem_allowed(
             &self._controller(),
             contract_addr,

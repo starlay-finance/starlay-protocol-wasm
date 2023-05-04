@@ -1,5 +1,6 @@
 import { ReturnNumber } from '@727-ventures/typechain-types'
 import { encodeAddress } from '@polkadot/keyring'
+import type { KeyringPair } from '@polkadot/keyring/types'
 import BN from 'bn.js'
 import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
@@ -8,7 +9,10 @@ import {
   deployPriceOracle,
 } from '../scripts/helper/deploy_helper'
 import { hexToUtf8 } from '../scripts/helper/utils'
+import Controller from '../types/contracts/controller'
+import PriceOracle from '../types/contracts/price_oracle'
 import {
+  Pools,
   TEST_METADATAS,
   preparePoolWithMockToken,
   preparePoolsWithPreparedTokens,
@@ -899,6 +903,32 @@ describe('Controller spec', () => {
           },
         )
       })
+    })
+  })
+
+  describe('.calculate_user_account_data', () => {
+    let controller: Controller
+    let pools: Pools
+    let deployer: KeyringPair
+    let users: KeyringPair[]
+    let priceOracle: PriceOracle
+
+    it('instantiate', async () => {
+      ;({ controller, deployer, pools, users, priceOracle } =
+        await setupWithPools())
+
+      const markets = (await controller.query.markets()).value.ok
+      expect(markets.length).toBe(3)
+      expect((await controller.query.oracle()).value.ok).toEqual(
+        priceOracle.address,
+      )
+      const closeFactorMantissa = (await controller.query.closeFactorMantissa())
+        .value.ok
+      expect(closeFactorMantissa.toNumber()).toEqual(0)
+      const liquidationIncentiveMantissa = (
+        await controller.query.liquidationIncentiveMantissa()
+      ).value.ok
+      expect(liquidationIncentiveMantissa.toNumber()).toEqual(0)
     })
   })
 })
