@@ -19,6 +19,7 @@ use openbrush::{
     storage::Mapping,
     traits::{
         AccountId,
+        AccountIdExt,
         Balance,
         Storage,
         String,
@@ -94,6 +95,9 @@ impl Default for PoolAttributesForWithdrawValidation {
             underlying: ZERO_ADDRESS.into(),
             decimals: Default::default(),
             liquidation_threshold: Default::default(),
+            account_balance: Default::default(),
+            account_borrow_balance: Default::default(),
+            exchange_rate: Default::default(),
         }
     }
 }
@@ -256,7 +260,11 @@ pub trait Internal {
         borrow_amount: Balance,
         caller_pool: Option<(AccountId, PoolAttributes)>,
     ) -> Result<(U256, U256)>;
-    fn _calculate_user_account_data(&self, account: AccountId) -> AccountData;
+    fn _calculate_user_account_data(
+        &self,
+        account: AccountId,
+        pool_attributes: Option<PoolAttributesForWithdrawValidation>,
+    ) -> AccountData;
     fn _balance_decrease_allowed(
         &self,
         pool_attributes: PoolAttributesForWithdrawValidation,
@@ -618,8 +626,12 @@ impl<T: Storage<Data>> Controller for T {
         self._get_hypothetical_account_liquidity(account, token, redeem_tokens, borrow_amount, None)
     }
 
-    default fn calculate_user_account_data(&self, account: AccountId) -> AccountData {
-        self._calculate_user_account_data(account)
+    default fn calculate_user_account_data(
+        &self,
+        account: AccountId,
+        pool_attributes: Option<PoolAttributesForWithdrawValidation>,
+    ) -> AccountData {
+        self._calculate_user_account_data(account, pool_attributes)
     }
 
     default fn balance_decrease_allowed(
@@ -1197,8 +1209,14 @@ impl<T: Storage<Data>> Internal for T {
         Ok(value)
     }
 
-    default fn _calculate_user_account_data(&self, account: AccountId) -> AccountData {
-        let account_assets: Vec<AccountId> = self._account_assets(account, ZERO_ADDRESS.into());
+    default fn _calculate_user_account_data(
+        &self,
+        account: AccountId,
+        pool_attributes: Option<PoolAttributesForWithdrawValidation>,
+    ) -> AccountData {
+        let caller = Self::env().caller();
+        let account_assets: Vec<AccountId> = self._account_assets(account, caller);
+        let mut checked_markets: Vec<AccountId> = Default::default();
         if account_assets.is_empty() {
             return AccountData {
                 total_collateral_in_eth: U256::from(0),
@@ -1206,6 +1224,7 @@ impl<T: Storage<Data>> Internal for T {
                 avg_ltv: U256::from(0),
                 avg_liquidation_threshold: U256::from(0),
                 health_factor: U256::MAX,
+                checked_markets,
             }
         }
         let mut account_assets_iter = account_assets.into_iter();
@@ -1215,8 +1234,12 @@ impl<T: Storage<Data>> Internal for T {
         let mut avg_ltv = U256::from(0);
         let mut avg_liquidation_threshold = U256::from(0);
         let mut total_debt_in_eth = U256::from(0);
+
+        // let _pool_attributes_is_none = pool_attributes.is_none();
+        // let _pool_attributes = pool_attributes.unwrap_or(Default::default());
         for asset in markets.iter() {
             let result = account_assets_iter.find(|&x| x == *asset);
+            checked_markets.push(result.unwrap());
             if result.is_none() || result.unwrap() == ZERO_ADDRESS.into() {
                 continue
             }
@@ -1233,8 +1256,19 @@ impl<T: Storage<Data>> Internal for T {
             let token_unit = 10_u128.pow(decimals.into());
             let unit_price = PriceOracleRef::get_underlying_price(&self._oracle(), *asset).unwrap();
 
+            // if *asset == caller && _pool_attributes.underlying.is_zero() {
+            //     continue
+            // }
+            // let compounded_liquidity_balance: Balance;
+            // let borrow_balance_stored: Balance;
+
+            // if *asset == caller {
+            //     compounded_liquidity_balance = _pool_attributes.account_balance;
+            //     borrow_balance_stored = _pool_attributes.account_borrow_balance;
+            // } else {
             let (compounded_liquidity_balance, borrow_balance_stored, _) =
                 PoolRef::get_account_snapshot(asset, account);
+            // }
 
             if liquidation_threshold != 0 && compounded_liquidity_balance > 0 {
                 let liquidity_balance_eth = U256::from(unit_price)
@@ -1276,6 +1310,7 @@ impl<T: Storage<Data>> Internal for T {
             avg_ltv,
             avg_liquidation_threshold,
             health_factor,
+            checked_markets,
         }
     }
 
@@ -1285,7 +1320,7 @@ impl<T: Storage<Data>> Internal for T {
         account: AccountId,
         amount: Balance,
     ) -> bool {
-        let account_assets: Vec<AccountId> = self._account_assets(account, ZERO_ADDRESS.into());
+        let account_assets: Vec<AccountId> = self._account_assets(account, Self::env().caller());
         if account_assets.is_empty() {
             return true
         }
@@ -1295,7 +1330,8 @@ impl<T: Storage<Data>> Internal for T {
             return true
         }
 
-        let account_data = self._calculate_user_account_data(account);
+        let account_data =
+            self._calculate_user_account_data(account, Some(pool_attributes.clone()));
 
         let total_collateral_in_eth = account_data.total_collateral_in_eth;
         let total_debt_in_eth = account_data.total_debt_in_eth;

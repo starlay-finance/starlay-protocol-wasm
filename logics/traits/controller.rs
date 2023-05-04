@@ -283,7 +283,11 @@ pub trait Controller {
 
     /// Returns User account data
     #[ink(message)]
-    fn calculate_user_account_data(&self, account: AccountId) -> AccountData;
+    fn calculate_user_account_data(
+        &self,
+        account: AccountId,
+        pool_attributes: Option<PoolAttributesForWithdrawValidation>,
+    ) -> AccountData;
 
     #[ink(message)]
     fn balance_decrease_allowed(
@@ -331,6 +335,9 @@ pub struct PoolAttributesForWithdrawValidation {
     pub underlying: AccountId,
     pub decimals: u8,
     pub liquidation_threshold: u128,
+    pub account_balance: Balance,
+    pub account_borrow_balance: Balance,
+    pub exchange_rate: U256,
 }
 
 #[derive(Clone, Decode, Encode)]
@@ -341,6 +348,7 @@ pub struct AccountData {
     pub avg_ltv: U256,
     pub avg_liquidation_threshold: U256,
     pub health_factor: U256,
+    pub checked_markets: Vec<AccountId>,
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]

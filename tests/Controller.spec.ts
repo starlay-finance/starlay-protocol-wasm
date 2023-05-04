@@ -916,6 +916,7 @@ describe('Controller spec', () => {
     it('instantiate', async () => {
       ;({ controller, deployer, pools, users, priceOracle } =
         await setupWithPools())
+      const { dai, usdt, usdc } = pools
 
       const markets = (await controller.query.markets()).value.ok
       expect(markets.length).toBe(3)
@@ -929,6 +930,111 @@ describe('Controller spec', () => {
         await controller.query.liquidationIncentiveMantissa()
       ).value.ok
       expect(liquidationIncentiveMantissa.toNumber()).toEqual(0)
+
+      await shouldNotRevert(dai.pool, 'setLiquidationThreshold', [8500])
+      await shouldNotRevert(usdt.pool, 'setLiquidationThreshold', [9000])
+      await shouldNotRevert(usdc.pool, 'setLiquidationThreshold', [8000])
+
+      expect(
+        (await dai.pool.query.liquidationThreshold()).value.ok.toNumber(),
+      ).toEqual(8500)
+      expect(
+        (await usdt.pool.query.liquidationThreshold()).value.ok.toNumber(),
+      ).toEqual(9000)
+      expect(
+        (await usdc.pool.query.liquidationThreshold()).value.ok.toNumber(),
+      ).toEqual(8000)
+    })
+
+    it('preparation', async () => {
+      const { dai, usdc, usdt } = pools
+
+      const daiDeposited = 20_000
+      await shouldNotRevert(dai.token, 'mint', [deployer.address, daiDeposited])
+      await shouldNotRevert(dai.token, 'approve', [
+        dai.pool.address,
+        daiDeposited,
+      ])
+      await shouldNotRevert(dai.pool, 'mint', [daiDeposited])
+
+      expect(
+        (await dai.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(daiDeposited)
+
+      const usdcDeposited = 30_000
+      await shouldNotRevert(usdc.token, 'mint', [
+        deployer.address,
+        usdcDeposited,
+      ])
+      await shouldNotRevert(usdc.token, 'approve', [
+        usdc.pool.address,
+        usdcDeposited,
+      ])
+      await shouldNotRevert(usdc.pool, 'mint', [usdcDeposited])
+
+      expect(
+        (await usdc.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(usdcDeposited)
+
+      const usdtDeposited = 50_000
+      await shouldNotRevert(usdt.token, 'mint', [
+        users[0].address,
+        usdtDeposited,
+      ])
+      await shouldNotRevert(usdt.token.withSigner(users[0]), 'approve', [
+        usdt.pool.address,
+        usdtDeposited,
+      ])
+      await shouldNotRevert(usdt.pool.withSigner(users[0]), 'mint', [
+        usdtDeposited,
+      ])
+
+      expect(
+        (await usdt.pool.query.balanceOf(users[0].address)).value.ok.toNumber(),
+      ).toEqual(usdtDeposited)
+
+      const borrowAmount = 20_000
+      await shouldNotRevert(usdt.pool, 'borrow', [borrowAmount])
+
+      expect(
+        (
+          await usdt.pool.query.borrowBalanceStored(deployer.address)
+        ).value.ok.toNumber(),
+      ).toEqual(borrowAmount)
+    })
+
+    it('check account data', async () => {
+      const accountData = (
+        await controller.query.calculateUserAccountData(users[0].address, null)
+      ).value.ok
+
+      console.log(
+        'Account Asset for deployer',
+        (await controller.query.accountAssets(deployer.address)).value.ok,
+      )
+
+      console.log(
+        'Assets',
+        [pools.dai, pools.usdc, pools.usdt].map((sym) => sym.pool.address),
+      )
+      // console.log(
+      //   'avgLiquidationThreshold',
+      //   accountData.avgLiquidationThreshold,
+      // )
+
+      // console.log(
+      //   'totalCollateralInEth',
+      //   accountData.totalCollateralInEth.toString(),
+      // )
+      // console.log('totalDebtInEth', accountData.totalDebtInEth)
+      // console.log('avgLtv', accountData.avgLtv)
+      // console.log('healghFactor', accountData.healthFactor)
+      console.log('checkedMarkets', accountData.checkedMarkets)
+
+      expect(
+        (await controller.query.accountAssets(users[0].address)).value.ok
+          .length,
+      ).toEqual(1)
     })
   })
 })
