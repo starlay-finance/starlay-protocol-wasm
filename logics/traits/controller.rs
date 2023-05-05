@@ -348,7 +348,6 @@ pub struct AccountData {
     pub avg_ltv: U256,
     pub avg_liquidation_threshold: U256,
     pub health_factor: U256,
-    pub result: Vec<AccountId>,
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]

@@ -1005,7 +1005,7 @@ describe('Controller spec', () => {
 
     it('check account data', async () => {
       const accountData = (
-        await controller.query.calculateUserAccountData(users[0].address, null)
+        await controller.query.calculateUserAccountData(deployer.address, null)
       ).value.ok
 
       expect((await controller.query.markets()).value.ok).toEqual(
