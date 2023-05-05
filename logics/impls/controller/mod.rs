@@ -19,7 +19,6 @@ use openbrush::{
     storage::Mapping,
     traits::{
         AccountId,
-        AccountIdExt,
         Balance,
         Storage,
         String,
@@ -1216,7 +1215,6 @@ impl<T: Storage<Data>> Internal for T {
     ) -> AccountData {
         let caller = Self::env().caller();
         let account_assets: Vec<AccountId> = self._account_assets(account, caller);
-        let mut checked_markets: Vec<AccountId> = Default::default();
         if account_assets.is_empty() {
             return AccountData {
                 total_collateral_in_eth: U256::from(0),
@@ -1224,23 +1222,25 @@ impl<T: Storage<Data>> Internal for T {
                 avg_ltv: U256::from(0),
                 avg_liquidation_threshold: U256::from(0),
                 health_factor: U256::MAX,
-                checked_markets,
+                result: Default::default(),
             }
         }
+
+        let mut result = account_assets.clone();
         let mut account_assets_iter = account_assets.into_iter();
 
-        let markets: Vec<AccountId> = self.markets();
+        let markets: Vec<AccountId> = self._markets();
         let mut total_collateral_in_eth = U256::from(0);
         let mut avg_ltv = U256::from(0);
         let mut avg_liquidation_threshold = U256::from(0);
         let mut total_debt_in_eth = U256::from(0);
 
-        // let _pool_attributes_is_none = pool_attributes.is_none();
-        // let _pool_attributes = pool_attributes.unwrap_or(Default::default());
+        let _pool_attributes = pool_attributes.unwrap_or(Default::default());
         for asset in markets.iter() {
-            let result = account_assets_iter.find(|&x| x == *asset);
-            checked_markets.push(result.unwrap());
-            if result.is_none() || result.unwrap() == ZERO_ADDRESS.into() {
+            let asset_result = account_assets_iter.find(|&x| x == *asset);
+            if asset_result.is_none() || asset_result.unwrap() == ZERO_ADDRESS.into() {
+                result.push(ZERO_ADDRESS.into());
+                result.push(*asset);
                 continue
             }
 
@@ -1251,24 +1251,41 @@ impl<T: Storage<Data>> Internal for T {
             }
             let ltv = U256::from(collateral_factor_mantissa.unwrap());
 
-            let liquidation_threshold = PoolRef::liquidation_threshold(asset);
-            let decimals = PSP22MetadataRef::token_decimals(&PoolRef::underlying(asset));
+            let liquidation_threshold: u128;
+            let decimals: u8;
+            let unit_price: u128;
+            let compounded_liquidity_balance: u128;
+            let borrow_balance_stored: u128;
+
+            if caller == *asset {
+                if _pool_attributes.underlying == ZERO_ADDRESS.into() {
+                    continue
+                }
+                liquidation_threshold = _pool_attributes.liquidation_threshold;
+                decimals = _pool_attributes.decimals;
+                unit_price =
+                    PriceOracleRef::get_price(&self._oracle(), _pool_attributes.underlying)
+                        .unwrap_or(0);
+                compounded_liquidity_balance = _pool_attributes.account_balance;
+                borrow_balance_stored = _pool_attributes.account_borrow_balance;
+            } else {
+                liquidation_threshold = PoolRef::liquidation_threshold(asset);
+                decimals = PSP22MetadataRef::token_decimals(&PoolRef::underlying(asset));
+                unit_price =
+                    PriceOracleRef::get_underlying_price(&self._oracle(), *asset).unwrap_or(0);
+                (compounded_liquidity_balance, borrow_balance_stored, _) =
+                    PoolRef::get_account_snapshot(asset, account);
+            }
             let token_unit = 10_u128.pow(decimals.into());
-            let unit_price = PriceOracleRef::get_underlying_price(&self._oracle(), *asset).unwrap();
 
-            // if *asset == caller && _pool_attributes.underlying.is_zero() {
-            //     continue
-            // }
-            // let compounded_liquidity_balance: Balance;
-            // let borrow_balance_stored: Balance;
-
-            // if *asset == caller {
-            //     compounded_liquidity_balance = _pool_attributes.account_balance;
-            //     borrow_balance_stored = _pool_attributes.account_borrow_balance;
-            // } else {
-            let (compounded_liquidity_balance, borrow_balance_stored, _) =
-                PoolRef::get_account_snapshot(asset, account);
-            // }
+            // result.push(PoolAttributesForWithdrawValidation {
+            //     underlying: *asset,
+            //     decimals,
+            //     liquidation_threshold,
+            //     account_balance: compounded_liquidity_balance,
+            //     account_borrow_balance: borrow_balance_stored,
+            //     exchange_rate: U256::from(unit_price),
+            // });
 
             if liquidation_threshold != 0 && compounded_liquidity_balance > 0 {
                 let liquidity_balance_eth = U256::from(unit_price)
@@ -1310,7 +1327,7 @@ impl<T: Storage<Data>> Internal for T {
             avg_ltv,
             avg_liquidation_threshold,
             health_factor,
-            checked_markets,
+            result,
         }
     }
 

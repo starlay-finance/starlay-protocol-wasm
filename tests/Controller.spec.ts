@@ -1008,15 +1008,21 @@ describe('Controller spec', () => {
         await controller.query.calculateUserAccountData(users[0].address, null)
       ).value.ok
 
-      console.log(
-        'Account Asset for deployer',
-        (await controller.query.accountAssets(deployer.address)).value.ok,
-      )
-
-      console.log(
-        'Assets',
+      expect((await controller.query.markets()).value.ok).toEqual(
         [pools.dai, pools.usdc, pools.usdt].map((sym) => sym.pool.address),
       )
+
+      expect(
+        (await controller.query.accountAssets(deployer.address)).value.ok,
+      ).toEqual(
+        [pools.dai, pools.usdc, pools.usdt].map((sym) => sym.pool.address),
+      )
+
+      expect(
+        (await controller.query.accountAssets(users[0].address)).value.ok,
+      ).toEqual([pools.usdt].map((sym) => sym.pool.address))
+
+      console.log(accountData)
       // console.log(
       //   'avgLiquidationThreshold',
       //   accountData.avgLiquidationThreshold,
@@ -1029,7 +1035,6 @@ describe('Controller spec', () => {
       // console.log('totalDebtInEth', accountData.totalDebtInEth)
       // console.log('avgLtv', accountData.avgLtv)
       // console.log('healghFactor', accountData.healthFactor)
-      console.log('checkedMarkets', accountData.checkedMarkets)
 
       expect(
         (await controller.query.accountAssets(users[0].address)).value.ok
