@@ -180,16 +180,16 @@ pub fn calculate_health_factor_from_balances(
     }
 
     let percent_mul_result = (Percent {
-        value: total_collateral_in_eth,
+        percentage: liquidation_threshold,
     })
-    .percent_mul(liquidation_threshold);
+    .percent_mul(total_collateral_in_eth);
 
     if percent_mul_result.is_err() {
         return U256::from(0)
     }
 
     let wad_div_result = (Wad {
-        mantissa: WrappedU256::from(percent_mul_result.unwrap().value),
+        mantissa: WrappedU256::from(percent_mul_result.unwrap()),
     })
     .wad_div(Wad {
         mantissa: WrappedU256::from(total_debt_in_eth),
