@@ -694,13 +694,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             account_borrow_balance,
             exchange_rate,
         };
-        if ControllerRef::balance_decrease_allowed(
+        let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
             &self.controller(),
             pool_attributes,
             redeemer,
             redeem_amount,
-        ) == false
-        {
+        )?;
+        if balance_decrease_allowed == false {
             return Err(Error::RedeemTransferOutNotPossible)
         }
 

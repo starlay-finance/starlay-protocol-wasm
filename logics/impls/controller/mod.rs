@@ -263,13 +263,13 @@ pub trait Internal {
         &self,
         account: AccountId,
         pool_attributes: Option<PoolAttributesForWithdrawValidation>,
-    ) -> AccountData;
+    ) -> Result<AccountData>;
     fn _balance_decrease_allowed(
         &self,
         pool_attributes: PoolAttributesForWithdrawValidation,
         account: AccountId,
         amount: Balance,
-    ) -> bool;
+    ) -> Result<bool>;
 
     // event emission
     fn _emit_market_listed_event(&self, pool: AccountId);
@@ -629,7 +629,7 @@ impl<T: Storage<Data>> Controller for T {
         &self,
         account: AccountId,
         pool_attributes: Option<PoolAttributesForWithdrawValidation>,
-    ) -> AccountData {
+    ) -> Result<AccountData> {
         self._calculate_user_account_data(account, pool_attributes)
     }
 
@@ -638,7 +638,7 @@ impl<T: Storage<Data>> Controller for T {
         pool_attributes: PoolAttributesForWithdrawValidation,
         account: AccountId,
         amount: Balance,
-    ) -> bool {
+    ) -> Result<bool> {
         self._balance_decrease_allowed(pool_attributes, account, amount)
     }
 }
@@ -1212,38 +1212,31 @@ impl<T: Storage<Data>> Internal for T {
         &self,
         account: AccountId,
         pool_attributes: Option<PoolAttributesForWithdrawValidation>,
-    ) -> AccountData {
+    ) -> Result<AccountData> {
         let caller = Self::env().caller();
         let account_assets: Vec<AccountId> = self._account_assets(account, caller);
         if account_assets.is_empty() {
-            return AccountData {
+            return Ok(AccountData {
                 total_collateral_in_eth: U256::from(0),
                 total_debt_in_eth: U256::from(0),
                 avg_ltv: U256::from(0),
                 avg_liquidation_threshold: U256::from(0),
                 health_factor: U256::MAX,
-            }
+            })
         }
 
-        let markets: Vec<AccountId> = self._markets();
-        let markets_iter = markets.into_iter();
         let mut total_collateral_in_eth = U256::from(0);
         let mut avg_ltv = U256::from(0);
         let mut avg_liquidation_threshold = U256::from(0);
         let mut total_debt_in_eth: U256 = U256::from(0);
 
         let _pool_attributes = pool_attributes.unwrap_or(Default::default());
-        for asset in markets_iter {
-            let mut account_assets_iter = account_assets.clone().into_iter();
-            let asset_result = account_assets_iter.position(|x| x == asset);
-            if asset_result.is_none() {
-                continue
-            }
-
+        let account_assets_iter = account_assets.into_iter();
+        for asset in account_assets_iter {
             let collateral_factor_mantissa: Option<WrappedU256> =
                 self.collateral_factor_mantissa(asset);
             if collateral_factor_mantissa.is_none() {
-                continue
+                return Err(Error::MarketNotListed)
             }
             let ltv = U256::from(collateral_factor_mantissa.unwrap());
 
@@ -1309,13 +1302,13 @@ impl<T: Storage<Data>> Internal for T {
             total_debt_in_eth,
             avg_liquidation_threshold,
         );
-        AccountData {
+        Ok(AccountData {
             total_collateral_in_eth,
             total_debt_in_eth,
             avg_ltv,
             avg_liquidation_threshold,
             health_factor,
-        }
+        })
     }
 
     default fn _balance_decrease_allowed(
@@ -1323,31 +1316,31 @@ impl<T: Storage<Data>> Internal for T {
         pool_attributes: PoolAttributesForWithdrawValidation,
         account: AccountId,
         amount: Balance,
-    ) -> bool {
+    ) -> Result<bool> {
         let account_assets: Vec<AccountId> = self._account_assets(account, Self::env().caller());
         if account_assets.is_empty() {
-            return true
+            return Ok(true)
         }
 
         let liquidation_threshold = pool_attributes.liquidation_threshold;
         if liquidation_threshold == 0 {
-            return true
+            return Ok(true)
         }
 
         let account_data =
-            self._calculate_user_account_data(account, Some(pool_attributes.clone()));
+            self._calculate_user_account_data(account, Some(pool_attributes.clone()))?;
 
         let total_collateral_in_eth = account_data.total_collateral_in_eth;
         let total_debt_in_eth = account_data.total_debt_in_eth;
         let avg_liquidation_threshold = account_data.avg_liquidation_threshold;
 
         if total_debt_in_eth.is_zero() {
-            return true
+            return Ok(true)
         }
 
         let asset_price = PriceOracleRef::get_price(&self._oracle(), pool_attributes.underlying);
         if let None | Some(0) = asset_price {
-            return false
+            return Ok(false)
         }
 
         let decimals = pool_attributes.decimals;
@@ -1359,7 +1352,7 @@ impl<T: Storage<Data>> Internal for T {
             total_collateral_in_eth.sub(amount_to_decrease_in_eth);
 
         if collateral_balance_after_decrease.is_zero() {
-            return false
+            return Ok(false)
         }
 
         let liquidation_threshold_after_decrease = total_collateral_in_eth
@@ -1373,7 +1366,7 @@ impl<T: Storage<Data>> Internal for T {
             liquidation_threshold_after_decrease,
         );
 
-        health_factor_after_decrease >= U256::from(HEALTH_FACTOR_LIQUIDATION_THRESHOLD)
+        Ok(health_factor_after_decrease >= U256::from(HEALTH_FACTOR_LIQUIDATION_THRESHOLD))
     }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}

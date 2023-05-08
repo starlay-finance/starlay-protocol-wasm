@@ -1006,7 +1006,7 @@ describe('Controller spec', () => {
     it('check account data', async () => {
       const deployerAccountData = (
         await controller.query.calculateUserAccountData(deployer.address, null)
-      ).value.ok
+      ).value.ok.ok
 
       // Total Collateral In Eth
       expect(

@@ -287,7 +287,7 @@ pub trait Controller {
         &self,
         account: AccountId,
         pool_attributes: Option<PoolAttributesForWithdrawValidation>,
-    ) -> AccountData;
+    ) -> Result<AccountData>;
 
     #[ink(message)]
     fn balance_decrease_allowed(
@@ -295,7 +295,7 @@ pub trait Controller {
         pool_attributes: PoolAttributesForWithdrawValidation,
         account: AccountId,
         amount: Balance,
-    ) -> bool;
+    ) -> Result<bool>;
     /// Determine the current account liquidity with respect to collateral requirements
     #[ink(message)]
     fn get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)>;
