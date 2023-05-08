@@ -1,16 +1,14 @@
 pub use crate::traits::controller::*;
 use crate::{
-    impls::exp_no_err::{
-        exp_scale,
-        Exp,
-    },
-    traits::{
-        math::{
-            PercentMath,
-            WadRayMath,
+    impls::{
+        exp_no_err::{
+            exp_scale,
+            Exp,
         },
-        types::WrappedU256,
+        percent_math::Percent,
+        wad_ray_math::Wad,
     },
+    traits::types::WrappedU256,
 };
 use core::ops::{
     Add,
@@ -181,9 +179,27 @@ pub fn calculate_health_factor_from_balances(
         return U256::MAX
     }
 
-    total_collateral_in_eth
-        .percent_mul(liquidation_threshold)
-        .wad_div(total_debt_in_eth)
+    let percent_mul_result = (Percent {
+        value: total_collateral_in_eth,
+    })
+    .percent_mul(liquidation_threshold);
+
+    if percent_mul_result.is_err() {
+        return U256::from(0)
+    }
+
+    let wad_div_result = (Wad {
+        mantissa: WrappedU256::from(percent_mul_result.unwrap().value),
+    })
+    .wad_div(Wad {
+        mantissa: WrappedU256::from(total_debt_in_eth),
+    });
+
+    if wad_div_result.is_err() {
+        return U256::from(0)
+    }
+
+    U256::from(wad_div_result.unwrap().mantissa)
 }
 
 #[cfg(test)]

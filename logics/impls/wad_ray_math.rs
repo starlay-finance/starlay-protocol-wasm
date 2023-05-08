@@ -32,7 +32,7 @@ pub fn exp_ray_ratio() -> U256 {
 pub struct Ray {
     pub mantissa: WrappedU256,
 }
-type Wad = Exp;
+pub type Wad = Exp;
 impl Wad {
     pub fn wad_mul(&self, another: Wad) -> Result<Wad, Error> {
         let a = U256::from(self.mantissa);
