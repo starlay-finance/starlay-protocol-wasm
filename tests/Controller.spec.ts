@@ -946,22 +946,26 @@ describe('Controller spec', () => {
       ).toEqual(8000)
     })
 
+    const daiDeposited = 50_000
+    const usdcDeposited = 30_000
+    const usdtDeposited = 50_000
+    const daiBorrowed = 20_000
     it('preparation', async () => {
       const { dai, usdc, usdt } = pools
 
-      const daiDeposited = 20_000
-      await shouldNotRevert(dai.token, 'mint', [deployer.address, daiDeposited])
-      await shouldNotRevert(dai.token, 'approve', [
+      await shouldNotRevert(dai.token, 'mint', [users[0].address, daiDeposited])
+      await shouldNotRevert(dai.token.withSigner(users[0]), 'approve', [
         dai.pool.address,
         daiDeposited,
       ])
-      await shouldNotRevert(dai.pool, 'mint', [daiDeposited])
+      await shouldNotRevert(dai.pool.withSigner(users[0]), 'mint', [
+        daiDeposited,
+      ])
 
       expect(
-        (await dai.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+        (await dai.pool.query.balanceOf(users[0].address)).value.ok.toNumber(),
       ).toEqual(daiDeposited)
 
-      const usdcDeposited = 30_000
       await shouldNotRevert(usdc.token, 'mint', [
         deployer.address,
         usdcDeposited,
@@ -976,65 +980,64 @@ describe('Controller spec', () => {
         (await usdc.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(usdcDeposited)
 
-      const usdtDeposited = 50_000
       await shouldNotRevert(usdt.token, 'mint', [
-        users[0].address,
+        deployer.address,
         usdtDeposited,
       ])
-      await shouldNotRevert(usdt.token.withSigner(users[0]), 'approve', [
+      await shouldNotRevert(usdt.token, 'approve', [
         usdt.pool.address,
         usdtDeposited,
       ])
-      await shouldNotRevert(usdt.pool.withSigner(users[0]), 'mint', [
-        usdtDeposited,
-      ])
+      await shouldNotRevert(usdt.pool, 'mint', [usdtDeposited])
 
       expect(
-        (await usdt.pool.query.balanceOf(users[0].address)).value.ok.toNumber(),
+        (await usdt.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(usdtDeposited)
 
-      const borrowAmount = 20_000
-      await shouldNotRevert(usdt.pool, 'borrow', [borrowAmount])
+      await shouldNotRevert(dai.pool, 'borrow', [daiBorrowed])
 
       expect(
         (
-          await usdt.pool.query.borrowBalanceStored(deployer.address)
+          await dai.pool.query.borrowBalanceStored(deployer.address)
         ).value.ok.toNumber(),
-      ).toEqual(borrowAmount)
+      ).toEqual(daiBorrowed)
     })
 
     it('check account data', async () => {
-      const accountData = (
+      const deployerAccountData = (
         await controller.query.calculateUserAccountData(deployer.address, null)
       ).value.ok
 
-      expect((await controller.query.markets()).value.ok).toEqual(
-        [pools.dai, pools.usdc, pools.usdt].map((sym) => sym.pool.address),
-      )
-
+      // Total Collateral In Eth
       expect(
-        (await controller.query.accountAssets(deployer.address)).value.ok,
+        new BN(
+          BigInt(
+            deployerAccountData.totalCollateralInEth.toString(),
+          ).toString(),
+        ).toString(),
       ).toEqual(
-        [pools.dai, pools.usdc, pools.usdt].map((sym) => sym.pool.address),
+        new BN(usdcDeposited)
+          .mul(ONE_ETHER)
+          .div(new BN(10).pow(new BN(pools.usdc.metadata.decimals)))
+          .add(
+            new BN(usdtDeposited)
+              .mul(ONE_ETHER)
+              .div(new BN(10).pow(new BN(pools.usdt.metadata.decimals))),
+          )
+          .toString(),
       )
 
+      // Total Debt In Eth
       expect(
-        (await controller.query.accountAssets(users[0].address)).value.ok,
-      ).toEqual([pools.usdt].map((sym) => sym.pool.address))
-
-      console.log(accountData)
-      // console.log(
-      //   'avgLiquidationThreshold',
-      //   accountData.avgLiquidationThreshold,
-      // )
-
-      // console.log(
-      //   'totalCollateralInEth',
-      //   accountData.totalCollateralInEth.toString(),
-      // )
-      // console.log('totalDebtInEth', accountData.totalDebtInEth)
-      // console.log('avgLtv', accountData.avgLtv)
-      // console.log('healghFactor', accountData.healthFactor)
+        new BN(
+          BigInt(deployerAccountData.totalDebtInEth.toString()).toString(),
+        ).toString(),
+      ).toEqual(
+        new BN(daiBorrowed)
+          .mul(ONE_ETHER)
+          .div(new BN(10).pow(new BN(pools.dai.metadata.decimals)))
+          .toString(),
+      )
 
       expect(
         (await controller.query.accountAssets(users[0].address)).value.ok
