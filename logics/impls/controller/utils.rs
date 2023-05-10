@@ -706,6 +706,7 @@ mod tests {
         let one: U256 = U256::from(10).pow(U256::from(18));
         let price_one: U256 = one;
         let mantissa_one: U256 = one;
+        let one_percent: U256 = U256::from(100);
         let cases = vec![
             Case {
                 name: "all params are zero",
@@ -736,11 +737,9 @@ mod tests {
                 input: BalanceDecreaseAllowedParam {
                     asset_price: price_one,
                     // 80 %
-                    avg_liquidation_threshold: mantissa_one
-                        .div(U256::from(100))
-                        .mul(U256::from(80)),
+                    avg_liquidation_threshold: one_percent.mul(U256::from(80)),
                     // 80 %
-                    liquidation_threshold: mantissa_one.div(U256::from(100)).mul(U256::from(80)),
+                    liquidation_threshold: one_percent.mul(U256::from(80)),
                     // 110
                     total_collateral_in_base_currency: one.mul(U256::from(110)),
                     // 80
@@ -755,11 +754,9 @@ mod tests {
                 input: BalanceDecreaseAllowedParam {
                     asset_price: price_one,
                     // 80 %
-                    avg_liquidation_threshold: mantissa_one
-                        .div(U256::from(100))
-                        .mul(U256::from(80)),
+                    avg_liquidation_threshold: one_percent.mul(U256::from(80)),
                     // 80 %
-                    liquidation_threshold: mantissa_one.div(U256::from(100)).mul(U256::from(80)),
+                    liquidation_threshold: one_percent.mul(U256::from(80)),
                     // 110
                     total_collateral_in_base_currency: one.mul(U256::from(110)),
                     // 80
