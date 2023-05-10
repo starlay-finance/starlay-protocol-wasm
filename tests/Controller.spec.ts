@@ -1012,32 +1012,19 @@ describe('Controller spec', () => {
       expect(
         new BN(
           BigInt(
-            deployerAccountData.totalCollateralInEth.toString(),
+            deployerAccountData.totalCollateralInBaseCurrency.toString(),
           ).toString(),
         ).toString(),
-      ).toEqual(
-        new BN(usdcDeposited)
-          .mul(ONE_ETHER)
-          .div(new BN(10).pow(new BN(pools.usdc.metadata.decimals)))
-          .add(
-            new BN(usdtDeposited)
-              .mul(ONE_ETHER)
-              .div(new BN(10).pow(new BN(pools.usdt.metadata.decimals))),
-          )
-          .toString(),
-      )
+      ).toEqual(new BN(usdcDeposited).add(new BN(usdtDeposited)).toString())
 
       // Total Debt In Eth
       expect(
         new BN(
-          BigInt(deployerAccountData.totalDebtInEth.toString()).toString(),
+          BigInt(
+            deployerAccountData.totalDebtInBaseCurrency.toString(),
+          ).toString(),
         ).toString(),
-      ).toEqual(
-        new BN(daiBorrowed)
-          .mul(ONE_ETHER)
-          .div(new BN(10).pow(new BN(pools.dai.metadata.decimals)))
-          .toString(),
-      )
+      ).toEqual(new BN(daiBorrowed).toString())
 
       expect(
         (await controller.query.accountAssets(users[0].address)).value.ok
