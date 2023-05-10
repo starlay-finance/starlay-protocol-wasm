@@ -1347,7 +1347,7 @@ impl<T: Storage<Data>> Internal for T {
                 total_collateral_in_base_currency: account_data.total_collateral_in_base_currency,
                 total_debt_in_base_currency,
                 avg_liquidation_threshold: account_data.avg_liquidation_threshold,
-                amount: amount.into(),
+                amount_in_base_currency_unit: amount.into(),
                 asset_price: asset_price.unwrap().into(),
                 liquidation_threshold: pool_attributes.liquidation_threshold.into(),
             },
