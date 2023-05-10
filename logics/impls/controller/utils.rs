@@ -171,18 +171,18 @@ pub fn get_hypothetical_account_liquidity_per_asset(
 }
 
 pub fn calculate_health_factor_from_balances(
-    total_collateral_in_usd: U256,
-    total_debt_in_usd: U256,
+    total_collateral_in_base_currency: U256,
+    total_debt_in_base_currency: U256,
     liquidation_threshold: U256,
 ) -> U256 {
-    if total_debt_in_usd.is_zero() {
+    if total_debt_in_base_currency.is_zero() {
         return U256::MAX
     }
 
     let percent_mul_result = (Percent {
         percentage: liquidation_threshold,
     })
-    .percent_mul(total_collateral_in_usd);
+    .percent_mul(total_collateral_in_base_currency);
 
     if percent_mul_result.is_err() {
         return U256::from(0)
@@ -192,7 +192,7 @@ pub fn calculate_health_factor_from_balances(
         mantissa: WrappedU256::from(percent_mul_result.unwrap()),
     })
     .wad_div(Wad {
-        mantissa: WrappedU256::from(total_debt_in_usd),
+        mantissa: WrappedU256::from(total_debt_in_base_currency),
     });
 
     if wad_div_result.is_err() {

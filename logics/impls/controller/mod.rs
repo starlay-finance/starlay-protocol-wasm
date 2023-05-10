@@ -1218,18 +1218,18 @@ impl<T: Storage<Data>> Internal for T {
         let account_assets: Vec<AccountId> = self._account_assets(account, caller);
         if account_assets.is_empty() {
             return Ok(AccountData {
-                total_collateral_in_usd: U256::from(0),
-                total_debt_in_usd: U256::from(0),
+                total_collateral_in_base_currency: U256::from(0),
+                total_debt_in_base_currency: U256::from(0),
                 avg_ltv: U256::from(0),
                 avg_liquidation_threshold: U256::from(0),
                 health_factor: U256::MAX,
             })
         }
 
-        let mut total_collateral_in_usd = U256::from(0);
+        let mut total_collateral_in_base_currency = U256::from(0);
         let mut avg_ltv = U256::from(0);
         let mut avg_liquidation_threshold = U256::from(0);
-        let mut total_debt_in_usd: U256 = U256::from(0);
+        let mut total_debt_in_base_currency: U256 = U256::from(0);
 
         let account_assets_iter = account_assets.into_iter();
         for asset in account_assets_iter {
@@ -1276,7 +1276,8 @@ impl<T: Storage<Data>> Internal for T {
                 let liquidity_balance_eth = U256::from(unit_price)
                     .mul(U256::from(compounded_liquidity_balance))
                     .div(U256::from(PRICE_PRECISION));
-                total_collateral_in_usd = total_collateral_in_usd.add(liquidity_balance_eth);
+                total_collateral_in_base_currency =
+                    total_collateral_in_base_currency.add(liquidity_balance_eth);
                 avg_ltv = avg_ltv.add(liquidity_balance_eth.mul(U256::from(ltv)));
                 avg_liquidation_threshold = avg_liquidation_threshold
                     .add(liquidity_balance_eth.mul(U256::from(liquidation_threshold)));
@@ -1286,30 +1287,30 @@ impl<T: Storage<Data>> Internal for T {
                 let borrow_balance_eth = U256::from(unit_price)
                     .mul(U256::from(borrow_balance_stored))
                     .div(U256::from(PRICE_PRECISION));
-                total_debt_in_usd = total_debt_in_usd.add(borrow_balance_eth);
+                total_debt_in_base_currency = total_debt_in_base_currency.add(borrow_balance_eth);
             }
         }
 
-        avg_ltv = if total_collateral_in_usd.is_zero() {
+        avg_ltv = if total_collateral_in_base_currency.is_zero() {
             U256::from(0)
         } else {
-            avg_ltv.div(total_collateral_in_usd)
+            avg_ltv.div(total_collateral_in_base_currency)
         };
 
-        avg_liquidation_threshold = if total_collateral_in_usd.is_zero() {
+        avg_liquidation_threshold = if total_collateral_in_base_currency.is_zero() {
             U256::from(0)
         } else {
-            avg_liquidation_threshold.div(total_collateral_in_usd)
+            avg_liquidation_threshold.div(total_collateral_in_base_currency)
         };
 
         let health_factor = calculate_health_factor_from_balances(
-            total_collateral_in_usd,
-            total_debt_in_usd,
+            total_collateral_in_base_currency,
+            total_debt_in_base_currency,
             avg_liquidation_threshold,
         );
         Ok(AccountData {
-            total_collateral_in_usd,
-            total_debt_in_usd,
+            total_collateral_in_base_currency,
+            total_debt_in_base_currency,
             avg_ltv,
             avg_liquidation_threshold,
             health_factor,
@@ -1330,11 +1331,11 @@ impl<T: Storage<Data>> Internal for T {
         let account_data =
             self._calculate_user_account_data(account, Some(pool_attributes.clone()))?;
 
-        let total_collateral_in_usd = account_data.total_collateral_in_usd;
-        let total_debt_in_usd = account_data.total_debt_in_usd;
+        let total_collateral_in_base_currency = account_data.total_collateral_in_base_currency;
+        let total_debt_in_base_currency = account_data.total_debt_in_base_currency;
         let avg_liquidation_threshold = account_data.avg_liquidation_threshold;
 
-        if total_debt_in_usd.is_zero() {
+        if total_debt_in_base_currency.is_zero() {
             return Ok(true)
         }
 
@@ -1343,25 +1344,28 @@ impl<T: Storage<Data>> Internal for T {
             return Ok(false)
         }
 
-        let amount_to_decrease_in_usd = U256::from(asset_price.unwrap())
+        let amount_to_decrease_in_base_currency = U256::from(asset_price.unwrap())
             .mul(U256::from(amount))
             .div(U256::from(PRICE_PRECISION));
 
         let collateral_balance_after_decrease =
-            total_collateral_in_usd.sub(amount_to_decrease_in_usd);
+            total_collateral_in_base_currency.sub(amount_to_decrease_in_base_currency);
 
         if collateral_balance_after_decrease.is_zero() {
             return Ok(false)
         }
 
-        let liquidation_threshold_after_decrease = total_collateral_in_usd
+        let liquidation_threshold_after_decrease = total_collateral_in_base_currency
             .mul(avg_liquidation_threshold)
-            .sub(amount_to_decrease_in_usd.mul(U256::from(pool_attributes.liquidation_threshold)))
+            .sub(
+                amount_to_decrease_in_base_currency
+                    .mul(U256::from(pool_attributes.liquidation_threshold)),
+            )
             .div(collateral_balance_after_decrease);
 
         let health_factor_after_decrease = calculate_health_factor_from_balances(
             collateral_balance_after_decrease,
-            total_debt_in_usd,
+            total_debt_in_base_currency,
             liquidation_threshold_after_decrease,
         );
 
