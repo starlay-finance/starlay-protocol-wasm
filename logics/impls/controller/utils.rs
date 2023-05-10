@@ -17,10 +17,7 @@ use core::ops::{
     Mul,
     Sub,
 };
-use ink::{
-    env::debug_print,
-    prelude::vec::Vec,
-};
+use ink::prelude::vec::Vec;
 use openbrush::traits::{
     AccountId,
     Balance,
@@ -232,7 +229,7 @@ pub fn calculate_health_factor_from_balances(
         return U256::from(0)
     }
 
-    let wad_div_result: core::result::Result<Exp, crate::impls::wad_ray_math::Error> = (Wad {
+    let wad_div_result = (Wad {
         mantissa: WrappedU256::from(percent_mul_result.unwrap()),
     })
     .wad_div(Wad {
@@ -250,12 +247,9 @@ pub fn calculate_health_factor_from_balances(
 mod tests {
     use super::*;
     use crate::impls::exp_no_err::exp_scale;
-    use core::{
-        f32::MANTISSA_DIGITS,
-        ops::{
-            Div,
-            Mul,
-        },
+    use core::ops::{
+        Div,
+        Mul,
     };
     use openbrush::traits::ZERO_ADDRESS;
     use primitive_types::U256;
@@ -675,10 +669,8 @@ mod tests {
             expected: U256,
             name: &'static str,
         }
-        let ONE: U256 = U256::from(10).pow(U256::from(18));
-        let PRICE_ONE: U256 = ONE;
-        let MANTISSA_ONE: U256 = ONE;
-        let ONE_PERCENT: U256 = U256::from(100);
+        let one: U256 = U256::from(10).pow(U256::from(18));
+        let one_percent: U256 = U256::from(100);
         let cases = vec![
             Case {
                 name: "debt is zero",
@@ -689,10 +681,10 @@ mod tests {
             },
             Case {
                 name: "just hits liquidation threshold",
-                total_collateral_in_base_currency: ONE,
-                total_debt_in_base_currency: ONE.div(U256::from(100)),
-                liquidation_threshold: ONE_PERCENT,
-                expected: ONE,
+                total_collateral_in_base_currency: one,
+                total_debt_in_base_currency: one.div(U256::from(100)),
+                liquidation_threshold: one_percent,
+                expected: one,
             },
         ];
         for case in cases {
@@ -701,7 +693,7 @@ mod tests {
                 case.total_debt_in_base_currency,
                 case.liquidation_threshold,
             );
-            assert_eq!(got, case.expected);
+            assert_eq!(got, case.expected, "{}", case.name);
         }
     }
     #[test]
@@ -711,9 +703,9 @@ mod tests {
             expected: bool,
             name: &'static str,
         }
-        let ONE: U256 = U256::from(10).pow(U256::from(18));
-        let PRICE_ONE: U256 = ONE;
-        let MANTISSA_ONE: U256 = ONE;
+        let one: U256 = U256::from(10).pow(U256::from(18));
+        let price_one: U256 = one;
+        let mantissa_one: U256 = one;
         let cases = vec![
             Case {
                 name: "all params are zero",
@@ -730,11 +722,11 @@ mod tests {
             Case {
                 name: "if there is a borrow, there can't be 0 collateral",
                 input: BalanceDecreaseAllowedParam {
-                    amount_in_base_currency_unit: ONE,
-                    asset_price: PRICE_ONE,
-                    avg_liquidation_threshold: MANTISSA_ONE,
-                    liquidation_threshold: MANTISSA_ONE,
-                    total_collateral_in_base_currency: MANTISSA_ONE,
+                    amount_in_base_currency_unit: one,
+                    asset_price: price_one,
+                    avg_liquidation_threshold: mantissa_one,
+                    liquidation_threshold: mantissa_one,
+                    total_collateral_in_base_currency: mantissa_one,
                     total_debt_in_base_currency: 0.into(),
                 },
                 expected: false,
@@ -742,38 +734,38 @@ mod tests {
             Case {
                 name: "just hit the boundary of liquidation threshold: pass",
                 input: BalanceDecreaseAllowedParam {
-                    asset_price: PRICE_ONE,
+                    asset_price: price_one,
                     // 80 %
-                    avg_liquidation_threshold: MANTISSA_ONE
+                    avg_liquidation_threshold: mantissa_one
                         .div(U256::from(100))
                         .mul(U256::from(80)),
                     // 80 %
-                    liquidation_threshold: MANTISSA_ONE.div(U256::from(100)).mul(U256::from(80)),
+                    liquidation_threshold: mantissa_one.div(U256::from(100)).mul(U256::from(80)),
                     // 110
-                    total_collateral_in_base_currency: ONE.mul(U256::from(110)),
+                    total_collateral_in_base_currency: one.mul(U256::from(110)),
                     // 80
-                    total_debt_in_base_currency: ONE.mul(U256::from(80)),
+                    total_debt_in_base_currency: one.mul(U256::from(80)),
                     // decrease amount just hits the boundary should be 10
-                    amount_in_base_currency_unit: ONE.mul(U256::from(10)),
+                    amount_in_base_currency_unit: one.mul(U256::from(10)),
                 },
                 expected: true,
             },
             Case {
                 name: "just hit the boundary of liquidation threshold: fail",
                 input: BalanceDecreaseAllowedParam {
-                    asset_price: PRICE_ONE,
+                    asset_price: price_one,
                     // 80 %
-                    avg_liquidation_threshold: MANTISSA_ONE
+                    avg_liquidation_threshold: mantissa_one
                         .div(U256::from(100))
                         .mul(U256::from(80)),
                     // 80 %
-                    liquidation_threshold: MANTISSA_ONE.div(U256::from(100)).mul(U256::from(80)),
+                    liquidation_threshold: mantissa_one.div(U256::from(100)).mul(U256::from(80)),
                     // 110
-                    total_collateral_in_base_currency: ONE.mul(U256::from(110)),
+                    total_collateral_in_base_currency: one.mul(U256::from(110)),
                     // 80
-                    total_debt_in_base_currency: ONE.mul(U256::from(80)),
+                    total_debt_in_base_currency: one.mul(U256::from(80)),
                     // decrease amount just hits the boundary should be 10 so should fail with 1e19 + 1
-                    amount_in_base_currency_unit: ONE.mul(U256::from(10)).add(U256::from(1)),
+                    amount_in_base_currency_unit: one.mul(U256::from(10)).add(U256::from(1)),
                 },
                 expected: false,
             },
