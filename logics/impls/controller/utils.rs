@@ -6,6 +6,7 @@ use crate::{
             Exp,
         },
         percent_math::Percent,
+        price_oracle::PRICE_PRECISION,
         wad_ray_math::Wad,
     },
     traits::types::WrappedU256,
@@ -14,6 +15,7 @@ use core::ops::{
     Add,
     Div,
     Mul,
+    Sub,
 };
 use ink::prelude::vec::Vec;
 use openbrush::traits::{
@@ -54,6 +56,45 @@ pub fn liquidate_calculate_seize_tokens(input: &LiquidateCalculateSeizeTokensInp
             .div(U256::from(10).pow(input.decimals_borrowed.into())),
     );
     seize_tokens.as_u128()
+}
+
+#[derive(Clone, Debug)]
+pub struct BalanceDecreaseAllowedParam {
+    pub asset_price: U256,
+    pub amount: U256,
+    pub total_collateral_in_base_currency: U256,
+    pub avg_liquidation_threshold: U256,
+    pub liquidation_threshold: U256,
+    pub total_debt_in_base_currency: U256,
+}
+
+pub fn balance_decrease_allowed(param: BalanceDecreaseAllowedParam) -> bool {
+    let amount_to_decrease_in_base_currency = param
+        .asset_price
+        .mul(param.amount)
+        .div(U256::from(PRICE_PRECISION));
+
+    let collateral_balance_after_decrease = param
+        .total_collateral_in_base_currency
+        .sub(amount_to_decrease_in_base_currency);
+
+    if collateral_balance_after_decrease.is_zero() {
+        return false
+    }
+
+    let liquidation_threshold_after_decrease = param
+        .total_collateral_in_base_currency
+        .mul(param.avg_liquidation_threshold)
+        .sub(amount_to_decrease_in_base_currency.mul(param.liquidation_threshold))
+        .div(collateral_balance_after_decrease);
+
+    let health_factor_after_decrease = calculate_health_factor_from_balances(
+        collateral_balance_after_decrease,
+        param.total_debt_in_base_currency,
+        liquidation_threshold_after_decrease,
+    );
+
+    health_factor_after_decrease >= U256::from(HEALTH_FACTOR_LIQUIDATION_THRESHOLD)
 }
 
 pub fn collateral_factor_max_mantissa() -> U256 {
@@ -206,9 +247,12 @@ pub fn calculate_health_factor_from_balances(
 mod tests {
     use super::*;
     use crate::impls::exp_no_err::exp_scale;
-    use core::ops::{
-        Div,
-        Mul,
+    use core::{
+        f32::MANTISSA_DIGITS,
+        ops::{
+            Div,
+            Mul,
+        },
     };
     use openbrush::traits::ZERO_ADDRESS;
     use primitive_types::U256;
@@ -615,6 +659,50 @@ mod tests {
             assert_eq!(
                 sum_borrow_plus_effect,
                 U256::from(case.expected.sum_borrow_plus_effect)
+            );
+        }
+    }
+    #[test]
+    fn test_balance_decrease_allowed() {
+        struct Case {
+            input: BalanceDecreaseAllowedParam,
+            expected: bool,
+            name: &'static str,
+        }
+        let PRICE_ONE: U256 = U256::from(10).pow(U256::from(18));
+        let MANTISSA_ONE: U256 = U256::from(10).pow(U256::from(18));
+        let cases = vec![
+            Case {
+                name: "all params are zero",
+                input: BalanceDecreaseAllowedParam {
+                    amount: 0.into(),
+                    asset_price: 0.into(),
+                    avg_liquidation_threshold: 0.into(),
+                    liquidation_threshold: 0.into(),
+                    total_collateral_in_base_currency: 0.into(),
+                    total_debt_in_base_currency: 0.into(),
+                },
+                expected: false,
+            },
+            Case {
+                name: "debt is zero",
+                input: BalanceDecreaseAllowedParam {
+                    amount: 1.into(),
+                    asset_price: PRICE_ONE,
+                    avg_liquidation_threshold: 1.into(),
+                    liquidation_threshold: 1.into(),
+                    total_collateral_in_base_currency: 0.into(),
+                    total_debt_in_base_currency: 0.into(),
+                },
+                expected: true,
+            },
+        ];
+        for case in cases {
+            assert_eq!(
+                balance_decrease_allowed(case.input.clone()),
+                case.expected,
+                "case: {}",
+                case.name
             );
         }
     }

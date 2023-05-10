@@ -35,10 +35,10 @@ use self::utils::{
     collateral_factor_max_mantissa,
     get_hypothetical_account_liquidity,
     liquidate_calculate_seize_tokens,
+    BalanceDecreaseAllowedParam,
     GetHypotheticalAccountLiquidityInput,
     HypotheticalAccountLiquidityCalculationParam,
     LiquidateCalculateSeizeTokensInput,
-    HEALTH_FACTOR_LIQUIDATION_THRESHOLD,
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
@@ -1331,9 +1331,7 @@ impl<T: Storage<Data>> Internal for T {
         let account_data =
             self._calculate_user_account_data(account, Some(pool_attributes.clone()))?;
 
-        let total_collateral_in_base_currency = account_data.total_collateral_in_base_currency;
         let total_debt_in_base_currency = account_data.total_debt_in_base_currency;
-        let avg_liquidation_threshold = account_data.avg_liquidation_threshold;
 
         if total_debt_in_base_currency.is_zero() {
             return Ok(true)
@@ -1344,32 +1342,16 @@ impl<T: Storage<Data>> Internal for T {
             return Ok(false)
         }
 
-        let amount_to_decrease_in_base_currency = U256::from(asset_price.unwrap())
-            .mul(U256::from(amount))
-            .div(U256::from(PRICE_PRECISION));
-
-        let collateral_balance_after_decrease =
-            total_collateral_in_base_currency.sub(amount_to_decrease_in_base_currency);
-
-        if collateral_balance_after_decrease.is_zero() {
-            return Ok(false)
-        }
-
-        let liquidation_threshold_after_decrease = total_collateral_in_base_currency
-            .mul(avg_liquidation_threshold)
-            .sub(
-                amount_to_decrease_in_base_currency
-                    .mul(U256::from(pool_attributes.liquidation_threshold)),
-            )
-            .div(collateral_balance_after_decrease);
-
-        let health_factor_after_decrease = calculate_health_factor_from_balances(
-            collateral_balance_after_decrease,
-            total_debt_in_base_currency,
-            liquidation_threshold_after_decrease,
-        );
-
-        Ok(health_factor_after_decrease >= U256::from(HEALTH_FACTOR_LIQUIDATION_THRESHOLD))
+        return Ok(utils::balance_decrease_allowed(
+            BalanceDecreaseAllowedParam {
+                total_collateral_in_base_currency: account_data.total_collateral_in_base_currency,
+                total_debt_in_base_currency,
+                avg_liquidation_threshold: account_data.avg_liquidation_threshold,
+                amount: amount.into(),
+                asset_price: asset_price.unwrap().into(),
+                liquidation_threshold: pool_attributes.liquidation_threshold.into(),
+            },
+        ))
     }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}
