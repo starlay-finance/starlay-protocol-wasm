@@ -689,7 +689,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let pool_attributes = PoolAttributesForWithdrawValidation {
             underlying: self._underlying(),
             liquidation_threshold: self._liquidation_threshold(),
-            decimals: self.token_decimals(),
             account_balance,
             account_borrow_balance,
             exchange_rate,
