@@ -342,8 +342,8 @@ pub struct PoolAttributesForWithdrawValidation {
 #[derive(Clone, Decode, Encode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct AccountData {
-    pub total_collateral_in_eth: U256,
-    pub total_debt_in_eth: U256,
+    pub total_collateral_in_usd: U256,
+    pub total_debt_in_usd: U256,
     pub avg_ltv: U256,
     pub avg_liquidation_threshold: U256,
     pub health_factor: U256,
