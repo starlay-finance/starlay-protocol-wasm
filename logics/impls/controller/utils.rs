@@ -761,10 +761,26 @@ mod tests {
                     total_collateral_in_base_currency: one.mul(U256::from(110)),
                     // 80
                     total_debt_in_base_currency: one.mul(U256::from(80)),
-                    // decrease amount just hits the boundary should be 10 so should fail with 1e19 + 1
-                    amount_in_base_currency_unit: one.mul(U256::from(10)).add(U256::from(1)),
+                    // decrease amount just hits the boundary should be 10 so should fail with 1e19 + 1 + 50(see: wad_div)
+                    amount_in_base_currency_unit: one.mul(U256::from(10)).add(U256::from(51)),
                 },
                 expected: false,
+            },
+            Case {
+                name: "health factor is 2",
+                input: BalanceDecreaseAllowedParam {
+                    asset_price: price_one,
+                    // 80 %
+                    avg_liquidation_threshold: one_percent.mul(U256::from(80)),
+                    // 80 %
+                    liquidation_threshold: one_percent.mul(U256::from(80)),
+                    // 210
+                    total_collateral_in_base_currency: one.mul(U256::from(210)),
+                    // 80
+                    total_debt_in_base_currency: one.mul(U256::from(80)),
+                    amount_in_base_currency_unit: one.mul(U256::from(10)),
+                },
+                expected: true,
             },
         ];
         for case in cases {
