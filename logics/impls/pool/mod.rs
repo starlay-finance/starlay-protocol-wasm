@@ -83,6 +83,7 @@ pub struct Data {
     pub reserve_factor_mantissa: WrappedU256,
     pub liquidation_threshold: u128,
     pub delegate_allowance: Mapping<(AccountId, AccountId), Balance, AllowancesKey>,
+    pub using_reserve_as_collateral: Mapping<AccountId, bool>,
 }
 
 pub struct AllowancesKey;
@@ -107,6 +108,7 @@ impl Default for Data {
             initial_exchange_rate_mantissa: WrappedU256::from(U256::zero()),
             reserve_factor_mantissa: WrappedU256::from(U256::zero()),
             liquidation_threshold: 10000,
+            using_reserve_as_collateral: Default::default(),
         }
     }
 }
@@ -168,7 +170,7 @@ pub trait Internal {
         delegatee: AccountId,
         amount: Balance,
     ) -> Result<()>;
-
+    fn _set_use_reserve_as_collateral(&mut self, user: AccountId, use_as_collateral: bool);
     // utilities
     fn _transfer_underlying_from(
         &self,
@@ -178,7 +180,11 @@ pub trait Internal {
     ) -> Result<()>;
     fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()>;
     fn _assert_manager(&self) -> Result<()>;
-
+    fn _validate_set_use_reserve_as_collateral(
+        &self,
+        user: AccountId,
+        use_as_collateral: bool,
+    ) -> Result<()>;
     // view functions
     fn _underlying(&self) -> AccountId;
     fn _controller(&self) -> AccountId;
@@ -214,6 +220,7 @@ pub trait Internal {
     fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool);
     fn _liquidation_threshold(&self) -> u128;
     fn _delegate_allowance(&self, owner: &AccountId, delegatee: &AccountId) -> Balance;
+    fn _using_reserve_as_collateral(&self, user: AccountId) -> Option<bool>;
     // event emission
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
     fn _emit_redeem_event(&self, redeemer: AccountId, redeem_amount: Balance);
@@ -262,6 +269,8 @@ pub trait Internal {
         delegatee: AccountId,
         amount: Balance,
     );
+    fn _emit_reserve_used_as_collateral_enabled_event(&self, user: AccountId);
+    fn _emit_reserve_used_as_collateral_disabled_event(&self, user: AccountId);
 }
 
 #[modifier_definition]
@@ -465,6 +474,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._approve_delegate(owner, delegatee, delegate_allowance - amount)
     }
 
+    default fn set_use_reserve_as_collateral(&mut self, use_as_collateral: bool) -> Result<()> {
+        let user = Self::env().caller();
+        self._validate_set_use_reserve_as_collateral(user, use_as_collateral)?;
+        self._set_use_reserve_as_collateral(user, use_as_collateral);
+        Ok(())
+    }
+
     default fn underlying(&self) -> AccountId {
         self._underlying()
     }
@@ -548,6 +564,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn delegate_allowance(&self, owner: AccountId, delegatee: AccountId) -> Balance {
         self._delegate_allowance(&owner, &delegatee)
+    }
+
+    default fn using_reserve_as_collateral(&self, user: AccountId) -> Option<bool> {
+        self._using_reserve_as_collateral(user)
     }
 }
 
@@ -649,6 +669,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             self._transfer_from_to(src, dst, psp22_transfer_amount, data)?;
         }
 
+        let lp_balance = self._principal_balance_of(&src);
+        if lp_balance == 0 {
+            self._set_use_reserve_as_collateral(src, false);
+            self._set_use_reserve_as_collateral(dst, true);
+        }
+
         Ok(())
     }
 
@@ -668,6 +694,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             .mul(exp_scale())
             .div(exchange_rate)
             .as_u128();
+
+        // Check if it is first deposit.
+        let lp_balance = self._principal_balance_of(&caller);
+        if lp_balance == 0 {
+            self._set_use_reserve_as_collateral(caller, true);
+        }
+
         self._mint_to(minter, minted_tokens)?;
 
         self._emit_mint_event(minter, mint_amount, minted_tokens);
@@ -726,6 +759,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         if self._get_cash_prior() < redeem_amount {
             return Err(Error::RedeemTransferOutNotPossible)
+        }
+
+        let lp_balance = Internal::_balance_of(self, &redeemer);
+        if lp_balance == redeem_amount {
+            self._set_use_reserve_as_collateral(redeemer, false);
         }
 
         self._burn_from(
@@ -1139,6 +1177,55 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
 
+    default fn _set_use_reserve_as_collateral(&mut self, user: AccountId, use_as_collateral: bool) {
+        self.data::<Data>()
+            .using_reserve_as_collateral
+            .insert(&user, &use_as_collateral);
+
+        if use_as_collateral {
+            self._emit_reserve_used_as_collateral_enabled_event(user);
+        } else {
+            self._emit_reserve_used_as_collateral_disabled_event(user);
+        }
+    }
+
+    default fn _validate_set_use_reserve_as_collateral(
+        &self,
+        user: AccountId,
+        use_as_collateral: bool,
+    ) -> Result<()> {
+        let underlying_balance = PSP22Ref::balance_of(&self._underlying(), user);
+        if underlying_balance == 0 {
+            return Err(Error::UnderlyingBalanceNotGreaterThanZero)
+        }
+
+        if use_as_collateral {
+            return Ok(())
+        }
+
+        let (account_balance, account_borrow_balance, exchange_rate) =
+            self.get_account_snapshot(user);
+
+        let pool_attributes = PoolAttributesForWithdrawValidation {
+            underlying: self._underlying(),
+            liquidation_threshold: self._liquidation_threshold(),
+            account_balance,
+            account_borrow_balance,
+            exchange_rate,
+        };
+        let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
+            &self.controller(),
+            pool_attributes,
+            user,
+            underlying_balance,
+        )?;
+
+        if balance_decrease_allowed == false {
+            return Err(Error::DepositAlreadyInUse)
+        }
+        Ok(())
+    }
+
     // utilities
     default fn _transfer_underlying_from(
         &self,
@@ -1330,6 +1417,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             .unwrap_or(0)
     }
 
+    default fn _using_reserve_as_collateral(&self, user: AccountId) -> Option<bool> {
+        self.data::<Data>().using_reserve_as_collateral.get(&user)
+    }
+
     // event emission
     default fn _emit_mint_event(
         &self,
@@ -1399,6 +1490,9 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         _amount: Balance,
     ) {
     }
+
+    default fn _emit_reserve_used_as_collateral_enabled_event(&self, _user: AccountId) {}
+    default fn _emit_reserve_used_as_collateral_disabled_event(&self, _user: AccountId) {}
 }
 
 pub fn to_psp22_error(e: PSP22Error) -> Error {

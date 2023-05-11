@@ -142,6 +142,9 @@ pub trait Pool: PSP22 + PSP22Metadata {
         amount: Balance,
     ) -> Result<()>;
 
+    #[ink(message)]
+    fn set_use_reserve_as_collateral(&mut self, use_as_collateral: bool) -> Result<()>;
+
     // view functions
     #[ink(message)]
     fn underlying(&self) -> AccountId;
@@ -181,6 +184,8 @@ pub trait Pool: PSP22 + PSP22Metadata {
     fn liquidation_threshold(&self) -> u128;
     #[ink(message)]
     fn delegate_allowance(&self, owner: AccountId, delegatee: AccountId) -> Balance;
+    #[ink(message)]
+    fn using_reserve_as_collateral(&self, user: AccountId) -> Option<bool>;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -203,6 +208,8 @@ pub enum Error {
     ZeroOwnerAddress,
     ZeroDelegateeAddress,
     InsufficientDelegateAllowance,
+    UnderlyingBalanceNotGreaterThanZero,
+    DepositAlreadyInUse,
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),
