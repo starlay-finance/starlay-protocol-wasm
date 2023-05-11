@@ -719,12 +719,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(redeemer);
 
+        let is_using_collateral = self._using_reserve_as_collateral(redeemer).unwrap_or(false);
         let pool_attributes = PoolAttributesForWithdrawValidation {
             underlying: self._underlying(),
             liquidation_threshold: self._liquidation_threshold(),
             account_balance,
             account_borrow_balance,
-            exchange_rate,
+            is_using_collateral,
         };
         let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
             &self.controller(),
@@ -1203,15 +1204,15 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Ok(())
         }
 
-        let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(user);
+        let (account_balance, account_borrow_balance, _) = self.get_account_snapshot(user);
 
+        let is_using_collateral = self._using_reserve_as_collateral(user).unwrap_or(false);
         let pool_attributes = PoolAttributesForWithdrawValidation {
             underlying: self._underlying(),
             liquidation_threshold: self._liquidation_threshold(),
             account_balance,
             account_borrow_balance,
-            exchange_rate,
+            is_using_collateral,
         };
         let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
             &self.controller(),

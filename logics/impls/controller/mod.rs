@@ -97,7 +97,7 @@ impl Default for PoolAttributesForWithdrawValidation {
             liquidation_threshold: Default::default(),
             account_balance: Default::default(),
             account_borrow_balance: Default::default(),
-            exchange_rate: Default::default(),
+            is_using_collateral: false,
         }
     }
 }
@@ -1261,6 +1261,11 @@ impl<T: Storage<Data>> Internal for T {
                 compounded_liquidity_balance = _pool_attributes.account_balance;
                 borrow_balance_stored = _pool_attributes.account_borrow_balance;
             } else {
+                let is_using_collateral = PoolRef::using_reserve_as_collateral(&asset, account);
+                if let None | Some(false) = is_using_collateral {
+                    continue
+                }
+
                 liquidation_threshold = PoolRef::liquidation_threshold(&asset);
                 let underlying: AccountId = PoolRef::underlying(&asset);
                 let unit_price_result = PriceOracleRef::get_price(&oracle, underlying);
@@ -1324,7 +1329,7 @@ impl<T: Storage<Data>> Internal for T {
         amount: Balance,
     ) -> Result<bool> {
         let account_assets: Vec<AccountId> = self._account_assets(account, Self::env().caller());
-        if account_assets.is_empty() {
+        if account_assets.is_empty() || pool_attributes.is_using_collateral == false {
             return Ok(true)
         }
 
