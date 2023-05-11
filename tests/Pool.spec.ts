@@ -15,7 +15,12 @@ import { RATE_MODELS } from '../scripts/interest_rates'
 import Contract from '../types/contracts/default_interest_rate_model'
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
-import { Mint, Redeem } from '../types/event-types/pool'
+import {
+  Mint,
+  Redeem,
+  ReserveUsedAsCollateralDisabled,
+  ReserveUsedAsCollateralEnabled,
+} from '../types/event-types/pool'
 import { Transfer } from '../types/event-types/psp22_token'
 import { SUPPORTED_TOKENS } from './../scripts/tokens'
 import {
@@ -175,13 +180,20 @@ describe('Pool spec', () => {
         ).value.ok.toNumber(),
       ).toBe(mintAmount)
 
-      expect(events).toHaveLength(2)
-      expectToEmit<Transfer>(events[0], 'Transfer', {
+      expect(events).toHaveLength(3)
+      expectToEmit<ReserveUsedAsCollateralEnabled>(
+        events[0],
+        'ReserveUsedAsCollateralEnabled',
+        {
+          user: deployer.address,
+        },
+      )
+      expectToEmit<Transfer>(events[1], 'Transfer', {
         from: null,
         to: deployer.address,
         value: mintAmount,
       })
-      expectToEmit<Mint>(events[1], 'Mint', {
+      expectToEmit<Mint>(events[2], 'Mint', {
         minter: deployer.address,
         mintAmount: depositAmount,
         mintTokens: mintAmount,
@@ -1711,13 +1723,20 @@ describe('Pool spec', () => {
         (await dai.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(deployerDaiDeposited - redeemAmount)
 
-      expect(events).toHaveLength(2)
-      expectToEmit<Transfer>(events[0], 'Transfer', {
+      expect(events).toHaveLength(3)
+      expectToEmit<ReserveUsedAsCollateralDisabled>(
+        events[0],
+        'ReserveUsedAsCollateralDisabled',
+        {
+          user: deployer.address,
+        },
+      )
+      expectToEmit<Transfer>(events[1], 'Transfer', {
         from: deployer.address,
         to: null,
         value: redeemAmount,
       })
-      expectToEmit<Redeem>(events[1], 'Redeem', {
+      expectToEmit<Redeem>(events[2], 'Redeem', {
         redeemer: deployer.address,
         redeemAmount,
       })

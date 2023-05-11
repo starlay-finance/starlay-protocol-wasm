@@ -1244,6 +1244,7 @@ impl<T: Storage<Data>> Internal for T {
             let unit_price: u128;
             let compounded_liquidity_balance: u128;
             let borrow_balance_stored: u128;
+            let is_using_collateral: Option<bool>;
 
             let oracle = self._oracle();
             if caller == asset {
@@ -1260,12 +1261,8 @@ impl<T: Storage<Data>> Internal for T {
                 unit_price = unit_price_result.unwrap();
                 compounded_liquidity_balance = _pool_attributes.account_balance;
                 borrow_balance_stored = _pool_attributes.account_borrow_balance;
+                is_using_collateral = Some(_pool_attributes.is_using_collateral);
             } else {
-                let is_using_collateral = PoolRef::using_reserve_as_collateral(&asset, account);
-                if let None | Some(false) = is_using_collateral {
-                    continue
-                }
-
                 liquidation_threshold = PoolRef::liquidation_threshold(&asset);
                 let underlying: AccountId = PoolRef::underlying(&asset);
                 let unit_price_result = PriceOracleRef::get_price(&oracle, underlying);
@@ -1275,9 +1272,10 @@ impl<T: Storage<Data>> Internal for T {
                 unit_price = unit_price_result.unwrap();
                 (compounded_liquidity_balance, borrow_balance_stored, _) =
                     PoolRef::get_account_snapshot(&asset, account);
+                is_using_collateral = PoolRef::using_reserve_as_collateral(&asset, account);
             }
 
-            if compounded_liquidity_balance != 0 {
+            if compounded_liquidity_balance != 0 && is_using_collateral.unwrap_or(false) {
                 let liquidity_balance_eth = U256::from(unit_price)
                     .mul(U256::from(compounded_liquidity_balance))
                     .div(U256::from(PRICE_PRECISION));
