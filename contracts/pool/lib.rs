@@ -274,6 +274,7 @@ pub mod contract {
             controller: AccountId,
             rate_model: AccountId,
             initial_exchange_rate_mantissa: WrappedU256,
+            liquidation_threshold: u128,
             name: String,
             symbol: String,
             decimals: u8,
@@ -291,6 +292,7 @@ pub mod contract {
                 Self::env().caller(),
                 rate_model,
                 initial_exchange_rate_mantissa,
+                liquidation_threshold,
                 name,
                 symbol,
                 decimals,
@@ -304,6 +306,7 @@ pub mod contract {
             controller: AccountId,
             rate_model: AccountId,
             initial_exchange_rate_mantissa: WrappedU256,
+            liquidation_threshold: u128,
         ) -> Self {
             if underlying.is_zero() {
                 panic!("underlying is zero address");
@@ -311,7 +314,6 @@ pub mod contract {
             if controller.is_zero() {
                 panic!("controller is zero address");
             }
-
             let base_name = PSP22MetadataRef::token_name(&underlying);
             let base_symbol = PSP22MetadataRef::token_symbol(&underlying);
             let decimals = PSP22MetadataRef::token_decimals(&underlying);
@@ -328,6 +330,7 @@ pub mod contract {
                 Self::env().caller(),
                 rate_model,
                 initial_exchange_rate_mantissa,
+                liquidation_threshold,
                 name,
                 symbol,
                 decimals,
@@ -342,6 +345,7 @@ pub mod contract {
             manager: AccountId,
             rate_model: AccountId,
             initial_exchange_rate_mantissa: WrappedU256,
+            liquidation_threshold: u128,
             name: String,
             symbol: String,
             decimals: u8,
@@ -351,6 +355,7 @@ pub mod contract {
             self.pool.manager = manager;
             self.pool.rate_model = rate_model;
             self.pool.initial_exchange_rate_mantissa = initial_exchange_rate_mantissa;
+            self.pool.liquidation_threshold = liquidation_threshold;
             self.pool.accrual_block_timestamp = Self::env().block_timestamp();
             self.metadata.name = Some(name);
             self.metadata.symbol = Some(symbol);
@@ -404,11 +409,13 @@ pub mod contract {
             let controller = AccountId::from([0x02; 32]);
             let rate_model = AccountId::from([0x03; 32]);
             let initial_exchange_rate_mantissa = WrappedU256::from(exp_scale());
+            let liquidation_threshold = 10000;
             let contract = PoolContract::new(
                 underlying,
                 controller,
                 rate_model,
                 initial_exchange_rate_mantissa,
+                liquidation_threshold,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -425,6 +432,7 @@ pub mod contract {
                 WrappedU256::from(U256::from(0))
             );
             assert_eq!(contract.total_borrows(), 0);
+            assert_eq!(contract.liquidation_threshold(), liquidation_threshold);
         }
 
         #[ink::test]
@@ -434,11 +442,13 @@ pub mod contract {
             set_caller(accounts.bob);
 
             let controller = AccountId::from([0x02; 32]);
+            let liquidation_threshold = 10000;
             PoolContract::new(
                 ZERO_ADDRESS.into(),
                 controller,
                 ZERO_ADDRESS.into(),
                 WrappedU256::from(U256::from(0)),
+                liquidation_threshold,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -452,11 +462,13 @@ pub mod contract {
             set_caller(accounts.bob);
 
             let underlying = AccountId::from([0x01; 32]);
+            let liquidation_threshold = 10000;
             PoolContract::new(
                 underlying,
                 ZERO_ADDRESS.into(),
                 ZERO_ADDRESS.into(),
                 WrappedU256::from(U256::from(0)),
+                liquidation_threshold,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -472,11 +484,13 @@ pub mod contract {
             set_caller(accounts.bob);
 
             let dummy_id = AccountId::from([0x01; 32]);
+            let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
                 dummy_id,
                 dummy_id,
                 dummy_id,
                 WrappedU256::from(U256::from(0)),
+                liquidation_threshold,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -494,11 +508,13 @@ pub mod contract {
             set_caller(accounts.bob);
 
             let dummy_id = AccountId::from([0x01; 32]);
+            let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
                 dummy_id,
                 dummy_id,
                 dummy_id,
                 WrappedU256::from(U256::from(0)),
+                liquidation_threshold,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -515,11 +531,13 @@ pub mod contract {
             set_caller(accounts.bob);
 
             let dummy_id = AccountId::from([0x01; 32]);
+            let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
                 dummy_id,
                 dummy_id,
                 dummy_id,
                 WrappedU256::from(U256::from(0)),
+                liquidation_threshold,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -537,11 +555,13 @@ pub mod contract {
             set_caller(accounts.bob);
 
             let dummy_id = AccountId::from([0x01; 32]);
+            let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
                 dummy_id,
                 dummy_id,
                 dummy_id,
                 WrappedU256::from(U256::from(0)),
+                liquidation_threshold,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -556,11 +576,13 @@ pub mod contract {
             set_caller(accounts.bob);
 
             let dummy_id = AccountId::from([0x01; 32]);
+            let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
                 dummy_id,
                 dummy_id,
                 dummy_id,
                 WrappedU256::from(U256::from(0)),
+                liquidation_threshold,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -577,11 +599,13 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
             let dummy_id = AccountId::from([0x01; 32]);
+            let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
                 dummy_id,
                 dummy_id,
                 dummy_id,
                 WrappedU256::from(U256::from(0)),
+                liquidation_threshold,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -610,11 +634,13 @@ pub mod contract {
             set_caller(accounts.bob);
 
             let dummy_id = AccountId::from([0x01; 32]);
+            let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
                 dummy_id,
                 dummy_id,
                 dummy_id,
                 WrappedU256::from(U256::from(0)),
+                liquidation_threshold,
                 String::from("Token Name"),
                 String::from("symbol"),
                 8,
@@ -629,6 +655,29 @@ pub mod contract {
             for func in admin_funcs {
                 assert_eq!(func.unwrap_err(), Error::CallerIsNotManager);
             }
+        }
+
+        #[ink::test]
+        fn set_liquidation_threshold_works() {
+            let accounts = default_accounts();
+            set_caller(accounts.bob);
+
+            let dummy_id = AccountId::from([0x01; 32]);
+            let mut liquidation_threshold = 10000;
+            let mut contract = PoolContract::new(
+                dummy_id,
+                dummy_id,
+                dummy_id,
+                WrappedU256::from(U256::from(0)),
+                liquidation_threshold,
+                String::from("Token Name"),
+                String::from("symbol"),
+                8,
+            );
+
+            liquidation_threshold = 8000;
+            let _ = contract.set_liquidation_threshold(liquidation_threshold);
+            assert_eq!(contract.liquidation_threshold(), liquidation_threshold);
         }
     }
 }

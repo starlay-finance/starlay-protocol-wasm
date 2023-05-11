@@ -80,6 +80,7 @@ const setup = async (
       controller.address,
       interestRateModel.address,
       [ONE_ETHER.toString()],
+      10000,
     ],
     token: token1,
   })
@@ -92,6 +93,7 @@ const setup = async (
       controller.address,
       interestRateModel.address,
       [ONE_ETHER.toString()],
+      10000,
     ],
     token: token2,
   })

@@ -3,11 +3,19 @@ pub use crate::traits::{
     controller::*,
     pool::PoolRef,
 };
-use crate::traits::{
-    price_oracle::PriceOracleRef,
-    types::WrappedU256,
+use crate::{
+    impls::price_oracle::PRICE_PRECISION,
+    traits::{
+        price_oracle::PriceOracleRef,
+        types::WrappedU256,
+    },
 };
-use core::ops::Sub;
+use core::ops::{
+    Add,
+    Div,
+    Mul,
+    Sub,
+};
 use ink::prelude::vec::Vec;
 use openbrush::{
     storage::Mapping,
@@ -23,9 +31,11 @@ use primitive_types::U256;
 
 mod utils;
 use self::utils::{
+    calculate_health_factor_from_balances,
     collateral_factor_max_mantissa,
     get_hypothetical_account_liquidity,
     liquidate_calculate_seize_tokens,
+    BalanceDecreaseAllowedParam,
     GetHypotheticalAccountLiquidityInput,
     HypotheticalAccountLiquidityCalculationParam,
     LiquidateCalculateSeizeTokensInput,
@@ -76,6 +86,18 @@ impl Default for PoolAttributes {
             account_borrow_balance: Default::default(),
             exchange_rate: Default::default(),
             total_borrows: Default::default(),
+        }
+    }
+}
+
+impl Default for PoolAttributesForWithdrawValidation {
+    fn default() -> Self {
+        PoolAttributesForWithdrawValidation {
+            underlying: ZERO_ADDRESS.into(),
+            liquidation_threshold: Default::default(),
+            account_balance: Default::default(),
+            account_borrow_balance: Default::default(),
+            exchange_rate: Default::default(),
         }
     }
 }
@@ -238,6 +260,17 @@ pub trait Internal {
         borrow_amount: Balance,
         caller_pool: Option<(AccountId, PoolAttributes)>,
     ) -> Result<(U256, U256)>;
+    fn _calculate_user_account_data(
+        &self,
+        account: AccountId,
+        pool_attributes: Option<PoolAttributesForWithdrawValidation>,
+    ) -> Result<AccountData>;
+    fn _balance_decrease_allowed(
+        &self,
+        pool_attributes: PoolAttributesForWithdrawValidation,
+        account: AccountId,
+        amount: Balance,
+    ) -> Result<bool>;
 
     // event emission
     fn _emit_market_listed_event(&self, pool: AccountId);
@@ -591,6 +624,23 @@ impl<T: Storage<Data>> Controller for T {
         borrow_amount: Balance,
     ) -> Result<(U256, U256)> {
         self._get_hypothetical_account_liquidity(account, token, redeem_tokens, borrow_amount, None)
+    }
+
+    default fn calculate_user_account_data(
+        &self,
+        account: AccountId,
+        pool_attributes: Option<PoolAttributesForWithdrawValidation>,
+    ) -> Result<AccountData> {
+        self._calculate_user_account_data(account, pool_attributes)
+    }
+
+    default fn balance_decrease_allowed(
+        &self,
+        pool_attributes: PoolAttributesForWithdrawValidation,
+        account: AccountId,
+        amount: Balance,
+    ) -> Result<bool> {
+        self._balance_decrease_allowed(pool_attributes, account, amount)
     }
 }
 
@@ -1157,6 +1207,151 @@ impl<T: Storage<Data>> Internal for T {
             (U256::from(0), sum_borrow_plus_effect.sub(sum_collateral))
         };
         Ok(value)
+    }
+
+    default fn _calculate_user_account_data(
+        &self,
+        account: AccountId,
+        pool_attributes: Option<PoolAttributesForWithdrawValidation>,
+    ) -> Result<AccountData> {
+        let caller = Self::env().caller();
+        let account_assets: Vec<AccountId> = self._account_assets(account, caller);
+        if account_assets.is_empty() {
+            return Ok(AccountData {
+                total_collateral_in_base_currency: U256::from(0),
+                total_debt_in_base_currency: U256::from(0),
+                avg_ltv: U256::from(0),
+                avg_liquidation_threshold: U256::from(0),
+                health_factor: U256::MAX,
+            })
+        }
+
+        let mut total_collateral_in_base_currency = U256::from(0);
+        let mut avg_ltv = U256::from(0);
+        let mut avg_liquidation_threshold = U256::from(0);
+        let mut total_debt_in_base_currency: U256 = U256::from(0);
+
+        let account_assets_iter = account_assets.into_iter();
+        for asset in account_assets_iter {
+            let collateral_factor_mantissa: Option<WrappedU256> =
+                self.collateral_factor_mantissa(asset);
+            if collateral_factor_mantissa.is_none() {
+                return Err(Error::MarketNotListed)
+            }
+            let ltv = U256::from(collateral_factor_mantissa.unwrap());
+
+            let liquidation_threshold: u128;
+            let unit_price: u128;
+            let compounded_liquidity_balance: u128;
+            let borrow_balance_stored: u128;
+
+            let oracle = self._oracle();
+            if caller == asset {
+                if pool_attributes.is_none() {
+                    return Err(Error::MarketNotListed)
+                }
+                let _pool_attributes = pool_attributes.clone().unwrap();
+                liquidation_threshold = _pool_attributes.liquidation_threshold;
+                let unit_price_result =
+                    PriceOracleRef::get_price(&oracle, _pool_attributes.underlying);
+                if unit_price_result.is_none() {
+                    return Err(Error::PriceError)
+                }
+                unit_price = unit_price_result.unwrap();
+                compounded_liquidity_balance = _pool_attributes.account_balance;
+                borrow_balance_stored = _pool_attributes.account_borrow_balance;
+            } else {
+                liquidation_threshold = PoolRef::liquidation_threshold(&asset);
+                let underlying: AccountId = PoolRef::underlying(&asset);
+                let unit_price_result = PriceOracleRef::get_price(&oracle, underlying);
+                if unit_price_result.is_none() {
+                    return Err(Error::PriceError)
+                }
+                unit_price = unit_price_result.unwrap();
+                (compounded_liquidity_balance, borrow_balance_stored, _) =
+                    PoolRef::get_account_snapshot(&asset, account);
+            }
+
+            if compounded_liquidity_balance != 0 {
+                let liquidity_balance_eth = U256::from(unit_price)
+                    .mul(U256::from(compounded_liquidity_balance))
+                    .div(U256::from(PRICE_PRECISION));
+                total_collateral_in_base_currency =
+                    total_collateral_in_base_currency.add(liquidity_balance_eth);
+                avg_ltv = avg_ltv.add(liquidity_balance_eth.mul(U256::from(ltv)));
+                avg_liquidation_threshold = avg_liquidation_threshold
+                    .add(liquidity_balance_eth.mul(U256::from(liquidation_threshold)));
+            }
+
+            if borrow_balance_stored != 0 {
+                let borrow_balance_eth = U256::from(unit_price)
+                    .mul(U256::from(borrow_balance_stored))
+                    .div(U256::from(PRICE_PRECISION));
+                total_debt_in_base_currency = total_debt_in_base_currency.add(borrow_balance_eth);
+            }
+        }
+
+        avg_ltv = if total_collateral_in_base_currency.is_zero() {
+            U256::from(0)
+        } else {
+            avg_ltv.div(total_collateral_in_base_currency)
+        };
+
+        avg_liquidation_threshold = if total_collateral_in_base_currency.is_zero() {
+            U256::from(0)
+        } else {
+            avg_liquidation_threshold.div(total_collateral_in_base_currency)
+        };
+
+        let health_factor = calculate_health_factor_from_balances(
+            total_collateral_in_base_currency,
+            total_debt_in_base_currency,
+            avg_liquidation_threshold,
+        );
+        Ok(AccountData {
+            total_collateral_in_base_currency,
+            total_debt_in_base_currency,
+            avg_ltv,
+            avg_liquidation_threshold,
+            health_factor,
+        })
+    }
+
+    default fn _balance_decrease_allowed(
+        &self,
+        pool_attributes: PoolAttributesForWithdrawValidation,
+        account: AccountId,
+        amount: Balance,
+    ) -> Result<bool> {
+        let account_assets: Vec<AccountId> = self._account_assets(account, Self::env().caller());
+        if account_assets.is_empty() {
+            return Ok(true)
+        }
+
+        let account_data =
+            self._calculate_user_account_data(account, Some(pool_attributes.clone()))?;
+
+        let total_debt_in_base_currency = account_data.total_debt_in_base_currency;
+
+        if total_debt_in_base_currency.is_zero() {
+            return Ok(true)
+        }
+
+        let asset_price = PriceOracleRef::get_price(&self._oracle(), pool_attributes.underlying);
+        if let None | Some(0) = asset_price {
+            return Ok(false)
+        }
+
+        return Ok(utils::balance_decrease_allowed(
+            BalanceDecreaseAllowedParam {
+                total_collateral_in_base_currency: account_data.total_collateral_in_base_currency,
+                total_debt_in_base_currency,
+                avg_liquidation_threshold: account_data.avg_liquidation_threshold,
+                amount_in_base_currency_unit: amount.into(),
+                asset_price: asset_price.unwrap().into(),
+                liquidation_threshold: pool_attributes.liquidation_threshold.into(),
+            },
+        ))
     }
 
     default fn _emit_market_listed_event(&self, _pool: AccountId) {}

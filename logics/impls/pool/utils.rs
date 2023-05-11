@@ -1,9 +1,3 @@
-use openbrush::traits::{
-    Balance,
-    Timestamp,
-};
-use primitive_types::U256;
-
 use super::super::exp_no_err::{
     exp_scale,
     Exp,
@@ -22,6 +16,11 @@ use core::ops::{
     Mul,
     Sub,
 };
+use openbrush::traits::{
+    Balance,
+    Timestamp,
+};
+use primitive_types::U256;
 
 pub fn borrow_rate_max_mantissa() -> U256 {
     // .0005% / time
@@ -178,6 +177,7 @@ pub fn exchange_rate(
 }
 
 #[cfg(test)]
+
 mod tests {
     use super::Exp;
 

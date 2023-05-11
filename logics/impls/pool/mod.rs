@@ -2,6 +2,7 @@ use super::{
     controller::{
         PoolAttributes,
         PoolAttributesForSeizeCalculation,
+        PoolAttributesForWithdrawValidation,
     },
     exp_no_err::{
         exp_scale,
@@ -80,6 +81,7 @@ pub struct Data {
     pub borrow_index: WrappedU256,
     pub initial_exchange_rate_mantissa: WrappedU256,
     pub reserve_factor_mantissa: WrappedU256,
+    pub liquidation_threshold: u128,
     pub delegate_allowance: Mapping<(AccountId, AccountId), Balance, AllowancesKey>,
 }
 
@@ -104,6 +106,7 @@ impl Default for Data {
             borrow_index: exp_scale().into(),
             initial_exchange_rate_mantissa: WrappedU256::from(U256::zero()),
             reserve_factor_mantissa: WrappedU256::from(U256::zero()),
+            liquidation_threshold: 10000,
         }
     }
 }
@@ -158,6 +161,7 @@ pub trait Internal {
     fn _add_reserves(&mut self, amount: Balance) -> Result<()>;
     fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()>;
     fn _sweep_token(&mut self, asset: AccountId) -> Result<()>;
+    fn _set_liquidation_threshold(&mut self, new_liquidation_threshold: u128) -> Result<()>;
     fn _approve_delegate(
         &mut self,
         owner: AccountId,
@@ -208,6 +212,7 @@ pub trait Internal {
     fn _exchange_rate_stored(&self) -> U256;
     fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput>;
     fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool);
+    fn _liquidation_threshold(&self) -> u128;
     fn _delegate_allowance(&self, owner: &AccountId, delegatee: &AccountId) -> Balance;
     // event emission
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
@@ -424,6 +429,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._sweep_token(asset)
     }
 
+    default fn set_liquidation_threshold(&mut self, new_liquidation_threshold: u128) -> Result<()> {
+        self._set_liquidation_threshold(new_liquidation_threshold)
+    }
+
     default fn approve_delegate(&mut self, delegatee: AccountId, amount: Balance) -> Result<()> {
         self._approve_delegate(Self::env().caller(), delegatee, amount)
     }
@@ -531,6 +540,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn reserve_factor_mantissa(&self) -> WrappedU256 {
         self._reserve_factor_mantissa()
+    }
+
+    default fn liquidation_threshold(&self) -> u128 {
+        self._liquidation_threshold()
     }
 
     default fn delegate_allowance(&self, owner: AccountId, delegatee: AccountId) -> Balance {
@@ -670,9 +683,26 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Ok(())
         }
 
-        let contract_addr = Self::env().account_id();
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(redeemer);
+
+        let pool_attributes = PoolAttributesForWithdrawValidation {
+            underlying: self._underlying(),
+            liquidation_threshold: self._liquidation_threshold(),
+            account_balance,
+            account_borrow_balance,
+            exchange_rate,
+        };
+        let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
+            &self.controller(),
+            pool_attributes,
+            redeemer,
+            redeem_amount,
+        )?;
+        if balance_decrease_allowed == false {
+            return Err(Error::RedeemTransferOutNotPossible)
+        }
+
         let pool_attribute = PoolAttributes {
             underlying: self._underlying(),
             decimals: self.token_decimals(),
@@ -681,6 +711,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             exchange_rate,
             total_borrows: self._total_borrows(),
         };
+        let contract_addr = Self::env().account_id();
         ControllerRef::redeem_allowed(
             &self._controller(),
             contract_addr,
@@ -746,6 +777,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let caller = Self::env().caller();
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(borrower);
+
         let pool_attribute = PoolAttributes {
             underlying: self._underlying(),
             decimals: self.token_decimals(),
@@ -1078,6 +1110,14 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
 
+    default fn _set_liquidation_threshold(
+        &mut self,
+        new_liquidation_threshold: u128,
+    ) -> Result<()> {
+        self.data::<Data>().liquidation_threshold = new_liquidation_threshold;
+        Ok(())
+    }
+
     default fn _approve_delegate(
         &mut self,
         owner: AccountId,
@@ -1277,6 +1317,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             self._total_reserves(),
             U256::from(self._initial_exchange_rate_mantissa()),
         )
+    }
+
+    default fn _liquidation_threshold(&self) -> u128 {
+        self.data::<Data>().liquidation_threshold
     }
 
     default fn _delegate_allowance(&self, owner: &AccountId, delegatee: &AccountId) -> Balance {

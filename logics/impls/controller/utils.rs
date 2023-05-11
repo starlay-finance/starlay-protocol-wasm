@@ -1,8 +1,13 @@
 pub use crate::traits::controller::*;
 use crate::{
-    impls::exp_no_err::{
-        exp_scale,
-        Exp,
+    impls::{
+        exp_no_err::{
+            exp_scale,
+            Exp,
+        },
+        percent_math::Percent,
+        price_oracle::PRICE_PRECISION,
+        wad_ray_math::Wad,
     },
     traits::types::WrappedU256,
 };
@@ -10,6 +15,7 @@ use core::ops::{
     Add,
     Div,
     Mul,
+    Sub,
 };
 use ink::prelude::vec::Vec;
 use openbrush::traits::{
@@ -17,6 +23,8 @@ use openbrush::traits::{
     Balance,
 };
 use primitive_types::U256;
+
+pub const HEALTH_FACTOR_LIQUIDATION_THRESHOLD: u128 = 10_u128.pow(18);
 
 pub struct LiquidateCalculateSeizeTokensInput {
     pub price_borrowed_mantissa: U256,
@@ -48,6 +56,45 @@ pub fn liquidate_calculate_seize_tokens(input: &LiquidateCalculateSeizeTokensInp
             .div(U256::from(10).pow(input.decimals_borrowed.into())),
     );
     seize_tokens.as_u128()
+}
+
+#[derive(Clone, Debug)]
+pub struct BalanceDecreaseAllowedParam {
+    pub asset_price: U256,
+    pub amount_in_base_currency_unit: U256,
+    pub total_collateral_in_base_currency: U256,
+    pub avg_liquidation_threshold: U256,
+    pub liquidation_threshold: U256,
+    pub total_debt_in_base_currency: U256,
+}
+
+pub fn balance_decrease_allowed(param: BalanceDecreaseAllowedParam) -> bool {
+    let amount_to_decrease_in_base_currency = param
+        .asset_price
+        .mul(param.amount_in_base_currency_unit)
+        .div(U256::from(PRICE_PRECISION));
+
+    let collateral_balance_after_decrease = param
+        .total_collateral_in_base_currency
+        .sub(amount_to_decrease_in_base_currency);
+
+    if collateral_balance_after_decrease.is_zero() {
+        return false
+    }
+
+    let liquidation_threshold_after_decrease = param
+        .total_collateral_in_base_currency
+        .mul(param.avg_liquidation_threshold)
+        .sub(amount_to_decrease_in_base_currency.mul(param.liquidation_threshold))
+        .div(collateral_balance_after_decrease);
+
+    let health_factor_after_decrease = calculate_health_factor_from_balances(
+        collateral_balance_after_decrease,
+        param.total_debt_in_base_currency,
+        liquidation_threshold_after_decrease,
+    );
+
+    health_factor_after_decrease >= U256::from(HEALTH_FACTOR_LIQUIDATION_THRESHOLD)
 }
 
 pub fn collateral_factor_max_mantissa() -> U256 {
@@ -162,6 +209,38 @@ pub fn get_hypothetical_account_liquidity_per_asset(
         flatten_collateral,
         flatten_borrow_plus_effect,
     )
+}
+
+pub fn calculate_health_factor_from_balances(
+    total_collateral_in_base_currency: U256,
+    total_debt_in_base_currency: U256,
+    liquidation_threshold: U256,
+) -> U256 {
+    if total_debt_in_base_currency.is_zero() {
+        return U256::MAX
+    }
+
+    let percent_mul_result = (Percent {
+        percentage: liquidation_threshold,
+    })
+    .percent_mul(total_collateral_in_base_currency);
+
+    if percent_mul_result.is_err() {
+        return U256::from(0)
+    }
+
+    let wad_div_result = (Wad {
+        mantissa: WrappedU256::from(percent_mul_result.unwrap()),
+    })
+    .wad_div(Wad {
+        mantissa: WrappedU256::from(total_debt_in_base_currency),
+    });
+
+    if wad_div_result.is_err() {
+        return U256::from(0)
+    }
+
+    U256::from(wad_div_result.unwrap().mantissa)
 }
 
 #[cfg(test)]
@@ -577,6 +656,139 @@ mod tests {
             assert_eq!(
                 sum_borrow_plus_effect,
                 U256::from(case.expected.sum_borrow_plus_effect)
+            );
+        }
+    }
+
+    #[test]
+    fn test_calculate_health_factor_from_balances() {
+        struct Case {
+            total_collateral_in_base_currency: U256,
+            total_debt_in_base_currency: U256,
+            liquidation_threshold: U256,
+            expected: U256,
+            name: &'static str,
+        }
+        let one: U256 = U256::from(10).pow(U256::from(18));
+        let one_percent: U256 = U256::from(100);
+        let cases = vec![
+            Case {
+                name: "debt is zero",
+                total_collateral_in_base_currency: 0.into(),
+                total_debt_in_base_currency: 0.into(),
+                liquidation_threshold: 0.into(),
+                expected: U256::MAX,
+            },
+            Case {
+                name: "just hits liquidation threshold",
+                total_collateral_in_base_currency: one,
+                total_debt_in_base_currency: one.div(U256::from(100)),
+                liquidation_threshold: one_percent,
+                expected: one,
+            },
+        ];
+        for case in cases {
+            let got = calculate_health_factor_from_balances(
+                case.total_collateral_in_base_currency,
+                case.total_debt_in_base_currency,
+                case.liquidation_threshold,
+            );
+            assert_eq!(got, case.expected, "{}", case.name);
+        }
+    }
+    #[test]
+    fn test_balance_decrease_allowed() {
+        struct Case {
+            input: BalanceDecreaseAllowedParam,
+            expected: bool,
+            name: &'static str,
+        }
+        let one: U256 = U256::from(10).pow(U256::from(18));
+        let price_one: U256 = one;
+        let mantissa_one: U256 = one;
+        let one_percent: U256 = U256::from(100);
+        let cases = vec![
+            Case {
+                name: "all params are zero",
+                input: BalanceDecreaseAllowedParam {
+                    amount_in_base_currency_unit: 0.into(),
+                    asset_price: 0.into(),
+                    avg_liquidation_threshold: 0.into(),
+                    liquidation_threshold: 0.into(),
+                    total_collateral_in_base_currency: 0.into(),
+                    total_debt_in_base_currency: 0.into(),
+                },
+                expected: false,
+            },
+            Case {
+                name: "if there is a borrow, there can't be 0 collateral",
+                input: BalanceDecreaseAllowedParam {
+                    amount_in_base_currency_unit: one,
+                    asset_price: price_one,
+                    avg_liquidation_threshold: mantissa_one,
+                    liquidation_threshold: mantissa_one,
+                    total_collateral_in_base_currency: mantissa_one,
+                    total_debt_in_base_currency: 0.into(),
+                },
+                expected: false,
+            },
+            Case {
+                name: "just hit the boundary of liquidation threshold: pass",
+                input: BalanceDecreaseAllowedParam {
+                    asset_price: price_one,
+                    // 80 %
+                    avg_liquidation_threshold: one_percent.mul(U256::from(80)),
+                    // 80 %
+                    liquidation_threshold: one_percent.mul(U256::from(80)),
+                    // 110
+                    total_collateral_in_base_currency: one.mul(U256::from(110)),
+                    // 80
+                    total_debt_in_base_currency: one.mul(U256::from(80)),
+                    // decrease amount just hits the boundary should be 10
+                    amount_in_base_currency_unit: one.mul(U256::from(10)),
+                },
+                expected: true,
+            },
+            Case {
+                name: "just hit the boundary of liquidation threshold: fail",
+                input: BalanceDecreaseAllowedParam {
+                    asset_price: price_one,
+                    // 80 %
+                    avg_liquidation_threshold: one_percent.mul(U256::from(80)),
+                    // 80 %
+                    liquidation_threshold: one_percent.mul(U256::from(80)),
+                    // 110
+                    total_collateral_in_base_currency: one.mul(U256::from(110)),
+                    // 80
+                    total_debt_in_base_currency: one.mul(U256::from(80)),
+                    // decrease amount just hits the boundary should be 10 so should fail with 1e19 + 1 + 50(see: wad_div)
+                    amount_in_base_currency_unit: one.mul(U256::from(10)).add(U256::from(51)),
+                },
+                expected: false,
+            },
+            Case {
+                name: "health factor is 2",
+                input: BalanceDecreaseAllowedParam {
+                    asset_price: price_one,
+                    // 80 %
+                    avg_liquidation_threshold: one_percent.mul(U256::from(80)),
+                    // 80 %
+                    liquidation_threshold: one_percent.mul(U256::from(80)),
+                    // 210
+                    total_collateral_in_base_currency: one.mul(U256::from(210)),
+                    // 80
+                    total_debt_in_base_currency: one.mul(U256::from(80)),
+                    amount_in_base_currency_unit: one.mul(U256::from(10)),
+                },
+                expected: true,
+            },
+        ];
+        for case in cases {
+            assert_eq!(
+                balance_decrease_allowed(case.input.clone()),
+                case.expected,
+                "case: {}",
+                case.name
             );
         }
     }

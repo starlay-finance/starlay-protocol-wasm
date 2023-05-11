@@ -1,5 +1,6 @@
 import { ReturnNumber } from '@727-ventures/typechain-types'
 import { encodeAddress } from '@polkadot/keyring'
+import type { KeyringPair } from '@polkadot/keyring/types'
 import BN from 'bn.js'
 import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
@@ -8,7 +9,10 @@ import {
   deployPriceOracle,
 } from '../scripts/helper/deploy_helper'
 import { hexToUtf8 } from '../scripts/helper/utils'
+import Controller from '../types/contracts/controller'
+import PriceOracle from '../types/contracts/price_oracle'
 import {
+  Pools,
   TEST_METADATAS,
   preparePoolWithMockToken,
   preparePoolsWithPreparedTokens,
@@ -229,7 +233,7 @@ describe('Controller spec', () => {
         ZERO_ADDRESS,
         0,
       )
-      expect(value.ok.ok).toBeNull
+      expect(value.ok.ok).toBeNull()
     })
   })
 
@@ -314,10 +318,7 @@ describe('Controller spec', () => {
 
   describe('.seize_allowed', () => {
     it('check pause status', async () => {
-      const {
-        controller,
-        pools: { dai },
-      } = await setupWithPools()
+      const { controller } = await setupWithPools()
       await controller.tx.setSeizeGuardianPaused(true)
       const { value } = await controller.query.seizeAllowed(
         ZERO_ADDRESS,
@@ -411,9 +412,7 @@ describe('Controller spec', () => {
       const res = await usdc.pool
         .withSigner(sender)
         .query.transfer(receiver.address, toDec6(50_000).add(new BN(1)), [])
-      expect(hexToUtf8(res.value.ok.err['custom'])).toBe(
-        'InsufficientLiquidity',
-      )
+      expect(hexToUtf8(res.value.ok.err.custom)).toBe('InsufficientLiquidity')
     }
   })
 
@@ -904,6 +903,133 @@ describe('Controller spec', () => {
           },
         )
       })
+    })
+  })
+
+  describe('.calculate_user_account_data', () => {
+    let controller: Controller
+    let pools: Pools
+    let deployer: KeyringPair
+    let users: KeyringPair[]
+    let priceOracle: PriceOracle
+
+    it('instantiate', async () => {
+      ;({ controller, deployer, pools, users, priceOracle } =
+        await setupWithPools())
+      const { dai, usdt, usdc } = pools
+
+      const markets = (await controller.query.markets()).value.ok
+      expect(markets.length).toBe(3)
+      expect((await controller.query.oracle()).value.ok).toEqual(
+        priceOracle.address,
+      )
+      const closeFactorMantissa = (await controller.query.closeFactorMantissa())
+        .value.ok
+      expect(closeFactorMantissa.toNumber()).toEqual(0)
+      const liquidationIncentiveMantissa = (
+        await controller.query.liquidationIncentiveMantissa()
+      ).value.ok
+      expect(liquidationIncentiveMantissa.toNumber()).toEqual(0)
+
+      await shouldNotRevert(dai.pool, 'setLiquidationThreshold', [8500])
+      await shouldNotRevert(usdt.pool, 'setLiquidationThreshold', [9000])
+      await shouldNotRevert(usdc.pool, 'setLiquidationThreshold', [8000])
+
+      expect(
+        (await dai.pool.query.liquidationThreshold()).value.ok.toNumber(),
+      ).toEqual(8500)
+      expect(
+        (await usdt.pool.query.liquidationThreshold()).value.ok.toNumber(),
+      ).toEqual(9000)
+      expect(
+        (await usdc.pool.query.liquidationThreshold()).value.ok.toNumber(),
+      ).toEqual(8000)
+    })
+
+    const daiDeposited = 50_000
+    const usdcDeposited = 30_000
+    const usdtDeposited = 50_000
+    const daiBorrowed = 20_000
+    it('preparation', async () => {
+      const { dai, usdc, usdt } = pools
+
+      await shouldNotRevert(dai.token, 'mint', [users[0].address, daiDeposited])
+      await shouldNotRevert(dai.token.withSigner(users[0]), 'approve', [
+        dai.pool.address,
+        daiDeposited,
+      ])
+      await shouldNotRevert(dai.pool.withSigner(users[0]), 'mint', [
+        daiDeposited,
+      ])
+
+      expect(
+        (await dai.pool.query.balanceOf(users[0].address)).value.ok.toNumber(),
+      ).toEqual(daiDeposited)
+
+      await shouldNotRevert(usdc.token, 'mint', [
+        deployer.address,
+        usdcDeposited,
+      ])
+      await shouldNotRevert(usdc.token, 'approve', [
+        usdc.pool.address,
+        usdcDeposited,
+      ])
+      await shouldNotRevert(usdc.pool, 'mint', [usdcDeposited])
+
+      expect(
+        (await usdc.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(usdcDeposited)
+
+      await shouldNotRevert(usdt.token, 'mint', [
+        deployer.address,
+        usdtDeposited,
+      ])
+      await shouldNotRevert(usdt.token, 'approve', [
+        usdt.pool.address,
+        usdtDeposited,
+      ])
+      await shouldNotRevert(usdt.pool, 'mint', [usdtDeposited])
+
+      expect(
+        (await usdt.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+      ).toEqual(usdtDeposited)
+
+      await shouldNotRevert(dai.pool, 'borrow', [daiBorrowed])
+
+      expect(
+        (
+          await dai.pool.query.borrowBalanceStored(deployer.address)
+        ).value.ok.toNumber(),
+      ).toEqual(daiBorrowed)
+    })
+
+    it('check account data', async () => {
+      const deployerAccountData = (
+        await controller.query.calculateUserAccountData(deployer.address, null)
+      ).value.ok.ok
+
+      // Total Collateral In Eth
+      expect(
+        new BN(
+          BigInt(
+            deployerAccountData.totalCollateralInBaseCurrency.toString(),
+          ).toString(),
+        ).toString(),
+      ).toEqual(new BN(usdcDeposited).add(new BN(usdtDeposited)).toString())
+
+      // Total Debt In Eth
+      expect(
+        new BN(
+          BigInt(
+            deployerAccountData.totalDebtInBaseCurrency.toString(),
+          ).toString(),
+        ).toString(),
+      ).toEqual(new BN(daiBorrowed).toString())
+
+      expect(
+        (await controller.query.accountAssets(users[0].address)).value.ok
+          .length,
+      ).toEqual(1)
     })
   })
 })

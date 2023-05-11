@@ -98,6 +98,7 @@ export const preparePoolWithMockToken = async ({
       controller.address,
       rateModel.address,
       [ONE_ETHER.toString()],
+      10000,
     ],
     token,
   })
@@ -129,6 +130,7 @@ export const preparePoolWithWETH = async ({
       controller.address,
       rateModel.address,
       [ONE_ETHER.toString()],
+      10000,
     ],
     token,
   })

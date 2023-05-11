@@ -6,26 +6,28 @@ export interface RiskParameter {
   collateralFactor: BN
   reserveFactor: BN
   initialExchangeRateMantissa: BN
+  liquidationThreshold: BN
 }
 
-const param = (col: number, res: number): RiskParameter => {
+const param = (col: number, res: number, threshold: number): RiskParameter => {
   return {
     collateralFactor: percent(col),
     initialExchangeRateMantissa: ONE_ETHER,
     reserveFactor: percent(res),
+    liquidationThreshold: new BN(threshold * 100),
   }
 }
 
 export const RISK_PARAMETERS: iAssetBase<RiskParameter> = {
-  wastr: param(40, 20),
-  dot: param(65, 20),
-  usdc: param(80, 10),
-  usdt: param(80, 10),
-  dai: param(80, 10),
-  busd: param(80, 10),
-  weth: param(80, 10),
-  wbtc: param(70, 10),
-  matic: param(40, 20),
-  bnb: param(40, 20),
-  wsdn: param(40, 20),
+  wastr: param(40, 20, 55),
+  dot: param(65, 20, 70),
+  usdc: param(80, 10, 85),
+  usdt: param(80, 10, 85),
+  dai: param(80, 10, 85),
+  busd: param(80, 10, 85),
+  weth: param(80, 10, 85),
+  wbtc: param(70, 10, 75),
+  matic: param(40, 20, 55),
+  bnb: param(40, 20, 55),
+  wsdn: param(40, 20, 55),
 }
