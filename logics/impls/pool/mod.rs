@@ -515,8 +515,16 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256) {
+        let using_as_collateral = self._using_reserve_as_collateral(account);
+        if using_as_collateral.unwrap_or(false) {
+            return (
+                Internal::_balance_of(self, &account),
+                self._borrow_balance_stored(account),
+                self._exchange_rate_stored(),
+            )
+        }
         (
-            Internal::_balance_of(self, &account),
+            0,
             self._borrow_balance_stored(account),
             self._exchange_rate_stored(),
         )
@@ -672,8 +680,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let lp_balance = self._principal_balance_of(&src);
         if lp_balance == 0 {
             self._set_use_reserve_as_collateral(src, false);
-            self._set_use_reserve_as_collateral(dst, true);
         }
+        self._set_use_reserve_as_collateral(dst, true);
 
         Ok(())
     }
@@ -698,7 +706,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         // Check if it is first deposit.
         let lp_balance = self._principal_balance_of(&caller);
         if lp_balance == 0 {
-            self._set_use_reserve_as_collateral(caller, true);
+            self._set_use_reserve_as_collateral(minter, true);
         }
 
         self._mint_to(minter, minted_tokens)?;
@@ -716,11 +724,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Ok(())
         }
 
-        let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(redeemer);
-
+        let (_, account_borrow_balance, exchange_rate) = self.get_account_snapshot(redeemer);
+        let account_balance = Internal::_balance_of(self, &redeemer);
+        let contract_addr = Self::env().account_id();
         let is_using_collateral = self._using_reserve_as_collateral(redeemer).unwrap_or(false);
         let pool_attributes = PoolAttributesForWithdrawValidation {
+            pool: contract_addr,
             underlying: self._underlying(),
             liquidation_threshold: self._liquidation_threshold(),
             account_balance,
@@ -745,7 +754,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             exchange_rate,
             total_borrows: self._total_borrows(),
         };
-        let contract_addr = Self::env().account_id();
         ControllerRef::redeem_allowed(
             &self._controller(),
             contract_addr,
@@ -1179,6 +1187,15 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _set_use_reserve_as_collateral(&mut self, user: AccountId, use_as_collateral: bool) {
+        let current_using_as_collateral = self
+            .data::<Data>()
+            .using_reserve_as_collateral
+            .get(&user)
+            .unwrap_or(false);
+        if current_using_as_collateral == use_as_collateral {
+            return
+        }
+
         self.data::<Data>()
             .using_reserve_as_collateral
             .insert(&user, &use_as_collateral);
@@ -1195,19 +1212,19 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         user: AccountId,
         use_as_collateral: bool,
     ) -> Result<()> {
-        let underlying_balance = PSP22Ref::balance_of(&self._underlying(), user);
-        if underlying_balance == 0 {
-            return Err(Error::UnderlyingBalanceNotGreaterThanZero)
-        }
-
         if use_as_collateral {
             return Ok(())
         }
 
         let (account_balance, account_borrow_balance, _) = self.get_account_snapshot(user);
+        if account_balance == 0 {
+            return Err(Error::from(PSP22Error::InsufficientBalance))
+        }
 
         let is_using_collateral = self._using_reserve_as_collateral(user).unwrap_or(false);
+        let contract_addr = Self::env().account_id();
         let pool_attributes = PoolAttributesForWithdrawValidation {
+            pool: contract_addr,
             underlying: self._underlying(),
             liquidation_threshold: self._liquidation_threshold(),
             account_balance,
@@ -1218,7 +1235,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             &self.controller(),
             pool_attributes,
             user,
-            underlying_balance,
+            account_balance,
         )?;
 
         if balance_decrease_allowed == false {

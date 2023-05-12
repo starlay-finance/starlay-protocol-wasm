@@ -332,6 +332,7 @@ pub struct PoolAttributesForSeizeCalculation {
 #[derive(Clone, Decode, Encode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributesForWithdrawValidation {
+    pub pool: AccountId,
     pub underlying: AccountId,
     pub liquidation_threshold: u128,
     pub account_balance: Balance,

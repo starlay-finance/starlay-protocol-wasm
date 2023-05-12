@@ -74,6 +74,10 @@ pub fn balance_decrease_allowed(param: BalanceDecreaseAllowedParam) -> bool {
         .mul(param.amount_in_base_currency_unit)
         .div(U256::from(PRICE_PRECISION));
 
+    if param.total_collateral_in_base_currency < amount_to_decrease_in_base_currency {
+        return false
+    }
+
     let collateral_balance_after_decrease = param
         .total_collateral_in_base_currency
         .sub(amount_to_decrease_in_base_currency);

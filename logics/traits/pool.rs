@@ -208,7 +208,6 @@ pub enum Error {
     ZeroOwnerAddress,
     ZeroDelegateeAddress,
     InsufficientDelegateAllowance,
-    UnderlyingBalanceNotGreaterThanZero,
     DepositAlreadyInUse,
     Controller(ControllerError),
     PSP22(PSP22Error),
