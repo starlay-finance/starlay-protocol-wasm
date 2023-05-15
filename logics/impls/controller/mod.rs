@@ -1281,7 +1281,7 @@ impl<T: Storage<Data>> Internal for T {
                 PoolRef::get_account_snapshot(&asset, account);
             let is_using_collateral = PoolRef::using_reserve_as_collateral(&asset, account);
 
-            if compounded_liquidity_balance != 0 && is_using_collateral.unwrap_or(false) {
+            if compounded_liquidity_balance != 0 && is_using_collateral {
                 let liquidity_balance_eth = U256::from(unit_price)
                     .mul(U256::from(compounded_liquidity_balance))
                     .div(U256::from(PRICE_PRECISION));
@@ -1332,7 +1332,7 @@ impl<T: Storage<Data>> Internal for T {
         account: AccountId,
         amount: Balance,
     ) -> Result<bool> {
-        if pool_attributes.is_using_collateral == false {
+        if !pool_attributes.is_using_collateral {
             return Ok(true)
         }
 

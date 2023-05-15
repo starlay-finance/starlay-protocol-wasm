@@ -185,7 +185,7 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn delegate_allowance(&self, owner: AccountId, delegatee: AccountId) -> Balance;
     #[ink(message)]
-    fn using_reserve_as_collateral(&self, user: AccountId) -> Option<bool>;
+    fn using_reserve_as_collateral(&self, user: AccountId) -> bool;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]

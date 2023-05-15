@@ -574,8 +574,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._delegate_allowance(&owner, &delegatee)
     }
 
-    default fn using_reserve_as_collateral(&self, user: AccountId) -> Option<bool> {
-        self._using_reserve_as_collateral(user)
+    default fn using_reserve_as_collateral(&self, user: AccountId) -> bool {
+        self._using_reserve_as_collateral(user).unwrap_or_default()
     }
 }
 
