@@ -98,7 +98,6 @@ impl Default for PoolAttributesForWithdrawValidation {
             liquidation_threshold: Default::default(),
             account_balance: Default::default(),
             account_borrow_balance: Default::default(),
-            is_using_collateral: false,
         }
     }
 }
@@ -1330,10 +1329,6 @@ impl<T: Storage<Data>> Internal for T {
         account: AccountId,
         amount: Balance,
     ) -> Result<bool> {
-        if !pool_attributes.is_using_collateral {
-            return Ok(true)
-        }
-
         let account_data =
             self._calculate_user_account_data(account, Some(pool_attributes.clone()))?;
 

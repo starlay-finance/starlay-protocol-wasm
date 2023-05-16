@@ -337,7 +337,6 @@ pub struct PoolAttributesForWithdrawValidation {
     pub liquidation_threshold: u128,
     pub account_balance: Balance,
     pub account_borrow_balance: Balance,
-    pub is_using_collateral: bool,
 }
 
 #[derive(Clone, Decode, Encode)]

@@ -720,21 +720,23 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _redeem(&mut self, redeemer: AccountId, redeem_amount: Balance) -> Result<()> {
-        if redeem_amount == 0 {
+        if redeem_amount == 0
+            || !self
+                ._using_reserve_as_collateral(redeemer)
+                .unwrap_or_default()
+        {
             return Ok(())
         }
 
         let (_, account_borrow_balance, exchange_rate) = self.get_account_snapshot(redeemer);
         let account_balance = Internal::_balance_of(self, &redeemer);
         let contract_addr = Self::env().account_id();
-        let is_using_collateral = self._using_reserve_as_collateral(redeemer).unwrap_or(false);
         let pool_attributes = PoolAttributesForWithdrawValidation {
             pool: contract_addr,
             underlying: self._underlying(),
             liquidation_threshold: self._liquidation_threshold(),
             account_balance,
             account_borrow_balance,
-            is_using_collateral,
         };
         let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
             &self.controller(),
@@ -1212,7 +1214,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         user: AccountId,
         use_as_collateral: bool,
     ) -> Result<()> {
-        if use_as_collateral {
+        if use_as_collateral || !self._using_reserve_as_collateral(user).unwrap_or_default() {
             return Ok(())
         }
 
@@ -1221,7 +1223,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Err(Error::from(PSP22Error::InsufficientBalance))
         }
 
-        let is_using_collateral = self._using_reserve_as_collateral(user).unwrap_or(false);
         let contract_addr = Self::env().account_id();
         let pool_attributes = PoolAttributesForWithdrawValidation {
             pool: contract_addr,
@@ -1229,7 +1230,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             liquidation_threshold: self._liquidation_threshold(),
             account_balance,
             account_borrow_balance,
-            is_using_collateral,
         };
         let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
             &self.controller(),
