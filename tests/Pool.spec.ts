@@ -15,7 +15,12 @@ import { RATE_MODELS } from '../scripts/interest_rates'
 import Contract from '../types/contracts/default_interest_rate_model'
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
-import { Mint, Redeem } from '../types/event-types/pool'
+import {
+  Mint,
+  Redeem,
+  ReserveUsedAsCollateralDisabled,
+  ReserveUsedAsCollateralEnabled,
+} from '../types/event-types/pool'
 import { Transfer } from '../types/event-types/psp22_token'
 import { SUPPORTED_TOKENS } from './../scripts/tokens'
 import {
@@ -175,13 +180,20 @@ describe('Pool spec', () => {
         ).value.ok.toNumber(),
       ).toBe(mintAmount)
 
-      expect(events).toHaveLength(2)
-      expectToEmit<Transfer>(events[0], 'Transfer', {
+      expect(events).toHaveLength(3)
+      expectToEmit<ReserveUsedAsCollateralEnabled>(
+        events[0],
+        'ReserveUsedAsCollateralEnabled',
+        {
+          user: deployer.address,
+        },
+      )
+      expectToEmit<Transfer>(events[1], 'Transfer', {
         from: null,
         to: deployer.address,
         value: mintAmount,
       })
-      expectToEmit<Mint>(events[1], 'Mint', {
+      expectToEmit<Mint>(events[2], 'Mint', {
         minter: deployer.address,
         mintAmount: depositAmount,
         mintTokens: mintAmount,
@@ -780,7 +792,7 @@ describe('Pool spec', () => {
         (BigInt(5000) * dec18 * BigInt(108)) / BigInt(100),
       )
 
-      console.log(res.events)
+      // console.log(res.events)
       // // check events from Pool (execute seize)
       // const contractEvents = res.events
       // //// Burn
@@ -950,13 +962,22 @@ describe('Pool spec', () => {
         expect(
           (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec18(100_000).toString())
-        expect(events).toHaveLength(1)
         //// check event
-        const event = events[0]
-        expect(event.name).toEqual('Transfer')
-        expect(event.args.from).toEqual(userA.address)
-        expect(event.args.to).toEqual(userB.address)
-        expect(event.args.value.toString()).toEqual(toDec18(100_000).toString())
+        expect(events).toHaveLength(2)
+
+        expect(events[0].name).toEqual('Transfer')
+        expect(events[0].args.from).toEqual(userA.address)
+        expect(events[0].args.to).toEqual(userB.address)
+        expect(events[0].args.value.toString()).toEqual(
+          toDec18(100_000).toString(),
+        )
+        expectToEmit<ReserveUsedAsCollateralEnabled>(
+          events[1],
+          'ReserveUsedAsCollateralEnabled',
+          {
+            user: userB.address,
+          },
+        )
         //// check account_liquidity
         assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(userA.address)).value.ok
@@ -988,13 +1009,20 @@ describe('Pool spec', () => {
         expect(
           (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec6(300_000).toString())
-        expect(events).toHaveLength(1)
+        expect(events).toHaveLength(2)
         //// check event
         const event = events[0]
         expect(event.name).toEqual('Transfer')
         expect(event.args.from).toEqual(userB.address)
         expect(event.args.to).toEqual(userA.address)
         expect(event.args.value.toString()).toEqual(toDec6(200_000).toString())
+        expectToEmit<ReserveUsedAsCollateralEnabled>(
+          events[1],
+          'ReserveUsedAsCollateralEnabled',
+          {
+            user: userA.address,
+          },
+        )
         //// check account_liquidity
         assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(userA.address)).value.ok
@@ -1169,8 +1197,8 @@ describe('Pool spec', () => {
         expect(
           (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec18(100_000).toString())
-        expect(transferFromEvents).toHaveLength(2)
         //// check event
+        expect(transferFromEvents).toHaveLength(3)
         const approvalEvent = transferFromEvents[0]
         expect(approvalEvent.name).toEqual('Approval')
         expect(approvalEvent.args.owner).toEqual(userA.address)
@@ -1182,6 +1210,13 @@ describe('Pool spec', () => {
         expect(transferEvent.args.to).toEqual(userB.address)
         expect(transferEvent.args.value.toString()).toEqual(
           toDec18(100_000).toString(),
+        )
+        expectToEmit<ReserveUsedAsCollateralEnabled>(
+          transferFromEvents[2],
+          'ReserveUsedAsCollateralEnabled',
+          {
+            user: userB.address,
+          },
         )
       }
     })
@@ -1529,8 +1564,6 @@ describe('Pool spec', () => {
         // confirmations
         await wait()
         await pool.tx.accrueInterest()
-        const borrows = await pool.query.borrowsScaled()
-        console.log(borrows.value.ok.toString())
         expect(
           (
             await pool.query.borrowBalanceCurrent(alice.address)
@@ -1711,16 +1744,170 @@ describe('Pool spec', () => {
         (await dai.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(deployerDaiDeposited - redeemAmount)
 
-      expect(events).toHaveLength(2)
-      expectToEmit<Transfer>(events[0], 'Transfer', {
+      expect(events).toHaveLength(3)
+      expectToEmit<ReserveUsedAsCollateralDisabled>(
+        events[0],
+        'ReserveUsedAsCollateralDisabled',
+        {
+          user: deployer.address,
+        },
+      )
+      expectToEmit<Transfer>(events[1], 'Transfer', {
         from: deployer.address,
         to: null,
         value: redeemAmount,
       })
-      expectToEmit<Redeem>(events[1], 'Redeem', {
+      expectToEmit<Redeem>(events[2], 'Redeem', {
         redeemer: deployer.address,
         redeemAmount,
       })
+    })
+  })
+
+  describe('.set_use_reserve_as_collateral', () => {
+    let users: KeyringPair[]
+    let dai: PoolContracts
+    let usdt: PoolContracts
+    let usdc: PoolContracts
+    let pools: Pools
+
+    beforeAll(async () => {
+      ;({ pools, users } = await setup())
+      ;({ dai, usdt, usdc } = pools)
+    })
+
+    it('User 0 Deposits 10_000 DAI, disables DAI as collateral', async () => {
+      const depositAmount = 10_000
+      await shouldNotRevert(dai.token, 'mint', [
+        users[0].address,
+        depositAmount,
+      ])
+      await shouldNotRevert(dai.token.withSigner(users[0]), 'approve', [
+        dai.pool.address,
+        depositAmount,
+      ])
+      await shouldNotRevert(dai.pool.withSigner(users[0]), 'mint', [
+        depositAmount,
+      ])
+
+      await shouldNotRevert(
+        dai.pool.withSigner(users[0]),
+        'setUseReserveAsCollateral',
+        [false],
+      )
+
+      const usingReserveAsCollateral = (
+        await dai.pool.query.usingReserveAsCollateral(users[0].address)
+      ).value.ok.valueOf()
+      expect(usingReserveAsCollateral).toEqual(false)
+    })
+
+    it('User 1 Deposits 20_000 USDT, disables USDT as collateral, borrows 4000 DAI (revert expected)', async () => {
+      const depositAmount = 20_000
+      await shouldNotRevert(usdt.token, 'mint', [
+        users[1].address,
+        depositAmount,
+      ])
+      await shouldNotRevert(usdt.token.withSigner(users[1]), 'approve', [
+        usdt.pool.address,
+        depositAmount,
+      ])
+      await shouldNotRevert(usdt.pool.withSigner(users[1]), 'mint', [
+        depositAmount,
+      ])
+
+      await shouldNotRevert(
+        usdt.pool.withSigner(users[1]),
+        'setUseReserveAsCollateral',
+        [false],
+      )
+
+      const borrowAmount = 4_000
+      expect(
+        (await dai.pool.withSigner(users[1]).query.borrow(borrowAmount)).value
+          .ok.err,
+      ).toEqual({ controller: 'InsufficientLiquidity' })
+    })
+
+    it('User 1 enables USDT as collateral, borrows 4000 DAI', async () => {
+      const borrowAmount = 4_000
+      await shouldNotRevert(
+        usdt.pool.withSigner(users[1]),
+        'setUseReserveAsCollateral',
+        [true],
+      )
+
+      await shouldNotRevert(dai.pool.withSigner(users[1]), 'borrow', [
+        borrowAmount,
+      ])
+    })
+
+    it('User 1 disables USDT as collateral (revert expected)', async () => {
+      expect(
+        (
+          await usdt.pool
+            .withSigner(users[1])
+            .query.setUseReserveAsCollateral(false)
+        ).value.ok.err,
+      ).toEqual({ depositAlreadyInUse: null })
+    })
+
+    it('User 1 Deposits 2000 USDC, disables USDT as collateral. Should revert as 2000 USDC are not enough to cover the debt (revert expected)', async () => {
+      const depositAmount = 2_000
+      await shouldNotRevert(usdc.token, 'mint', [
+        users[1].address,
+        depositAmount,
+      ])
+      await shouldNotRevert(usdc.token.withSigner(users[1]), 'approve', [
+        usdc.pool.address,
+        depositAmount,
+      ])
+      await shouldNotRevert(usdc.pool.withSigner(users[1]), 'mint', [
+        depositAmount,
+      ])
+
+      expect(
+        (
+          await usdt.pool
+            .withSigner(users[1])
+            .query.setUseReserveAsCollateral(false)
+        ).value.ok.err,
+      ).toEqual({ depositAlreadyInUse: null })
+    })
+
+    it('User 1 Deposits 2000 more USDC (enough to cover the DAI debt), disables USDT as collateral', async () => {
+      const depositAmount = 2_000
+      await shouldNotRevert(usdc.token, 'mint', [
+        users[1].address,
+        depositAmount,
+      ])
+      await shouldNotRevert(usdc.token.withSigner(users[1]), 'approve', [
+        usdc.pool.address,
+        depositAmount,
+      ])
+      await shouldNotRevert(usdc.pool.withSigner(users[1]), 'mint', [
+        depositAmount,
+      ])
+
+      await shouldNotRevert(
+        usdt.pool.withSigner(users[1]),
+        'setUseReserveAsCollateral',
+        [false],
+      )
+    })
+
+    it('User 1 disables USDC as collateral (revert expected)', async () => {
+      expect(
+        (
+          await usdc.pool
+            .withSigner(users[1])
+            .query.setUseReserveAsCollateral(false)
+        ).value.ok.err,
+      ).toEqual({ depositAlreadyInUse: null })
+    })
+
+    it('User 1 withdraw USDT', async () => {
+      await shouldNotRevert(usdt.pool.withSigner(users[1]), 'redeem', [20000])
     })
   })
 })

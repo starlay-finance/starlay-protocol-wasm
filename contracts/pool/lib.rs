@@ -110,6 +110,18 @@ pub mod contract {
         amount: Balance,
     }
 
+    #[ink(event)]
+    pub struct ReserveUsedAsCollateralEnabled {
+        #[ink(topic)]
+        user: AccountId,
+    }
+
+    #[ink(event)]
+    pub struct ReserveUsedAsCollateralDisabled {
+        #[ink(topic)]
+        user: AccountId,
+    }
+
     impl Pool for PoolContract {
         #[ink(message)]
         fn set_controller(&mut self, _new_controller: AccountId) -> Result<()> {
@@ -210,6 +222,16 @@ pub mod contract {
                 delegatee,
                 amount,
             })
+        }
+
+        fn _emit_reserve_used_as_collateral_enabled_event(&self, user: AccountId) {
+            self.env()
+                .emit_event(ReserveUsedAsCollateralEnabled { user })
+        }
+
+        fn _emit_reserve_used_as_collateral_disabled_event(&self, user: AccountId) {
+            self.env()
+                .emit_event(ReserveUsedAsCollateralDisabled { user })
         }
     }
 

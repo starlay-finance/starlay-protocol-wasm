@@ -286,7 +286,7 @@ pub trait Controller {
     fn calculate_user_account_data(
         &self,
         account: AccountId,
-        pool_attributes: Option<PoolAttributesForWithdrawValidation>,
+        pool_attributes: PoolAttributesForWithdrawValidation,
     ) -> Result<AccountData>;
 
     #[ink(message)]
@@ -332,11 +332,11 @@ pub struct PoolAttributesForSeizeCalculation {
 #[derive(Clone, Decode, Encode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributesForWithdrawValidation {
+    pub pool: AccountId,
     pub underlying: AccountId,
     pub liquidation_threshold: u128,
     pub account_balance: Balance,
     pub account_borrow_balance: Balance,
-    pub exchange_rate: U256,
 }
 
 #[derive(Clone, Decode, Encode)]

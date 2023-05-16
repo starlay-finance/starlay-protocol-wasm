@@ -1004,8 +1004,15 @@ describe('Controller spec', () => {
     })
 
     it('check account data', async () => {
+      const { dai } = pools
       const deployerAccountData = (
-        await controller.query.calculateUserAccountData(deployer.address, null)
+        await controller.query.calculateUserAccountData(deployer.address, {
+          pool: dai.pool.address,
+          underlying: dai.token.address,
+          liquidationThreshold: 10000,
+          accountBalance: 0,
+          accountBorrowBalance: 0,
+        })
       ).value.ok.ok
 
       // Total Collateral In Eth
