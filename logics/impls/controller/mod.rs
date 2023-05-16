@@ -1241,9 +1241,8 @@ impl<T: Storage<Data>> Internal for T {
             let unit_price = unit_price_result.unwrap();
             let compounded_liquidity_balance = _pool_attributes.account_balance;
             let borrow_balance_stored = _pool_attributes.account_borrow_balance;
-            let is_using_collateral = _pool_attributes.is_using_collateral;
 
-            if compounded_liquidity_balance != 0 && is_using_collateral {
+            if compounded_liquidity_balance != 0 {
                 let liquidity_balance_eth = U256::from(unit_price)
                     .mul(U256::from(compounded_liquidity_balance))
                     .div(U256::from(PRICE_PRECISION));
@@ -1279,9 +1278,8 @@ impl<T: Storage<Data>> Internal for T {
             let unit_price = unit_price_result.unwrap();
             let (compounded_liquidity_balance, borrow_balance_stored, _) =
                 PoolRef::get_account_snapshot(&asset, account);
-            let is_using_collateral = PoolRef::using_reserve_as_collateral(&asset, account);
 
-            if compounded_liquidity_balance != 0 && is_using_collateral {
+            if compounded_liquidity_balance != 0 {
                 let liquidity_balance_eth = U256::from(unit_price)
                     .mul(U256::from(compounded_liquidity_balance))
                     .div(U256::from(PRICE_PRECISION));

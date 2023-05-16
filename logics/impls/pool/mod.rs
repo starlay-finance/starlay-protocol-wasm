@@ -742,7 +742,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             redeemer,
             redeem_amount,
         )?;
-        if balance_decrease_allowed == false {
+        if !balance_decrease_allowed {
             return Err(Error::RedeemTransferOutNotPossible)
         }
 
@@ -1238,7 +1238,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             account_balance,
         )?;
 
-        if balance_decrease_allowed == false {
+        if !balance_decrease_allowed {
             return Err(Error::DepositAlreadyInUse)
         }
         Ok(())
