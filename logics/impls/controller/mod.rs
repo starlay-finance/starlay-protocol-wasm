@@ -1225,7 +1225,7 @@ impl<T: Storage<Data>> Internal for T {
         let oracle = self._oracle();
 
         if pool_attributes.is_some() {
-            let _pool_attributes = pool_attributes.clone().unwrap();
+            let _pool_attributes = pool_attributes.unwrap();
             let collateral_factor_mantissa: Option<WrappedU256> =
                 self.collateral_factor_mantissa(_pool_attributes.pool);
             if collateral_factor_mantissa.is_none() {
