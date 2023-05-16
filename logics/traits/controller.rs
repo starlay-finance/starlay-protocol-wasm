@@ -286,7 +286,7 @@ pub trait Controller {
     fn calculate_user_account_data(
         &self,
         account: AccountId,
-        pool_attributes: Option<PoolAttributesForWithdrawValidation>,
+        pool_attributes: PoolAttributesForWithdrawValidation,
     ) -> Result<AccountData>;
 
     #[ink(message)]
