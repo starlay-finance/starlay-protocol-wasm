@@ -58,6 +58,9 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn borrow_for(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()>;
 
+    #[ink(message)]
+    fn borrow_for_flashloan(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()>;
+
     /// Sender repays their own borrow
     #[ink(message)]
     fn repay_borrow(&mut self, repay_amount: Balance) -> Result<()>;
@@ -90,6 +93,10 @@ pub trait Pool: PSP22 + PSP22Metadata {
         borrower: AccountId,
         seize_tokens: Balance,
     ) -> Result<()>;
+
+    /// Transfer Underlying Token.
+    #[ink(message)]
+    fn transfer_underlying(&mut self, to: AccountId, amount: Balance) -> Result<()>;
 
     // admin functions
     /// Sets a new controller for the market
@@ -209,6 +216,7 @@ pub enum Error {
     ZeroDelegateeAddress,
     InsufficientDelegateAllowance,
     DepositAlreadyInUse,
+    CallerIsNotFlashloanGateway,
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),

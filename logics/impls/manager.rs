@@ -22,6 +22,7 @@ pub trait Internal {
     fn _controller(&self) -> AccountId;
     fn _set_controller(&mut self, id: AccountId) -> Result<()>;
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
+    fn _set_flashloan_gateway(&mut self, new_flashloan_gateway: AccountId) -> Result<()>;
     fn _support_market(&mut self, pool: AccountId) -> Result<()>;
     fn _support_market_with_collateral_factor_mantissa(
         &mut self,
@@ -59,6 +60,9 @@ impl<T: Storage<Data>> Manager for T {
     }
     default fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
         self._set_price_oracle(new_oracle)
+    }
+    default fn set_flashloan_gateway(&mut self, new_flashloan_gateway: AccountId) -> Result<()> {
+        self._set_flashloan_gateway(new_flashloan_gateway)
     }
     default fn support_market(&mut self, pool: AccountId) -> Result<()> {
         self._support_market(pool)
@@ -123,6 +127,10 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
         ControllerRef::set_price_oracle(&self._controller(), new_oracle)?;
+        Ok(())
+    }
+    default fn _set_flashloan_gateway(&mut self, new_flashloan_gateway: AccountId) -> Result<()> {
+        ControllerRef::set_flashloan_gateway(&self._controller(), new_flashloan_gateway)?;
         Ok(())
     }
     default fn _support_market(&mut self, pool: AccountId) -> Result<()> {

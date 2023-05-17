@@ -85,6 +85,11 @@ pub mod contract {
         }
         #[ink(message)]
         #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
+        fn set_flashloan_gateway(&mut self, new_flashloan_gateway: AccountId) -> Result<()> {
+            self._set_flashloan_gateway(new_flashloan_gateway)
+        }
+        #[ink(message)]
+        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
         fn support_market(&mut self, pool: AccountId) -> Result<()> {
             self._support_market(pool)
         }

@@ -30,6 +30,9 @@ pub trait Manager {
     #[ink(message)]
     fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
 
+    #[ink(message)]
+    fn set_flashloan_gateway(&mut self, new_flashloan_gateway: AccountId) -> Result<()>;
+
     /// Add the market to the markets mapping and set it as listed (call Controller)
     #[ink(message)]
     fn support_market(&mut self, pool: AccountId) -> Result<()>;

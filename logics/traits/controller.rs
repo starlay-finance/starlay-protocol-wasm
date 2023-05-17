@@ -180,6 +180,9 @@ pub trait Controller {
     #[ink(message)]
     fn support_market(&mut self, pool: AccountId) -> Result<()>;
 
+    #[ink(message)]
+    fn set_flashloan_gateway(&mut self, new_flashloan_gateway: AccountId) -> Result<()>;
+
     /// Add the market to the markets mapping and set it as listed with collateral_factor
     #[ink(message)]
     fn support_market_with_collateral_factor_mantissa(
@@ -232,6 +235,13 @@ pub trait Controller {
     /// Returns the list of all markets that are currently supported
     #[ink(message)]
     fn markets(&self) -> Vec<AccountId>;
+
+    #[ink(message)]
+    fn flashloan_gateway(&self) -> AccountId;
+
+    /// Returns the market based on underlying
+    #[ink(message)]
+    fn market_of_underlying(&self, underlying: AccountId) -> Option<AccountId>;
 
     /// Returns the collateral factor for a given pool
     #[ink(message)]

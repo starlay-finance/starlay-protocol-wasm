@@ -1,4 +1,6 @@
 pub mod controller;
+pub mod flashloan_gateway;
+pub mod flashloan_receiver;
 pub mod interest_rate_model;
 pub mod manager;
 pub mod pool;

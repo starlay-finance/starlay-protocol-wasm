@@ -436,16 +436,19 @@ describe('Controller spec', () => {
   })
 
   it('.support_market', async () => {
-    const { controller } = await setup()
+    const { api, deployer, rateModel, controller } = await setup()
 
-    const tokenAddress = encodeAddress(
-      '0x0000000000000000000000000000000000000000000000000000000000000001',
-    )
+    const pools = await preparePoolsWithPreparedTokens({
+      api,
+      controller,
+      rateModel,
+      manager: deployer,
+    })
 
-    await controller.tx.supportMarket(tokenAddress)
+    await controller.tx.supportMarket(pools.dai.pool.address)
     const markets = (await controller.query.markets()).value.ok
     expect(markets.length).toBe(1)
-    expect(markets[0]).toBe(tokenAddress)
+    expect(markets[0]).toBe(pools.dai.pool.address)
   })
 
   describe('.support_market_with_collateral_factor_mantissa', () => {
