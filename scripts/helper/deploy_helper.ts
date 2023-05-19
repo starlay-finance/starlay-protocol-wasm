@@ -11,6 +11,8 @@ import PriceOracle from '../../types/contracts/price_oracle'
 
 import Controller_factory from '../../types/constructors/controller'
 import DefaultInterestRateModel_factory from '../../types/constructors/default_interest_rate_model'
+import FlashloanGateway_factory from '../../types/constructors/flashloan_gateway'
+import FlashloanReceiver_factory from '../../types/constructors/flashloan_receiver'
 import Pool_factory from '../../types/constructors/pool'
 import PSP22Token_factory from '../../types/constructors/psp22_token'
 import WETH_factory from '../../types/constructors/weth'
@@ -21,6 +23,8 @@ import PSP22Token from '../../types/contracts/psp22_token'
 import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
 import { LastArrayElement } from 'type-fest'
 import Controller from '../../types/contracts/controller'
+import FlashloanGateway from '../../types/contracts/flashloan_gateway'
+import FlashloanReceiver from '../../types/contracts/flashloan_receiver'
 import Pool from '../../types/contracts/pool'
 import Token from '../../types/contracts/psp22_token'
 import WETH from '../../types/contracts/weth'
@@ -230,6 +234,38 @@ export const deployWETHPool = async ({
   const contract = await factory.new(...args, name, symbol, decimals, option)
 
   const result = new Pool(contract.address, signer, api)
+  await afterDeployment(result.name, contract)
+  return result
+}
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export const deployFlashLoanGateway = async ({
+  api,
+  signer,
+  args,
+  option = defaultOption(api),
+}: FactoryArgs<FlashloanGateway_factory['new']>): Promise<FlashloanGateway> => {
+  const factory = new FlashloanGateway_factory(api, signer)
+  const contract = await factory.new(...args, option)
+
+  const result = new FlashloanGateway(contract.address, signer, api)
+  await afterDeployment(result.name, contract)
+  return result
+}
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+export const deployFlashLoanReceiver = async ({
+  api,
+  signer,
+  args,
+  option = defaultOption(api),
+}: FactoryArgs<
+  FlashloanReceiver_factory['new']
+>): Promise<FlashloanReceiver> => {
+  const factory = new FlashloanReceiver_factory(api, signer)
+  const contract = await factory.new(...args, option)
+
+  const result = new FlashloanReceiver(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
 }

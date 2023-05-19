@@ -43,13 +43,24 @@ impl<T: Storage<Data>> FlashloanReceiver for T {
         assets: Vec<AccountId>,
         amounts: Vec<Balance>,
         premiums: Vec<Balance>,
-        _initiator: AccountId,
+        initiator: AccountId,
         _params: Vec<u8>,
     ) -> bool {
         let contract_addr = Self::env().account_id();
         let gateway = self.data().flashloan_gateway;
-        for index in 1..assets.len() {
+        for index in 0..assets.len() {
             let current_asset = assets[index];
+            let transfer_result = PSP22Ref::transfer_from(
+                &current_asset,
+                initiator,
+                contract_addr,
+                premiums[index],
+                Vec::<u8>::new(),
+            );
+            if transfer_result.is_err() {
+                return false
+            }
+
             let balance = PSP22Ref::balance_of(&current_asset, contract_addr);
 
             let amount_to_return = amounts[index] + premiums[index];

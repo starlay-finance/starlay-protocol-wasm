@@ -26,6 +26,9 @@ pub trait FlashloanGateway {
 
     #[ink(message)]
     fn flashloan_premium_total(&self) -> u128;
+
+    #[ink(message)]
+    fn controller(&self) -> AccountId;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]

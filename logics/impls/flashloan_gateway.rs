@@ -64,19 +64,25 @@ impl<T: Storage<Data>> FlashloanGateway for T {
             return Err(Error::InconsistentFlashloanParams)
         }
 
-        let mut lp_token_addresses: Vec<AccountId> = Vec::with_capacity(assets.len());
-        let mut premiums: Vec<Balance> = Vec::with_capacity(assets.len());
+        let mut lp_token_addresses: Vec<AccountId> = Default::default();
+        let mut premiums: Vec<Balance> = Default::default();
 
         let controller = self._controller();
-        for index in 1..assets.len() {
+        let flashloan_premium_total = self._flashloan_premium_total();
+        for index in 0..assets.len() {
             let market = ControllerRef::market_of_underlying(&controller, assets[index]);
             if market.is_none() {
                 return Err(Error::MarketNotListed)
             }
-            lp_token_addresses[index] = market.unwrap();
-            premiums[index] = amounts[index] * self._flashloan_premium_total() / 10000;
+            lp_token_addresses.push(market.unwrap());
+            let premium: u128 = amounts[index] * flashloan_premium_total / 10000;
+            premiums.push(premium);
 
-            PoolRef::transfer_underlying(&assets[index], receiver_address, amounts[index])?;
+            PoolRef::transfer_underlying(
+                &lp_token_addresses[index],
+                receiver_address,
+                amounts[index],
+            )?;
         }
 
         let caller = Self::env().caller();
@@ -93,7 +99,7 @@ impl<T: Storage<Data>> FlashloanGateway for T {
             return Err(Error::InvalidFlashloanExecutorReturn)
         }
 
-        for index in 1..assets.len() {
+        for index in 0..assets.len() {
             let current_asset = assets[index];
             let current_amount = amounts[index];
             let current_premium = premiums[index];
@@ -132,6 +138,10 @@ impl<T: Storage<Data>> FlashloanGateway for T {
 
     default fn flashloan_premium_total(&self) -> u128 {
         self._flashloan_premium_total()
+    }
+
+    default fn controller(&self) -> AccountId {
+        self._controller()
     }
 }
 
