@@ -178,7 +178,7 @@ pub trait Controller {
 
     /// Add the market to the markets mapping and set it as listed
     #[ink(message)]
-    fn support_market(&mut self, pool: AccountId) -> Result<()>;
+    fn support_market(&mut self, pool: AccountId, underlying: AccountId) -> Result<()>;
 
     #[ink(message)]
     fn set_flashloan_gateway(&mut self, new_flashloan_gateway: AccountId) -> Result<()>;
@@ -188,6 +188,7 @@ pub trait Controller {
     fn support_market_with_collateral_factor_mantissa(
         &mut self,
         pool: AccountId,
+        underlying: AccountId,
         collateral_factor_mantissa: WrappedU256,
     ) -> Result<()>;
 

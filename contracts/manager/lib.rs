@@ -90,17 +90,22 @@ pub mod contract {
         }
         #[ink(message)]
         #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
-        fn support_market(&mut self, pool: AccountId) -> Result<()> {
-            self._support_market(pool)
+        fn support_market(&mut self, pool: AccountId, underlying: AccountId) -> Result<()> {
+            self._support_market(pool, underlying)
         }
         #[ink(message)]
         #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
         fn support_market_with_collateral_factor_mantissa(
             &mut self,
             pool: AccountId,
+            underlying: AccountId,
             collateral_factor_mantissa: WrappedU256,
         ) -> Result<()> {
-            self._support_market_with_collateral_factor_mantissa(pool, collateral_factor_mantissa)
+            self._support_market_with_collateral_factor_mantissa(
+                pool,
+                underlying,
+                collateral_factor_mantissa,
+            )
         }
         #[ink(message)]
         #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
@@ -350,8 +355,11 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
             let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
+            let underlying = AccountId::from([0x01; 32]);
             assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
-            contract.support_market(ZERO_ADDRESS.into()).unwrap();
+            contract
+                .support_market(ZERO_ADDRESS.into(), underlying)
+                .unwrap();
         }
         #[ink::test]
         fn support_market_fails_by_no_authority() {
@@ -359,13 +367,16 @@ pub mod contract {
             set_caller(accounts.bob);
 
             let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
+            let underlying = AccountId::from([0x01; 32]);
             assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
             assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
             assert!(contract
                 .grant_role(BORROW_CAP_GUARDIAN, accounts.bob)
                 .is_ok());
             assert_eq!(
-                contract.support_market(ZERO_ADDRESS.into()).unwrap_err(),
+                contract
+                    .support_market(ZERO_ADDRESS.into(), underlying)
+                    .unwrap_err(),
                 Error::AccessControl(AccessControlError::MissingRole)
             );
         }
@@ -378,10 +389,12 @@ pub mod contract {
             let accounts = default_accounts();
             set_caller(accounts.bob);
             let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
+            let underlying = AccountId::from([0x01; 32]);
             assert!(contract.grant_role(CONTROLLER_ADMIN, accounts.bob).is_ok());
             contract
                 .support_market_with_collateral_factor_mantissa(
                     ZERO_ADDRESS.into(),
+                    underlying,
                     WrappedU256::from(0),
                 )
                 .unwrap();
@@ -392,6 +405,7 @@ pub mod contract {
             set_caller(accounts.bob);
 
             let mut contract = ManagerContract::new(ZERO_ADDRESS.into());
+            let underlying = AccountId::from([0x01; 32]);
             assert!(contract.grant_role(TOKEN_ADMIN, accounts.bob).is_ok());
             assert!(contract.grant_role(PAUSE_GUARDIAN, accounts.bob).is_ok());
             assert!(contract
@@ -401,6 +415,7 @@ pub mod contract {
                 contract
                     .support_market_with_collateral_factor_mantissa(
                         ZERO_ADDRESS.into(),
+                        underlying,
                         WrappedU256::from(0)
                     )
                     .unwrap_err(),

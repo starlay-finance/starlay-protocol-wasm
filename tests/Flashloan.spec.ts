@@ -83,6 +83,7 @@ describe('Controller spec', () => {
       await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
       await controller.tx.supportMarketWithCollateralFactorMantissa(
         sym.pool.address,
+        sym.token.address,
         [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
       )
     }

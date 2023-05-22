@@ -222,6 +222,7 @@ pub trait Internal {
     fn _support_market(
         &mut self,
         pool: &AccountId,
+        underlying: &AccountId,
         collateral_factor_mantissa: Option<WrappedU256>,
     ) -> Result<()>;
     fn _set_flashloan_gateway(&mut self, flashloan_gateway: AccountId) -> Result<()>;
@@ -495,9 +496,9 @@ impl<T: Storage<Data>> Controller for T {
         Ok(())
     }
 
-    default fn support_market(&mut self, pool: AccountId) -> Result<()> {
+    default fn support_market(&mut self, pool: AccountId, underlying: AccountId) -> Result<()> {
         self._assert_manager()?;
-        self._support_market(&pool, None)?;
+        self._support_market(&pool, &underlying, None)?;
         self._emit_market_listed_event(pool);
         Ok(())
     }
@@ -513,10 +514,11 @@ impl<T: Storage<Data>> Controller for T {
     default fn support_market_with_collateral_factor_mantissa(
         &mut self,
         pool: AccountId,
+        underlying: AccountId,
         collateral_factor_mantissa: WrappedU256,
     ) -> Result<()> {
         self._assert_manager()?;
-        self._support_market(&pool, Some(collateral_factor_mantissa))?;
+        self._support_market(&pool, &underlying, Some(collateral_factor_mantissa))?;
         self._emit_market_listed_event(pool);
         Ok(())
     }
@@ -998,6 +1000,7 @@ impl<T: Storage<Data>> Internal for T {
     default fn _support_market(
         &mut self,
         pool: &AccountId,
+        underlying: &AccountId,
         collateral_factor_mantissa: Option<WrappedU256>,
     ) -> Result<()> {
         for market in self._markets() {
@@ -1007,8 +1010,7 @@ impl<T: Storage<Data>> Internal for T {
         }
 
         self.data().markets.push(*pool);
-        let underlying = PoolRef::underlying(pool);
-        self.data().markets_pair.insert(&underlying, pool);
+        self.data().markets_pair.insert(underlying, pool);
 
         // set default states
         self._set_mint_guardian_paused(pool, false)?;

@@ -35,13 +35,14 @@ pub trait Manager {
 
     /// Add the market to the markets mapping and set it as listed (call Controller)
     #[ink(message)]
-    fn support_market(&mut self, pool: AccountId) -> Result<()>;
+    fn support_market(&mut self, pool: AccountId, underlying: AccountId) -> Result<()>;
 
     /// Add the market to the markets mapping and set it as listed with collateral_factor (call Controller)
     #[ink(message)]
     fn support_market_with_collateral_factor_mantissa(
         &mut self,
         pool: AccountId,
+        underlying: AccountId,
         collateral_factor_mantissa: WrappedU256,
     ) -> Result<()>;
 
