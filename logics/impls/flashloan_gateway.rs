@@ -120,7 +120,7 @@ impl<T: Storage<Data>> FlashloanGateway for T {
                 PoolRef::borrow_for_flashloan(
                     &current_lp_token,
                     caller,
-                    current_amount_plus_premium,
+                    current_amount,
                 )?;
             }
 

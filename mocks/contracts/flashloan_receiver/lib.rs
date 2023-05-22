@@ -28,5 +28,15 @@ pub mod contract {
             _instance._initialize(flashloan_gateway);
             _instance
         }
+
+        #[ink(message)]
+        pub fn set_fail_execution_transfer(&mut self, fail: bool) {
+            self._set_fail_execution_transfer(fail);
+        }
+
+        #[ink(message)]
+        pub fn fail_execution_transfer(&self) -> bool {
+            self._fail_execution_transfer()
+        }
     }
 }

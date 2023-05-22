@@ -121,13 +121,33 @@ describe('Controller spec', () => {
     )
   })
 
-  it('Deployer deposit USDT into the pool and User 0 try to Flash Loan with mode 0 (return funds)', async () => {
-    // Make Liquidity
-    const deposited = 3_000_000
-    await shouldNotRevert(dai.token, 'mint', [deployer.address, deposited])
-    await shouldNotRevert(dai.token, 'approve', [dai.pool.address, deposited])
-    await shouldNotRevert(dai.pool, 'mint', [deposited])
+  const depositedDai = 3_000_000
+  const depositedUsdc = 3_000_000
+  const depositedUsdt = 3_000_000
+  it('Deployer deposit assets for liquidity', async () => {
+    await shouldNotRevert(dai.token, 'mint', [deployer.address, depositedDai])
+    await shouldNotRevert(dai.token, 'approve', [
+      dai.pool.address,
+      depositedDai,
+    ])
+    await shouldNotRevert(dai.pool, 'mint', [depositedDai])
 
+    await shouldNotRevert(usdc.token, 'mint', [deployer.address, depositedUsdc])
+    await shouldNotRevert(usdc.token, 'approve', [
+      usdc.pool.address,
+      depositedUsdc,
+    ])
+    await shouldNotRevert(usdc.pool, 'mint', [depositedUsdc])
+
+    await shouldNotRevert(usdt.token, 'mint', [deployer.address, depositedUsdt])
+    await shouldNotRevert(usdt.token, 'approve', [
+      usdt.pool.address,
+      depositedUsdt,
+    ])
+    await shouldNotRevert(usdt.pool, 'mint', [depositedUsdt])
+  })
+
+  it('User 0 try to Flash Loan with mode 0 (return funds)', async () => {
     const initialUserBalance = 100_000
     await shouldNotRevert(dai.token, 'mint', [
       users[0].address,
@@ -138,10 +158,10 @@ describe('Controller spec', () => {
     ).value.ok.toNumber()
 
     const flashLoanAmount = 200_000
-    const approveAmount = (flashLoanAmount * premiumTotal) / 10000
+    const premiumAmount = (flashLoanAmount * premiumTotal) / 10000
     await shouldNotRevert(dai.token.withSigner(users[0]), 'approve', [
       flashloanReceiver.address,
-      approveAmount,
+      premiumAmount,
     ])
 
     const { events } = await shouldNotRevert(
@@ -163,17 +183,139 @@ describe('Controller spec', () => {
       initiator: users[0].address,
       asset: dai.token.address,
       amount: flashLoanAmount,
-      premium: approveAmount,
+      premium: premiumAmount,
     })
 
     const user0Balance = (
       await dai.token.query.balanceOf(users[0].address)
     ).value.ok.toNumber()
-    expect(user0Balance).toEqual(initialUserBalance - approveAmount)
+    expect(user0Balance).toEqual(initialUserBalance - premiumAmount)
 
     const poolBalance = (
       await dai.token.query.balanceOf(dai.pool.address)
     ).value.ok.toNumber()
-    expect(poolBalance).toEqual(deposited + approveAmount)
+    expect(poolBalance).toEqual(depositedDai + premiumAmount)
+  })
+
+  it('User 0 try to Flash Loan with mod 1 (revert expected for insufficient liquidity)', async () => {
+    const premiumTotal = (
+      await flashloanGateway.query.flashloanPremiumTotal()
+    ).value.ok.toNumber()
+
+    const flashLoanAmount = 200_000
+    const premiumAmount = (flashLoanAmount * premiumTotal) / 10000
+    await shouldNotRevert(dai.token.withSigner(users[0]), 'approve', [
+      flashloanReceiver.address,
+      premiumAmount,
+    ])
+
+    const result = (
+      await flashloanGateway
+        .withSigner(users[0])
+        .query.flashloan(
+          flashloanReceiver.address,
+          [dai.token.address],
+          [flashLoanAmount],
+          [1],
+          users[0].address,
+          [],
+        )
+    ).value.ok
+    expect(result.err).toStrictEqual({
+      pool: { controller: 'InsufficientLiquidity' },
+    })
+  })
+
+  it('Set mock receiver as excution revert. User 0 try to Flash Loan (revert expected)', async () => {
+    await flashloanReceiver.tx.setFailExecutionTransfer(true)
+
+    const premiumTotal = (
+      await flashloanGateway.query.flashloanPremiumTotal()
+    ).value.ok.toNumber()
+
+    const flashLoanAmount = 200_000
+    const premiumAmount = (flashLoanAmount * premiumTotal) / 10000
+    await shouldNotRevert(dai.token.withSigner(users[0]), 'approve', [
+      flashloanReceiver.address,
+      premiumAmount,
+    ])
+
+    const result = (
+      await flashloanGateway
+        .withSigner(users[0])
+        .query.flashloan(
+          flashloanReceiver.address,
+          [dai.token.address],
+          [flashLoanAmount],
+          [0],
+          users[0].address,
+          [],
+        )
+    ).value.ok
+    expect(result.err).toStrictEqual({
+      invalidFlashloanExecutorReturn: null,
+    })
+  })
+
+  it('Caller deposits 100_000 USDC as collateral, Takes DAI flashloan with mode = 1, does not return the funds. A variable loan for caller is created', async () => {
+    const deposited = 100_000
+    await shouldNotRevert(usdc.token, 'mint', [users[0].address, deposited])
+    await shouldNotRevert(usdc.token.withSigner(users[0]), 'approve', [
+      usdc.pool.address,
+      deposited,
+    ])
+    await shouldNotRevert(usdc.pool.withSigner(users[0]), 'mint', [deposited])
+
+    await flashloanReceiver.tx.setFailExecutionTransfer(false)
+
+    const premiumTotal = (
+      await flashloanGateway.query.flashloanPremiumTotal()
+    ).value.ok.toNumber()
+
+    const flashLoanAmount = 80_000
+    const premiumAmount = (flashLoanAmount * premiumTotal) / 10000
+    const { events } = await shouldNotRevert(
+      flashloanGateway.withSigner(users[0]),
+      'flashloan',
+      [
+        flashloanReceiver.address,
+        [dai.token.address],
+        [flashLoanAmount],
+        [1],
+        users[0].address,
+        [],
+      ],
+    )
+
+    expect(events).toHaveLength(1)
+    expectToEmit<FlashLoan>(events[0], 'FlashLoan', {
+      target: flashloanReceiver.address,
+      initiator: users[0].address,
+      asset: dai.token.address,
+      amount: flashLoanAmount,
+      premium: premiumAmount,
+    })
+
+    const borrowBalance = (
+      await dai.pool.query.borrowBalanceStored(users[0].address)
+    ).value.ok.toNumber()
+
+    expect(borrowBalance).toEqual(flashLoanAmount)
+  })
+
+  it('tries to take a flashloan that is not listed in the market', async () => {
+    const flashLoanAmount = 100_000
+    const result = (
+      await flashloanGateway.query.flashloan(
+        flashloanReceiver.address,
+        [dai.pool.address],
+        [flashLoanAmount],
+        [0],
+        users[0].address,
+        [],
+      )
+    ).value.ok
+
+    expect(result.err).toStrictEqual({ marketNotListed: null })
   })
 })
