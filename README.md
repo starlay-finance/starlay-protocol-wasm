@@ -68,6 +68,28 @@ Here, we will provide an explanation of the templates constructed in this reposi
 L--- tests: ... End-to-end tests
 ```
 
+## Extensions
+
+### Wrapped ETH Gateway
+
+Wrapped ETH Gateway allows users to deposit, withdraw, borrow and repay using Native Token.
+It interacts with Native Token pool and Wrapped Token.
+
+### Flash Loan Gateway
+
+A user can use liquidity in Starlay’s pools to use in another place in the same transaction, as long as the borrowed amount is returned before the end of the transaction.
+
+### Liquidation Threshold
+
+The liquidation threshold is the percentage at which a position is defined as undercollateralized.
+The delta between the LTV and the Liquidation Threshold is a safety mechanism in place for borrowers.
+For more detail, please look at [here](https://docs.starlay.finance/asset/risk-parameters#liquidation-threshold)
+
+### Switch assets not to be collateralized.
+
+- A user can configure whether his/her asset to use as collateral or not
+- If he/she configures an asset not to use as collateral, the asset is excluded from collateral amount calculation and liquidation target
+
 ## Customize
 
 The implementation is based on the interface of Compound V2.
