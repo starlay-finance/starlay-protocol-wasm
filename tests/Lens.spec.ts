@@ -117,12 +117,12 @@ const setup = async (
   await shouldNotRevert(
     controller,
     'supportMarketWithCollateralFactorMantissa',
-    [pool1.address, [collateralFactor]],
+    [pool1.address, token1.address, [collateralFactor]],
   )
   await shouldNotRevert(
     controller,
     'supportMarketWithCollateralFactorMantissa',
-    [pool2.address, [collateralFactor]],
+    [pool2.address, token2.address, [collateralFactor]],
   )
   await shouldNotRevert(pool1, 'setReserveFactorMantissa', [[reserveFactor]])
   await shouldNotRevert(controller, 'setBorrowCap', [pool1.address, borrowCap])

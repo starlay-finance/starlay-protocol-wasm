@@ -67,7 +67,7 @@ describe('Manager spec', () => {
       await shouldNotRevert(
         manager,
         'supportMarketWithCollateralFactorMantissa',
-        [ZERO_ADDRESS, [collateralFactor]],
+        [ZERO_ADDRESS, ZERO_ADDRESS, [collateralFactor]],
       )
 
       const {

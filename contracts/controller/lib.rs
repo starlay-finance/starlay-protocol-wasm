@@ -111,7 +111,8 @@ pub mod contract {
             let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
-            assert!(contract.support_market(pool).is_ok());
+            let underlying = AccountId::from([0x01; 32]);
+            assert!(contract.support_market(pool, underlying).is_ok());
             assert!(contract.mint_allowed(pool, accounts.bob, 0).is_ok());
         }
 
@@ -135,7 +136,8 @@ pub mod contract {
             let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
-            assert!(contract.support_market(pool).is_ok());
+            let underlying = AccountId::from([0x01; 32]);
+            assert!(contract.support_market(pool, underlying).is_ok());
             assert!(contract.set_mint_guardian_paused(pool, true).is_ok());
             assert_eq!(
                 contract.mint_allowed(pool, accounts.bob, 0).unwrap_err(),
@@ -165,7 +167,8 @@ pub mod contract {
             let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
-            assert!(contract.support_market(pool).is_ok());
+            let underlying = AccountId::from([0x01; 32]);
+            assert!(contract.support_market(pool, underlying).is_ok());
             assert!(contract.set_borrow_guardian_paused(pool, true).is_ok());
             assert_eq!(
                 contract
@@ -184,6 +187,7 @@ pub mod contract {
             // not in market
             let pool1 = AccountId::from([0x01; 32]);
             let pool2 = AccountId::from([0x02; 32]);
+            let underlying1 = AccountId::from([0x01; 32]);
             assert_eq!(
                 contract
                     .liquidate_borrow_allowed(
@@ -197,7 +201,7 @@ pub mod contract {
                     .unwrap_err(),
                 Error::MarketNotListed
             );
-            assert!(contract.support_market(pool1).is_ok());
+            assert!(contract.support_market(pool1, underlying1).is_ok());
             assert_eq!(
                 contract
                     .liquidate_borrow_allowed(
@@ -222,13 +226,14 @@ pub mod contract {
             // not in market
             let pool1 = AccountId::from([0x01; 32]);
             let pool2 = AccountId::from([0x02; 32]);
+            let underlying1 = AccountId::from([0x01; 32]);
             assert_eq!(
                 contract
                     .seize_allowed(pool1, pool2, ZERO_ADDRESS.into(), ZERO_ADDRESS.into(), 0)
                     .unwrap_err(),
                 Error::MarketNotListed
             );
-            assert!(contract.support_market(pool1).is_ok());
+            assert!(contract.support_market(pool1, underlying1).is_ok());
             assert_eq!(
                 contract
                     .seize_allowed(pool1, pool2, ZERO_ADDRESS.into(), ZERO_ADDRESS.into(), 0)
@@ -244,7 +249,8 @@ pub mod contract {
             let mut contract = ControllerContract::new(accounts.bob);
 
             let p1 = AccountId::from([0x01; 32]);
-            assert!(contract.support_market(p1).is_ok());
+            let underlying1 = AccountId::from([0x01; 32]);
+            assert!(contract.support_market(p1, underlying1).is_ok());
             assert_eq!(contract.markets(), [p1]);
             assert_eq!(contract.collateral_factor_mantissa(p1), None);
             assert_eq!(contract.mint_guardian_paused(p1), Some(false));
@@ -254,7 +260,8 @@ pub mod contract {
             assert_eq!(event.pool, p1);
 
             let p2 = AccountId::from([0x02; 32]);
-            assert!(contract.support_market(p2).is_ok());
+            let underlying2 = AccountId::from([0x02; 32]);
+            assert!(contract.support_market(p2, underlying2).is_ok());
             assert_eq!(contract.markets(), [p1, p2]);
         }
 
@@ -265,9 +272,10 @@ pub mod contract {
             let mut contract = ControllerContract::new(accounts.bob);
 
             let p1 = AccountId::from([0x01; 32]);
-            assert!(contract.support_market(p1).is_ok());
+            let underlying = AccountId::from([0x01; 32]);
+            assert!(contract.support_market(p1, underlying).is_ok());
             assert_eq!(
-                contract.support_market(p1).unwrap_err(),
+                contract.support_market(p1, underlying).unwrap_err(),
                 Error::MarketAlreadyListed
             );
         }
@@ -283,8 +291,13 @@ pub mod contract {
             let mut contract = ControllerContract::new(accounts.bob);
 
             let p1 = AccountId::from([0x01; 32]);
+            let underlying = AccountId::from([0x01; 32]);
             contract
-                .support_market_with_collateral_factor_mantissa(p1, WrappedU256::from(1))
+                .support_market_with_collateral_factor_mantissa(
+                    p1,
+                    underlying,
+                    WrappedU256::from(1),
+                )
                 .unwrap();
         }
 
@@ -295,9 +308,14 @@ pub mod contract {
             let mut contract = ControllerContract::new(accounts.bob);
 
             let p1 = AccountId::from([0x01; 32]);
+            let underlying = AccountId::from([0x01; 32]);
             assert_eq!(
                 contract
-                    .support_market_with_collateral_factor_mantissa(p1, WrappedU256::from(0))
+                    .support_market_with_collateral_factor_mantissa(
+                        p1,
+                        underlying,
+                        WrappedU256::from(0)
+                    )
                     .unwrap_err(),
                 Error::InvalidCollateralFactor
             );
@@ -351,9 +369,10 @@ pub mod contract {
             let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
+            let underlying = AccountId::from([0x01; 32]);
             assert_eq!(contract.mint_guardian_paused(pool), None);
 
-            assert!(contract.support_market(pool).is_ok());
+            assert!(contract.support_market(pool, underlying).is_ok());
             assert_eq!(contract.mint_guardian_paused(pool), Some(false));
 
             assert!(contract.set_mint_guardian_paused(pool, true).is_ok());
@@ -369,9 +388,10 @@ pub mod contract {
             let mut contract = ControllerContract::new(accounts.bob);
 
             let pool = AccountId::from([0x01; 32]);
+            let underlying = AccountId::from([0x01; 32]);
             assert_eq!(contract.borrow_guardian_paused(pool), None);
 
-            assert!(contract.support_market(pool).is_ok());
+            assert!(contract.support_market(pool, underlying).is_ok());
             assert_eq!(contract.mint_guardian_paused(pool), Some(false));
 
             assert!(contract.set_borrow_guardian_paused(pool, true).is_ok());
@@ -411,11 +431,15 @@ pub mod contract {
 
             set_caller(accounts.charlie);
             let dummy_id = AccountId::from([0xff; 32]);
+            let underlying = AccountId::from([0x01; 32]);
             let admin_funcs: Vec<Result<()>> = vec![
                 contract.set_price_oracle(dummy_id),
-                contract.support_market(dummy_id),
-                contract
-                    .support_market_with_collateral_factor_mantissa(dummy_id, WrappedU256::from(0)),
+                contract.support_market(dummy_id, underlying),
+                contract.support_market_with_collateral_factor_mantissa(
+                    dummy_id,
+                    underlying,
+                    WrappedU256::from(0),
+                ),
                 contract.set_collateral_factor_mantissa(dummy_id, WrappedU256::from(0)),
                 contract.set_mint_guardian_paused(dummy_id, true),
                 contract.set_borrow_guardian_paused(dummy_id, true),

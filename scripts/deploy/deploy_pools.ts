@@ -101,7 +101,7 @@ const deployAndSetupPool = async (
       controller.address,
       interestRateModel.address,
       [config.riskParameter.initialExchangeRateMantissa],
-      [config.riskParameter.liquidationThreshold],
+      config.riskParameter.liquidationThreshold,
       [collateralNamePrefix + config.name],
       [collateralSymbolPrefix + config.symbol],
       config.decimals,
@@ -118,7 +118,7 @@ const deployAndSetupPool = async (
   await sendTxWithPreview(
     controller,
     'supportMarketWithCollateralFactorMantissa',
-    [pool.address, [config.riskParameter.collateralFactor]],
+    [pool.address, token.address, [config.riskParameter.collateralFactor]],
     option,
   )
   await sendTxWithPreview(

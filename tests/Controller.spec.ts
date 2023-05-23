@@ -72,6 +72,7 @@ describe('Controller spec', () => {
       await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
       await controller.tx.supportMarketWithCollateralFactorMantissa(
         sym.pool.address,
+        sym.token.address,
         [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
       )
     }
@@ -133,6 +134,7 @@ describe('Controller spec', () => {
       await priceOracle.tx.setFixedPrice(usdc.token.address, ONE_ETHER)
       await controller.tx.supportMarketWithCollateralFactorMantissa(
         usdc.pool.address,
+        usdc.token.address,
         [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
       )
       const { value } = await controller.query.redeemAllowed(
@@ -174,7 +176,10 @@ describe('Controller spec', () => {
           decimals: 6,
         },
       })
-      await controller.tx.supportMarket(sampleCoin.pool.address)
+      await controller.tx.supportMarket(
+        sampleCoin.pool.address,
+        sampleCoin.token.address,
+      )
 
       const { value: value1 } = await controller.query.borrowAllowed(
         sampleCoin.pool.address,
@@ -371,6 +376,7 @@ describe('Controller spec', () => {
       await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
       await controller.tx.supportMarketWithCollateralFactorMantissa(
         sym.pool.address,
+        sym.token.address,
         toParam(ONE_ETHER.mul(new BN(90)).div(new BN(100))),
       )
     }
@@ -436,16 +442,22 @@ describe('Controller spec', () => {
   })
 
   it('.support_market', async () => {
-    const { controller } = await setup()
+    const { api, deployer, rateModel, controller } = await setup()
 
-    const tokenAddress = encodeAddress(
-      '0x0000000000000000000000000000000000000000000000000000000000000001',
+    const pools = await preparePoolsWithPreparedTokens({
+      api,
+      controller,
+      rateModel,
+      manager: deployer,
+    })
+
+    await controller.tx.supportMarket(
+      pools.dai.pool.address,
+      pools.dai.token.address,
     )
-
-    await controller.tx.supportMarket(tokenAddress)
     const markets = (await controller.query.markets()).value.ok
     expect(markets.length).toBe(1)
-    expect(markets[0]).toBe(tokenAddress)
+    expect(markets[0]).toBe(pools.dai.pool.address)
   })
 
   describe('.support_market_with_collateral_factor_mantissa', () => {
@@ -464,6 +476,7 @@ describe('Controller spec', () => {
         await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
         await controller.tx.supportMarketWithCollateralFactorMantissa(
           sym.pool.address,
+          sym.token.address,
           [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
         )
       }
@@ -486,24 +499,26 @@ describe('Controller spec', () => {
           manager: deployer,
           metadata: TEST_METADATAS.dai,
         })
-        return { controller, pool: dai.pool }
+        return { controller, pool: dai.pool, token: dai.token }
       }
       it('if collateral_factor is over limit', async () => {
-        const { controller, pool } = await setupWithOnePool()
+        const { controller, pool, token } = await setupWithOnePool()
 
         const res =
           await controller.query.supportMarketWithCollateralFactorMantissa(
             pool.address,
+            token.address,
             [ONE_ETHER.mul(new BN(90)).div(new BN(100)).add(new BN(1))],
           )
         expect(res.value.ok.err).toStrictEqual('InvalidCollateralFactor')
       })
       it('if cannot get price', async () => {
-        const { controller, pool } = await setupWithOnePool()
+        const { controller, pool, token } = await setupWithOnePool()
 
         const res =
           await controller.query.supportMarketWithCollateralFactorMantissa(
             pool.address,
+            token.address,
             [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
           )
         expect(res.value.ok.err).toStrictEqual('PriceError')
@@ -528,6 +543,7 @@ describe('Controller spec', () => {
       await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
       await controller.tx.supportMarketWithCollateralFactorMantissa(
         sym.pool.address,
+        sym.token.address,
         [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
       )
     }
@@ -601,6 +617,7 @@ describe('Controller spec', () => {
           await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
           await controller.tx.supportMarketWithCollateralFactorMantissa(
             sym.pool.address,
+            sym.token.address,
             [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
           )
         }
@@ -690,6 +707,7 @@ describe('Controller spec', () => {
           await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
           await controller.tx.supportMarketWithCollateralFactorMantissa(
             sym.pool.address,
+            sym.token.address,
             [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
           )
         }
@@ -791,6 +809,7 @@ describe('Controller spec', () => {
           await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
           await controller.tx.supportMarketWithCollateralFactorMantissa(
             sym.pool.address,
+            sym.token.address,
             [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
           )
         }

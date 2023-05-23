@@ -47,6 +47,7 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
     pub markets: Vec<AccountId>,
+    pub markets_pair: Mapping<AccountId, AccountId>,
     pub collateral_factor_mantissa: Mapping<AccountId, WrappedU256>,
     pub mint_guardian_paused: Mapping<AccountId, bool>,
     pub borrow_guardian_paused: Mapping<AccountId, bool>,
@@ -57,12 +58,14 @@ pub struct Data {
     pub liquidation_incentive_mantissa: WrappedU256,
     pub borrow_caps: Mapping<AccountId, Balance>,
     pub manager: AccountId,
+    pub flashloan_gateway: AccountId,
 }
 
 impl Default for Data {
     fn default() -> Self {
         Self {
             markets: Default::default(),
+            markets_pair: Default::default(),
             collateral_factor_mantissa: Default::default(),
             mint_guardian_paused: Default::default(),
             borrow_guardian_paused: Default::default(),
@@ -73,6 +76,7 @@ impl Default for Data {
             liquidation_incentive_mantissa: WrappedU256::from(U256::zero()),
             borrow_caps: Default::default(),
             manager: ZERO_ADDRESS.into(),
+            flashloan_gateway: ZERO_ADDRESS.into(),
         }
     }
 }
@@ -218,8 +222,10 @@ pub trait Internal {
     fn _support_market(
         &mut self,
         pool: &AccountId,
+        underlying: &AccountId,
         collateral_factor_mantissa: Option<WrappedU256>,
     ) -> Result<()>;
+    fn _set_flashloan_gateway(&mut self, flashloan_gateway: AccountId) -> Result<()>;
     fn _set_collateral_factor_mantissa(
         &mut self,
         pool: &AccountId,
@@ -238,6 +244,8 @@ pub trait Internal {
 
     // view function
     fn _markets(&self) -> Vec<AccountId>;
+    fn _market_of_underlying(&self, underlying: AccountId) -> Option<AccountId>;
+    fn _flashloan_gateway(&self) -> AccountId;
     fn _collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256>;
     fn _is_listed(&self, pool: AccountId) -> bool;
     fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
@@ -283,6 +291,7 @@ pub trait Internal {
     fn _emit_pool_action_paused_event(&self, pool: AccountId, action: String, paused: bool);
     fn _emit_action_paused_event(&self, action: String, paused: bool);
     fn _emit_new_price_oracle_event(&self, old: AccountId, new: AccountId);
+    fn _emit_new_flashloan_gateway_event(&self, _old: AccountId, _new: AccountId);
     fn _emit_new_close_factor_event(&self, old: WrappedU256, new: WrappedU256);
     fn _emit_new_liquidation_incentive_event(&self, old: WrappedU256, new: WrappedU256);
     fn _emit_new_borrow_cap_event(&self, pool: AccountId, new: Balance);
@@ -487,20 +496,29 @@ impl<T: Storage<Data>> Controller for T {
         Ok(())
     }
 
-    default fn support_market(&mut self, pool: AccountId) -> Result<()> {
+    default fn support_market(&mut self, pool: AccountId, underlying: AccountId) -> Result<()> {
         self._assert_manager()?;
-        self._support_market(&pool, None)?;
+        self._support_market(&pool, &underlying, None)?;
         self._emit_market_listed_event(pool);
+        Ok(())
+    }
+
+    default fn set_flashloan_gateway(&mut self, new_flashloan_gateway: AccountId) -> Result<()> {
+        self._assert_manager()?;
+        let old = self._flashloan_gateway();
+        self._set_flashloan_gateway(new_flashloan_gateway)?;
+        self._emit_new_flashloan_gateway_event(old, new_flashloan_gateway);
         Ok(())
     }
 
     default fn support_market_with_collateral_factor_mantissa(
         &mut self,
         pool: AccountId,
+        underlying: AccountId,
         collateral_factor_mantissa: WrappedU256,
     ) -> Result<()> {
         self._assert_manager()?;
-        self._support_market(&pool, Some(collateral_factor_mantissa))?;
+        self._support_market(&pool, &underlying, Some(collateral_factor_mantissa))?;
         self._emit_market_listed_event(pool);
         Ok(())
     }
@@ -576,6 +594,12 @@ impl<T: Storage<Data>> Controller for T {
 
     default fn markets(&self) -> Vec<AccountId> {
         self._markets()
+    }
+    default fn market_of_underlying(&self, underlying: AccountId) -> Option<AccountId> {
+        self._market_of_underlying(underlying)
+    }
+    default fn flashloan_gateway(&self) -> AccountId {
+        self._flashloan_gateway()
     }
     default fn collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256> {
         self._collateral_factor_mantissa(pool)
@@ -969,9 +993,14 @@ impl<T: Storage<Data>> Internal for T {
         self.data().oracle = new_oracle;
         Ok(())
     }
+    default fn _set_flashloan_gateway(&mut self, new_flashloan_gateway: AccountId) -> Result<()> {
+        self.data().flashloan_gateway = new_flashloan_gateway;
+        Ok(())
+    }
     default fn _support_market(
         &mut self,
         pool: &AccountId,
+        underlying: &AccountId,
         collateral_factor_mantissa: Option<WrappedU256>,
     ) -> Result<()> {
         for market in self._markets() {
@@ -981,6 +1010,7 @@ impl<T: Storage<Data>> Internal for T {
         }
 
         self.data().markets.push(*pool);
+        self.data().markets_pair.insert(underlying, pool);
 
         // set default states
         self._set_mint_guardian_paused(pool, false)?;
@@ -1054,6 +1084,12 @@ impl<T: Storage<Data>> Internal for T {
 
     default fn _markets(&self) -> Vec<AccountId> {
         self.data().markets.clone()
+    }
+    default fn _market_of_underlying(&self, underlying: AccountId) -> Option<AccountId> {
+        self.data().markets_pair.get(&underlying)
+    }
+    default fn _flashloan_gateway(&self) -> AccountId {
+        self.data().flashloan_gateway
     }
     default fn _is_listed(&self, pool: AccountId) -> bool {
         let markets = self._markets();
@@ -1368,6 +1404,7 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _emit_action_paused_event(&self, _action: String, _paused: bool) {}
     default fn _emit_new_price_oracle_event(&self, _old: AccountId, _new: AccountId) {}
+    default fn _emit_new_flashloan_gateway_event(&self, _old: AccountId, _new: AccountId) {}
     default fn _emit_new_close_factor_event(&self, _old: WrappedU256, _new: WrappedU256) {}
     default fn _emit_new_liquidation_incentive_event(&self, _old: WrappedU256, _new: WrappedU256) {}
     default fn _emit_new_borrow_cap_event(&self, _pool: AccountId, _new: Balance) {}

@@ -131,7 +131,12 @@ pub trait Internal {
     ) -> core::result::Result<(), PSP22Error>;
     fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()>;
     fn _redeem(&mut self, redeemer: AccountId, amount: Balance) -> Result<()>;
-    fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()>;
+    fn _borrow(
+        &mut self,
+        borrower: AccountId,
+        borrow_amount: Balance,
+        release_underlying: bool,
+    ) -> Result<()>;
     fn _repay_borrow(
         &mut self,
         payer: AccountId,
@@ -294,6 +299,20 @@ where
     body(instance)
 }
 
+#[modifier_definition]
+pub fn only_flashloan_gateway<T, F, R>(instance: &mut T, body: F) -> Result<R>
+where
+    T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metadata::Data>,
+    F: FnOnce(&mut T) -> Result<R>,
+{
+    let caller = T::env().caller();
+    let flashloan_gateway = ControllerRef::flashloan_gateway(&instance._controller());
+    if caller != flashloan_gateway {
+        return Err(Error::CallerIsNotFlashloanGateway)
+    }
+    body(instance)
+}
+
 impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metadata::Data>> Pool
     for T
 {
@@ -338,13 +357,23 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn borrow(&mut self, borrow_amount: Balance) -> Result<()> {
         self._accrue_interest()?;
-        self._borrow(Self::env().caller(), borrow_amount)
+        self._borrow(Self::env().caller(), borrow_amount, true)
     }
 
     #[modifiers(delegated_allowed(borrower, borrow_amount))]
     default fn borrow_for(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
         self._accrue_interest()?;
-        self._borrow(borrower, borrow_amount)
+        self._borrow(borrower, borrow_amount, true)
+    }
+
+    #[modifiers(only_flashloan_gateway)]
+    default fn borrow_for_flashloan(
+        &mut self,
+        borrower: AccountId,
+        borrow_amount: Balance,
+    ) -> Result<()> {
+        self._accrue_interest()?;
+        self._borrow(borrower, borrow_amount, false)
     }
 
     default fn repay_borrow(&mut self, repay_amount: Balance) -> Result<()> {
@@ -390,6 +419,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     ) -> Result<()> {
         self._accrue_interest()?;
         self._seize(Self::env().caller(), liquidator, borrower, seize_tokens)
+    }
+
+    #[modifiers(only_flashloan_gateway)]
+    default fn transfer_underlying(&mut self, to: AccountId, amount: Balance) -> Result<()> {
+        self._transfer_underlying(to, amount)
     }
 
     default fn set_controller(&mut self, new_controller: AccountId) -> Result<()> {
@@ -821,7 +855,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         }
     }
 
-    default fn _borrow(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
+    default fn _borrow(
+        &mut self,
+        borrower: AccountId,
+        borrow_amount: Balance,
+        release_underlying: bool,
+    ) -> Result<()> {
         let contract_addr = Self::env().account_id();
         let caller = Self::env().caller();
         let (account_balance, account_borrow_balance, exchange_rate) =
@@ -855,7 +894,9 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let account_borrows_new = account_borrows_prev + borrow_amount;
         let total_borrows_new = self._total_borrows() + borrow_amount;
 
-        self._transfer_underlying(caller, borrow_amount)?;
+        if release_underlying {
+            self._transfer_underlying(caller, borrow_amount)?;
+        }
         self._increase_debt(borrower, borrow_amount, false);
 
         self._emit_borrow_event(

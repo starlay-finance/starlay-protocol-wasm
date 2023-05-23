@@ -1,6 +1,6 @@
 [package]
 name = "psp22_token"
-version = "2.1.0"
+version = "0.0.1"
 authors = ["Supercolony <green.baneling@supercolony.net>"]
 edition = "2021"
 
