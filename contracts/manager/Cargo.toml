@@ -21,7 +21,6 @@ logics = { path = "../../logics", default-features = false }
 
 [lib]
 path = "lib.rs"
-crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["std"]
