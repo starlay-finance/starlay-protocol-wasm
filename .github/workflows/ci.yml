@@ -43,9 +43,7 @@ jobs:
       - name: Install cargo contract
         if: ${{ steps.check-cargo-contract.outcome == 'failure' }}
         run: |
-          sudo apt-get install binaryen
-          cargo install cargo-dylint dylint-link
-          cargo install --force --locked cargo-contract
+          cargo install cargo-contract --version 2.0.1 --force
       - name: Compile checks
         env:
           CARGO_INCREMENTAL: 1
