@@ -322,6 +322,9 @@ pub trait Controller {
     ) -> Result<(U256, U256)>;
 }
 
+/// Structure for holding information about the Pool
+///
+/// NOTE: Used to prevent cross contract calls to the caller pool
 #[derive(Clone, Decode, Encode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributes {
@@ -333,6 +336,9 @@ pub struct PoolAttributes {
     pub total_borrows: Balance,
 }
 
+/// Structure for having information for Seize about the Pool
+///
+/// NOTE: Used to prevent cross contract calls to the caller pool
 #[derive(Clone, Decode, Encode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributesForSeizeCalculation {
@@ -340,6 +346,9 @@ pub struct PoolAttributesForSeizeCalculation {
     pub decimals: u8,
 }
 
+/// Structure for having information for Withdraw's validations about the Pool
+///
+/// NOTE: Used to prevent cross contract calls to the caller pool
 #[derive(Clone, Decode, Encode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributesForWithdrawValidation {
@@ -350,6 +359,9 @@ pub struct PoolAttributesForWithdrawValidation {
     pub account_borrow_balance: Balance,
 }
 
+/// Structure to hold status information of a user
+///
+/// Used to retrieve the status of all users in the Protocol pool and to make the calculated results available for use and reference.
 #[derive(Clone, Decode, Encode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct AccountData {
