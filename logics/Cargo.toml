@@ -14,7 +14,7 @@ scale-info = { version = "2.3", default-features = false, features = [
     "derive",
 ], optional = true }
 
-openbrush = { tag = "3.1.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false, features = [
+openbrush = { tag = "3.1.1", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false, features = [
     "psp22", "ownable"
 ] }
 primitive-types = { version = "0.11.1", default-features = false, features = [
@@ -22,6 +22,7 @@ primitive-types = { version = "0.11.1", default-features = false, features = [
 ] }
 
 [lib]
+name = "logics"
 path = "lib.rs"
 crate-type = ["rlib"]
 

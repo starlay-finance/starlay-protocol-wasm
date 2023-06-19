@@ -42,22 +42,12 @@ const setup = async (
   const token1 = await deployPSP22Token({
     api,
     signer: deployer,
-    args: [
-      0,
-      'Dai Stablecoin' as unknown as string[],
-      'DAI' as unknown as string[],
-      8,
-    ],
+    args: [0, 'Dai Stablecoin', 'DAI', 8],
   })
   const token2 = await deployPSP22Token({
     api,
     signer: deployer,
-    args: [
-      0,
-      'USDCoin' as unknown as string[],
-      'USDC' as unknown as string[],
-      18,
-    ],
+    args: [0, 'USDCoin', 'USDC', 18],
   })
 
   const controller = await deployController({

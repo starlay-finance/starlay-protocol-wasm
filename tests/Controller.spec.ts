@@ -8,7 +8,6 @@ import {
   deployDefaultInterestRateModel,
   deployPriceOracle,
 } from '../scripts/helper/deploy_helper'
-import { hexToUtf8 } from '../scripts/helper/utils'
 import Controller from '../types/contracts/controller'
 import PriceOracle from '../types/contracts/price_oracle'
 import {
@@ -418,7 +417,7 @@ describe('Controller spec', () => {
       const res = await usdc.pool
         .withSigner(sender)
         .query.transfer(receiver.address, toDec6(50_000).add(new BN(1)), [])
-      expect(hexToUtf8(res.value.ok.err.custom)).toBe('InsufficientLiquidity')
+      expect(res.value.ok.err.custom).toBe('InsufficientLiquidity')
     }
   })
 

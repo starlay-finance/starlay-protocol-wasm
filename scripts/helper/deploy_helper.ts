@@ -30,7 +30,7 @@ import Token from '../../types/contracts/psp22_token'
 import WETH from '../../types/contracts/weth'
 import WETHGateway from '../../types/contracts/weth_gateway'
 import { ExcludeLastArrayElement } from './utilityTypes'
-import { defaultOption, hexToUtf8, isTest, waitForTx } from './utils'
+import { defaultOption, isTest, waitForTx } from './utils'
 
 type FactoryArgs<C extends (...args: unknown[]) => unknown> = {
   api: ApiPromise
@@ -127,12 +127,8 @@ export const deployPoolFromAsset = async ({
   const factory = new Pool_factory(api, signer)
 
   // FIXME: calling token_name or token_symbol on contract will fail
-  const name = `Starlay ${hexToUtf8(
-    (await token.query.tokenName()).value.ok,
-  )}` as unknown as string[]
-  const symbol = `s${hexToUtf8(
-    (await token.query.tokenSymbol()).value.ok,
-  )}` as unknown as string[]
+  const name = `Starlay ${(await token.query.tokenName()).value.ok}`
+  const symbol = `s${(await token.query.tokenSymbol()).value.ok}`
   const decimals = (await token.query.tokenDecimals()).value.ok
   const contract = await factory.new(...args, name, symbol, decimals, option)
 
@@ -224,12 +220,8 @@ export const deployWETHPool = async ({
   const factory = new Pool_factory(api, signer)
 
   // FIXME: calling token_name or token_symbol on contract will fail
-  const name = `Starlay ${hexToUtf8(
-    (await token.query.tokenName()).value.ok,
-  )}` as unknown as string[]
-  const symbol = `s${hexToUtf8(
-    (await token.query.tokenSymbol()).value.ok,
-  )}` as unknown as string[]
+  const name = `Starlay ${(await token.query.tokenName()).value.ok}`
+  const symbol = `s${(await token.query.tokenSymbol()).value.ok}`
   const decimals = (await token.query.tokenDecimals()).value.ok
   const contract = await factory.new(...args, name, symbol, decimals, option)
 

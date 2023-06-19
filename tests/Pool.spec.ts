@@ -10,7 +10,6 @@ import {
   deployPoolFromAsset,
   deployPriceOracle,
 } from '../scripts/helper/deploy_helper'
-import { hexToUtf8 } from '../scripts/helper/utils'
 import { RATE_MODELS } from '../scripts/interest_rates'
 import Contract from '../types/contracts/default_interest_rate_model'
 import Pool from '../types/contracts/pool'
@@ -98,10 +97,10 @@ describe('Pool spec', () => {
     expect(pool.address).not.toBe(ZERO_ADDRESS)
     expect((await pool.query.underlying()).value.ok).toEqual(token.address)
     expect((await pool.query.controller()).value.ok).toEqual(controller.address)
-    expect(hexToUtf8((await pool.query.tokenName()).value.ok)).toEqual(
+    expect((await pool.query.tokenName()).value.ok).toEqual(
       'Starlay Dai Stablecoin',
     )
-    expect(hexToUtf8((await pool.query.tokenSymbol()).value.ok)).toEqual('sDAI')
+    expect((await pool.query.tokenSymbol()).value.ok).toEqual('sDAI')
     expect((await pool.query.tokenDecimals()).value.ok).toEqual(18)
     expect(
       (await pool.query.liquidationThreshold()).value.ok.toString(),
@@ -123,12 +122,7 @@ describe('Pool spec', () => {
       token = await deployPSP22Token({
         api,
         signer: deployer,
-        args: [
-          0,
-          'Sample' as unknown as string[],
-          'SAMPLE' as unknown as string[],
-          6,
-        ],
+        args: [0, 'Sample', 'SAMPLE', 6],
       })
 
       pool = await deployPoolFromAsset({
@@ -1093,7 +1087,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(userA)
           .query.transfer(userA.address, new BN(1), [])
-        expect(hexToUtf8(res.value.ok.err.custom)).toBe('TransferNotAllowed')
+        expect(res.value.ok.err.custom).toBe('TransferNotAllowed')
       }
       // case: shortfall of account_liquidity
 
@@ -1102,7 +1096,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(userA)
           .query.transfer(userB.address, new BN(2), []) // temp: truncated if less than 1 by collateral_factor?
-        expect(hexToUtf8(res.value.ok.err.custom)).toBe('InsufficientLiquidity')
+        expect(res.value.ok.err.custom).toBe('InsufficientLiquidity')
       }
       // case: paused
       await controller.tx.setTransferGuardianPaused(true)
@@ -1110,7 +1104,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(userA)
           .query.transfer(userB.address, new BN(1), [])
-        expect(hexToUtf8(res.value.ok.err.custom)).toBe('TransferIsPaused')
+        expect(res.value.ok.err.custom).toBe('TransferIsPaused')
       }
     })
   })
@@ -1299,7 +1293,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(spender)
           .query.transferFrom(userA.address, userA.address, new BN(1), [])
-        expect(hexToUtf8(res.value.ok.err.custom)).toBe('TransferNotAllowed')
+        expect(res.value.ok.err.custom).toBe('TransferNotAllowed')
       }
       // case: shortfall of account_liquidity
       {
@@ -1307,7 +1301,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(spender)
           .query.transferFrom(userA.address, userB.address, new BN(2), []) // temp: truncated if less than 1 by collateral_factor?
-        expect(hexToUtf8(res.value.ok.err.custom)).toBe('InsufficientLiquidity')
+        expect(res.value.ok.err.custom).toBe('InsufficientLiquidity')
       }
       // case: paused
       await controller.tx.setTransferGuardianPaused(true)
@@ -1315,7 +1309,7 @@ describe('Pool spec', () => {
         const res = await dai.pool
           .withSigner(spender)
           .query.transferFrom(userA.address, userB.address, new BN(1), [])
-        expect(hexToUtf8(res.value.ok.err.custom)).toBe('TransferIsPaused')
+        expect(res.value.ok.err.custom).toBe('TransferIsPaused')
       }
     })
   })
@@ -1328,12 +1322,7 @@ describe('Pool spec', () => {
         const newToken = await deployPSP22Token({
           api: api,
           signer: deployer,
-          args: [
-            0,
-            'Sample Coin' as unknown as string[],
-            'COIN' as unknown as string[],
-            8,
-          ],
+          args: [0, 'Sample Coin', 'COIN', 8],
         })
         const initialExchangeRate = ONE_ETHER
         const newPool = await deployPoolFromAsset({
@@ -1374,12 +1363,7 @@ describe('Pool spec', () => {
       const token = await deployPSP22Token({
         api: api,
         signer: deployer,
-        args: [
-          0,
-          'Dai Stablecoin' as unknown as string[],
-          'DAI' as unknown as string[],
-          8,
-        ],
+        args: [0, 'Dai Stablecoin', 'DAI', 8],
       })
       await priceOracle.tx.setFixedPrice(token.address, ONE_ETHER)
       const dai = SUPPORTED_TOKENS.dai

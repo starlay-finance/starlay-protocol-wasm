@@ -14,10 +14,15 @@ scale-info = { version = "2.3", default-features = false, features = [
     "derive",
 ], optional = true }
 
-openbrush = { tag = "3.1.0", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false }
+openbrush = { tag = "3.1.1", git = "https://github.com/727-Ventures/openbrush-contracts", default-features = false }
 logics = { path = "../../logics", default-features = false }
+primitive-types = { version = "0.11.1", default-features = false, features = [
+    "codec",
+] }
 
 [lib]
+name = "default_interest_rate_model"
+crate-type = ["cdylib", "rlib"]
 path = "lib.rs"
 
 [features]

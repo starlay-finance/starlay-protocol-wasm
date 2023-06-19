@@ -7,7 +7,6 @@ import {
   deployWETH,
   deployWETHGateway,
 } from '../scripts/helper/deploy_helper'
-import { hexToUtf8 } from '../scripts/helper/utils'
 import { preparePoolsWithPreparedTokens } from './testContractHelper'
 import { shouldNotRevert } from './testHelpers'
 
@@ -92,12 +91,8 @@ describe('WETHGateway spec', () => {
       weth.address,
     )
 
-    expect(hexToUtf8((await weth.query.tokenName()).value.ok)).toEqual(
-      'Wrapped Astar',
-    )
-    expect(hexToUtf8((await weth.query.tokenSymbol()).value.ok)).toEqual(
-      'WASTR',
-    )
+    expect((await weth.query.tokenName()).value.ok).toEqual('Wrapped Astar')
+    expect((await weth.query.tokenSymbol()).value.ok).toEqual('WASTR')
     expect((await weth.query.tokenDecimals()).value.ok).toEqual(18)
   })
 
