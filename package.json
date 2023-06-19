@@ -3,9 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
-    "@727-ventures/typechain-compiler": "0.5.19",
-    "@727-ventures/typechain-polkadot": "^0.6.12",
-    "@727-ventures/typechain-types": "0.0.24",
+    "@727-ventures/typechain-compiler": "^1.1.0",
+    "@727-ventures/typechain-polkadot": "^1.1.0",
+    "@727-ventures/typechain-types": "^1.1.0",
     "@types/jest": "^29.4.0",
     "@typescript-eslint/eslint-plugin": "^5.54.0",
     "@typescript-eslint/parser": "^5.54.0",
