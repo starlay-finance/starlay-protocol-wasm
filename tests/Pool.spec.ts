@@ -719,7 +719,7 @@ describe('Pool spec', () => {
           null,
         )
       ).value.ok.ok
-      expect(collateralValue.toString()).toEqual('0')
+      expect(BigInt(collateralValue.toString())).toEqual(BigInt(0))
       expect(BigInt(shortfallValue.toString())).toBeGreaterThanOrEqual(
         BigInt(9999) * BigInt(10) ** BigInt(18),
       )

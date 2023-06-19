@@ -120,18 +120,6 @@ const setup = async (
   const lens = await deployLens({ api, signer: deployer, args: [] })
   const faucet = await deployFaucet({ api, signer: deployer, args: [] })
 
-  console.log(
-    {
-      lens: lens.address,
-      controller: controller.address,
-      faucet: faucet.address,
-    },
-    {
-      tokens: [token1.address, token2.address],
-      pools: [pool1.address, pool2.address],
-      interestRateModel: interestRateModel.address,
-    },
-  )
   return {
     api,
     deployer,
