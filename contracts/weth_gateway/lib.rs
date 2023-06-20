@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
+/// Definition of WETH Gateway Contract
 #[openbrush::contract]
 pub mod contract {
     use ink::codegen::{
@@ -18,6 +19,7 @@ pub mod contract {
         traits::Storage,
     };
 
+    /// Contract's Storage
     #[ink(storage)]
     #[derive(Default, Storage)]
     pub struct WETHGatewayContract {
@@ -85,6 +87,7 @@ pub mod contract {
     impl WETHGateway for WETHGatewayContract {}
 
     impl WETHGatewayContract {
+        /// Generate this contract
         #[ink(constructor)]
         pub fn new(weth: AccountId) -> Self {
             let mut instance = Self::default();

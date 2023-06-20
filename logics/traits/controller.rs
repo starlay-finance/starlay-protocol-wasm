@@ -372,6 +372,7 @@ pub struct AccountData {
     pub health_factor: U256,
 }
 
+/// Custom error definitions for Controller
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {

@@ -1,6 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
+/// Definition of Lens Contract
+///
+/// This is a contract to make it easier to get protocol status and data for the frontend
 #[openbrush::contract]
 pub mod contract {
     use ink::prelude::vec::Vec;
@@ -25,6 +28,7 @@ pub mod contract {
         Encode,
     };
 
+    /// Metadata in the Pool
     #[derive(Decode, Encode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct PoolMetadata {
@@ -48,6 +52,7 @@ pub mod contract {
         borrow_guardian_paused: bool,
     }
 
+    /// Pool's Balance Information
     #[derive(Decode, Encode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct PoolBalances {
@@ -62,6 +67,7 @@ pub mod contract {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct PoolUnderlyingPrice {
         pool: AccountId,
+        /// underlying_price of the pool
         underlying_price: u128,
     }
 
@@ -73,6 +79,7 @@ pub mod contract {
         shortfall: Balance,
     }
 
+    /// Protocol's Configuration
     #[derive(Decode, Encode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct Configuration {
@@ -89,21 +96,25 @@ pub mod contract {
     pub struct LensContract {}
 
     impl LensContract {
+        /// Generate this contract
         #[ink(constructor)]
         pub fn new() -> Self {
             Self {}
         }
 
+        /// Get account_id of all managed Pools
         #[ink(message)]
         pub fn pools(&self, controller: AccountId) -> Vec<AccountId> {
             self._pools(controller)
         }
 
+        /// Get metadata for the specified pool
         #[ink(message)]
         pub fn pool_metadata(&self, pool: AccountId) -> PoolMetadata {
             self._pool_metadata(pool)
         }
 
+        /// Get metadata for the specified pools
         #[ink(message)]
         pub fn pool_metadata_all(&self, pools: Vec<AccountId>) -> Vec<PoolMetadata> {
             pools
@@ -112,11 +123,13 @@ pub mod contract {
                 .collect()
         }
 
+        /// Get balance information for a specified user in a pool
         #[ink(message)]
         pub fn pool_balances(&self, pool: AccountId, account: AccountId) -> PoolBalances {
             self._pool_balances(pool, account)
         }
 
+        /// Get balance informations for a specified user in pools
         #[ink(message)]
         pub fn pool_balances_all(
             &self,
@@ -129,11 +142,13 @@ pub mod contract {
                 .collect()
         }
 
+        /// Get balance in underlying asset for a specified user in a pool
         #[ink(message)]
         pub fn underlying_balance(&self, pool: AccountId, account: AccountId) -> Balance {
             self._underlying_balance(&pool, account)
         }
 
+        /// Get balances in underlying asset for a specified user in pools
         #[ink(message)]
         pub fn underlying_balance_all(
             &self,
@@ -146,11 +161,13 @@ pub mod contract {
                 .collect()
         }
 
+        /// Get underlying price for a specified pool
         #[ink(message)]
         pub fn pool_underlying_price(&self, pool: AccountId) -> PoolUnderlyingPrice {
             self._pool_underlying_price(pool)
         }
 
+        /// Get underlying prices for specified pools
         #[ink(message)]
         pub fn pool_underlying_price_all(&self, pools: Vec<AccountId>) -> Vec<PoolUnderlyingPrice> {
             pools
@@ -159,6 +176,7 @@ pub mod contract {
                 .collect()
         }
 
+        /// Get protocol's configuration
         #[ink(message)]
         pub fn configuration(&self, controller: AccountId) -> Configuration {
             Configuration {

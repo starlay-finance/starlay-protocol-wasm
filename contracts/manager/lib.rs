@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
+/// Definition of Manager Contract
 #[openbrush::contract]
 pub mod contract {
     use ink::codegen::{
@@ -33,6 +34,7 @@ pub mod contract {
     const BORROW_CAP_GUARDIAN: RoleType = ink::selector_id!("BORROW_CAP_GUARDIAN");
     const PAUSE_GUARDIAN: RoleType = ink::selector_id!("PAUSE_GUARDIAN");
 
+    /// Contract's Storage
     #[ink(storage)]
     #[derive(Storage)]
     pub struct ManagerContract {
@@ -42,6 +44,7 @@ pub mod contract {
         access: access_control::Data,
     }
 
+    /// Event: The admin role holder has changed
     #[ink(event)]
     pub struct RoleAdminChanged {
         #[ink(topic)]
@@ -52,6 +55,7 @@ pub mod contract {
         new_admin_role: RoleType,
     }
 
+    /// Event: New role is assigned to the account
     #[ink(event)]
     pub struct RoleGranted {
         #[ink(topic)]
@@ -62,6 +66,7 @@ pub mod contract {
         grantor: Option<AccountId>,
     }
 
+    /// Event: The role has been revoked from the account
     #[ink(event)]
     pub struct RoleRevoked {
         #[ink(topic)]
@@ -72,6 +77,7 @@ pub mod contract {
         admin: AccountId,
     }
 
+    /// NOTE: Apply permission control by overriding the Default implementation to use the permission settings in Manager.
     impl manager::Manager for ManagerContract {
         #[ink(message)]
         #[modifiers(access_control::only_role(DEFAULT_ADMIN_ROLE))]
@@ -207,6 +213,7 @@ pub mod contract {
     }
 
     impl ManagerContract {
+        /// Generate this contract
         #[ink(constructor)]
         pub fn new(controller: AccountId) -> Self {
             let mut instance = Self {
