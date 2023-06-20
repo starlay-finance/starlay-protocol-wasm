@@ -130,9 +130,11 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn sweep_token(&mut self, asset: AccountId) -> Result<()>;
 
+    /// Delegates borrowing power to a user on the specific debt token
     #[ink(message)]
     fn approve_delegate(&mut self, delegatee: AccountId, amount: Balance) -> Result<()>;
 
+    /// Increase delegate allowance from owner
     #[ink(message)]
     fn increase_delegate_allowance(
         &mut self,
@@ -141,6 +143,7 @@ pub trait Pool: PSP22 + PSP22Metadata {
         amount: Balance,
     ) -> Result<()>;
 
+    /// Decrease delegate allowance from owner
     #[ink(message)]
     fn decrease_delegate_allowance(
         &mut self,
@@ -149,6 +152,7 @@ pub trait Pool: PSP22 + PSP22Metadata {
         amount: Balance,
     ) -> Result<()>;
 
+    /// Set whether user's asset to use as collateral or not
     #[ink(message)]
     fn set_use_reserve_as_collateral(&mut self, use_as_collateral: bool) -> Result<()>;
 
@@ -189,8 +193,10 @@ pub trait Pool: PSP22 + PSP22Metadata {
     fn reserve_factor_mantissa(&self) -> WrappedU256;
     #[ink(message)]
     fn liquidation_threshold(&self) -> u128;
+    /// Returns the delegation allowance of the user
     #[ink(message)]
     fn delegate_allowance(&self, owner: AccountId, delegatee: AccountId) -> Balance;
+    /// Check if user is using reserve as collateral or not
     #[ink(message)]
     fn using_reserve_as_collateral(&self, user: AccountId) -> bool;
 }

@@ -9,6 +9,7 @@ pub type FlashloanReceiverRef = dyn FlashloanReceiver;
 
 #[openbrush::trait_definition]
 pub trait FlashloanReceiver {
+    /// Run FlashLoan action
     #[ink(message)]
     fn execute_operation(
         &self,
