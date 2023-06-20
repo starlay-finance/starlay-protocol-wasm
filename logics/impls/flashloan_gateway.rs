@@ -20,7 +20,8 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
-    /// Flashloan Fee
+    /// Flashloan Fee in percentage * 100.
+    /// Default value is 9 = 0.09%
     pub flashloan_premium_total: u128,
     /// AccountId of Controller managing Flashloan Gateway
     pub controller: AccountId,

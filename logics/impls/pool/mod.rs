@@ -90,7 +90,7 @@ pub struct Data {
     pub reserve_factor_mantissa: WrappedU256,
     /// Liquidation Threshold
     pub liquidation_threshold: u128,
-    /// Delegation power
+    /// Delegation Allowance for borrowing
     pub delegate_allowance: Mapping<(AccountId, AccountId), Balance, AllowancesKey>,
     /// Represent if user is using his reserve as collateral or not
     pub using_reserve_as_collateral: Mapping<AccountId, bool>,

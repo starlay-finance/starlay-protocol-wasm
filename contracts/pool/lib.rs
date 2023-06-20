@@ -118,7 +118,7 @@ pub mod contract {
         value: Balance,
     }
 
-    /// Event: Delegation Power is changed
+    /// Event: Delegation Allowance for Borrowing is changed
     #[ink(event)]
     pub struct DelegateApproval {
         #[ink(topic)]
