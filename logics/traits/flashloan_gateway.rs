@@ -13,6 +13,8 @@ pub type FlashloanGatewayRef = dyn FlashloanGateway;
 
 #[openbrush::trait_definition]
 pub trait FlashloanGateway {
+    /// Allows smartcontracts to access the liquidity of the pool within one transaction, as long as the amount taken plus a fee is returned.
+    ///  IMPORTANT There are security concerns for developers of flashloan receiver contracts that must be kept into consideration.
     #[ink(message)]
     fn flashloan(
         &self,
@@ -24,9 +26,11 @@ pub trait FlashloanGateway {
         params: Vec<u8>,
     ) -> Result<()>;
 
+    /// Returns the fee on flash loans
     #[ink(message)]
     fn flashloan_premium_total(&self) -> u128;
 
+    /// Returns Controller Address
     #[ink(message)]
     fn controller(&self) -> AccountId;
 }
