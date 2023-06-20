@@ -46,18 +46,30 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
+    /// AccountId of managed Pools
     pub markets: Vec<AccountId>,
     pub markets_pair: Mapping<AccountId, AccountId>,
+    /// Mapping of Pool and Collateral Factors
     pub collateral_factor_mantissa: Mapping<AccountId, WrappedU256>,
+    /// Whether Pool has paused `Mint` Action
     pub mint_guardian_paused: Mapping<AccountId, bool>,
+    /// Whether Pool has paused `Borrow` Action
     pub borrow_guardian_paused: Mapping<AccountId, bool>,
+    /// Whether Pool has paused `Seize` Action
     pub seize_guardian_paused: bool,
+    /// Whether Pool has paused `Transfer` Action
     pub transfer_guardian_paused: bool,
+    /// Oracle's AccountId associated with this contract
     pub oracle: AccountId,
+    /// Close Factor
     pub close_factor_mantissa: WrappedU256,
+    /// Liquidation Incentive
     pub liquidation_incentive_mantissa: WrappedU256,
+    /// Maximum that can be borrowed per Pool
     pub borrow_caps: Mapping<AccountId, Balance>,
+    /// Manager's AccountId associated with this contract
     pub manager: AccountId,
+    /// Flashloan Gateway's AccountId associated with this contract
     pub flashloan_gateway: AccountId,
 }
 
