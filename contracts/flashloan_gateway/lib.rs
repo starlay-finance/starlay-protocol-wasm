@@ -16,6 +16,7 @@ pub mod contract {
     };
     use openbrush::traits::Storage;
 
+    /// Contract's Storage
     #[ink(storage)]
     #[derive(Default, Storage)]
     pub struct FlashloanGatewayContract {
@@ -23,6 +24,7 @@ pub mod contract {
         gateway: Data,
     }
 
+    /// Event: Flashloan is executed.
     #[ink(event)]
     pub struct FlashLoan {
         #[ink(topic)]

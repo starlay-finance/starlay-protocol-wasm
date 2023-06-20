@@ -29,6 +29,7 @@ pub mod contract {
         ownable: ownable::Data,
     }
 
+    /// Event: DepositETH is executed.
     #[ink(event)]
     pub struct DepositEth {
         #[ink(topic)]
@@ -38,6 +39,7 @@ pub mod contract {
         value: Balance,
     }
 
+    /// Event: WithdrawEth is executed.
     #[ink(event)]
     pub struct WithdrawEth {
         #[ink(topic)]
@@ -47,6 +49,7 @@ pub mod contract {
         value: Balance,
     }
 
+    /// Event: BorrowEth is executed.
     #[ink(event)]
     pub struct BorrowEth {
         #[ink(topic)]
@@ -56,6 +59,7 @@ pub mod contract {
         value: Balance,
     }
 
+    /// Event: RepayEth is executed.
     #[ink(event)]
     pub struct RepayEth {
         #[ink(topic)]

@@ -20,7 +20,9 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
+    /// Flashloan Fee
     pub flashloan_premium_total: u128,
+    /// AccountId of Controller managing Flashloan Gateway
     pub controller: AccountId,
 }
 
@@ -117,11 +119,7 @@ impl<T: Storage<Data>> FlashloanGateway for T {
                     Vec::<u8>::new(),
                 )?;
             } else {
-                PoolRef::borrow_for_flashloan(
-                    &current_lp_token,
-                    caller,
-                    current_amount,
-                )?;
+                PoolRef::borrow_for_flashloan(&current_lp_token, caller, current_amount)?;
             }
 
             self._emit_flashloan_event(
