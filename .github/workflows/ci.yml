@@ -7,6 +7,80 @@ on:
     branches: [main]
 
 jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - id: cache-rustup
+        name: Cache Save restore toolchain
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo
+            ~/.rustup
+          key: ${{ runner.os }}-rust-${{ hashFiles('rust-toolchain.toml') }}
+      - if: ${{ steps.cache-rustup.outputs.cache-hit != 'true' }}
+        name: Install & display rust toolchain
+        run: |
+          rustup show
+          rustup component add rust-src
+      - name: Checkout the source code
+        uses: actions/checkout@v3
+      - name: Check Formatting
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps: 
+      - id: cache-rustup
+        name: Cache Save restore toolchain
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo
+            ~/.rustup
+          key: ${{ runner.os }}-rust-${{ hashFiles('rust-toolchain.toml') }}
+      - if: ${{ steps.cache-rustup.outputs.cache-hit != 'true' }}
+        name: Install & display rust toolchain
+        run: |
+          rustup show
+          rustup component add rust-src
+        # Check permissions of GITHUB_TOKEN, workaround for permission issues
+        # with @dependabot PRs. See https://github.com/actions-rs/clippy-check/issues/2#issuecomment-807878478
+      - name: Check workflow permissions
+        id: check_permissions
+        uses: scherermichael-oss/action-has-permission@1.0.6
+        with:
+          required-permission: write
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Clippy with features
+        uses: actions-rs/clippy-check@v1
+        if: ${{ steps.check_permissions.outputs.has-permission }}
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --profile debug-ci --all-features --all-targets -- -D warnings
+
+      - name: Clippy without features
+        if: ${{ steps.check_permissions.outputs.has-permission }}
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --profile debug-ci --all-targets -- -D warnings
+
+        # Runs if the GITHUB_TOKEN does not have `write` permissions e.g. @dependabot
+      - name: Clippy with features (no annotations)
+        if: ${{ !steps.check_permissions.outputs.has-permission }}
+        run: cargo clippy --profile debug-ci --all-features --all-targets -- -D warnings
+
+        # Runs if the GITHUB_TOKEN does not have `write` permissions e.g. @dependabot
+      - name: Clippy without features (no annotations)
+        if: ${{ !steps.check_permissions.outputs.has-permission }}
+        run: cargo clippy --profile debug-ci --all-targets -- -D warnings
+
+
   unit-test:
     runs-on: ubuntu-latest
     steps:
