@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
+/// Definition of Interest Rate Model Contract
 #[openbrush::contract]
 pub mod contract {
     use logics::{
@@ -9,6 +10,7 @@ pub mod contract {
     };
     use openbrush::traits::Storage;
 
+    /// Contract's Storage
     #[ink(storage)]
     #[derive(Storage)]
     pub struct DefaultInterestRateModelContract {
@@ -19,6 +21,7 @@ pub mod contract {
     impl InterestRateModel for DefaultInterestRateModelContract {}
 
     impl DefaultInterestRateModelContract {
+        /// Generate this contract
         #[ink(constructor)]
         pub fn new(
             base_rate_per_year: WrappedU256,

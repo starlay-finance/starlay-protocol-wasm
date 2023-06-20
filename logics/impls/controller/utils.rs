@@ -36,6 +36,7 @@ pub struct LiquidateCalculateSeizeTokensInput {
     pub actual_repay_amount: Balance,
 }
 
+/// Calculate seize value when liquidation
 pub fn liquidate_calculate_seize_tokens(input: &LiquidateCalculateSeizeTokensInput) -> Balance {
     let numerator = Exp {
         mantissa: WrappedU256::from(input.liquidation_incentive_mantissa),
@@ -101,6 +102,7 @@ pub fn balance_decrease_allowed(param: BalanceDecreaseAllowedParam) -> bool {
     health_factor_after_decrease >= U256::from(HEALTH_FACTOR_LIQUIDATION_THRESHOLD)
 }
 
+/// Maximum value of Collateral Factor
 pub fn collateral_factor_max_mantissa() -> U256 {
     // 90%
     exp_scale().mul(U256::from(90)).div(U256::from(100))
@@ -123,6 +125,8 @@ pub struct HypotheticalAccountLiquidityCalculationParam {
     pub collateral_factor_mantissa: Exp,
     pub oracle_price_mantissa: Exp,
 }
+/// Calculate the available capacity (hypothetical_account_liquidity) for a given user
+/// NOTE: This function has no state and calculates its arguments as source information
 pub fn get_hypothetical_account_liquidity(
     input: GetHypotheticalAccountLiquidityInput,
 ) -> (U256, U256) {
@@ -179,6 +183,8 @@ pub fn get_hypothetical_account_liquidity(
     (sum_collateral, sum_borrow_plus_effect)
 }
 
+/// Calculate the available capacity in a pool for a given user
+/// NOTE: This function has no state and calculates its arguments as source information
 pub fn get_hypothetical_account_liquidity_per_asset(
     token_balance: Balance,
     borrow_balance: Balance,
@@ -215,6 +221,7 @@ pub fn get_hypothetical_account_liquidity_per_asset(
     )
 }
 
+/// Calculate Health Factor from Balance
 pub fn calculate_health_factor_from_balances(
     total_collateral_in_base_currency: U256,
     total_debt_in_base_currency: U256,

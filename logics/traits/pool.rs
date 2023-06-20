@@ -201,6 +201,7 @@ pub trait Pool: PSP22 + PSP22Metadata {
     fn using_reserve_as_collateral(&self, user: AccountId) -> bool;
 }
 
+/// Custom error definitions for Pool
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {

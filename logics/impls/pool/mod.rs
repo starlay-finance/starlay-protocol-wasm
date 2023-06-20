@@ -70,17 +70,25 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
+    /// AccountId of underlying asset
     pub underlying: AccountId,
+    /// AccountId of Controller managing this pool
     pub controller: AccountId,
+    /// AccountId of Manager, the administrator of this pool
     pub manager: AccountId,
+    /// AccountId of Rate Model
     pub rate_model: AccountId,
     pub borrows_scaled: Balance,
     pub reserves_scaled: Balance,
     pub account_borrows: Mapping<AccountId, Balance>,
+    /// Last block stamp of interest calculation process execution
     pub accrual_block_timestamp: Timestamp,
     pub borrow_index: WrappedU256,
+    /// Initial exchange_rate, Used if never called
     pub initial_exchange_rate_mantissa: WrappedU256,
+    /// Maximum fraction of interest that can be set aside for reserves
     pub reserve_factor_mantissa: WrappedU256,
+    /// Liquidation Threshold
     pub liquidation_threshold: u128,
     pub delegate_allowance: Mapping<(AccountId, AccountId), Balance, AllowancesKey>,
     pub using_reserve_as_collateral: Mapping<AccountId, bool>,
