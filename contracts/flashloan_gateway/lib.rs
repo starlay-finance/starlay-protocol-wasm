@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
+/// Definition of Flashloan Gateway Contract
 #[openbrush::contract]
 pub mod contract {
     use ink::codegen::{
@@ -15,6 +16,7 @@ pub mod contract {
     };
     use openbrush::traits::Storage;
 
+    /// Contract's Storage
     #[ink(storage)]
     #[derive(Default, Storage)]
     pub struct FlashloanGatewayContract {
@@ -22,6 +24,7 @@ pub mod contract {
         gateway: Data,
     }
 
+    /// Event: Flashloan is executed.
     #[ink(event)]
     pub struct FlashLoan {
         #[ink(topic)]
@@ -54,6 +57,7 @@ pub mod contract {
     impl FlashloanGateway for FlashloanGatewayContract {}
 
     impl FlashloanGatewayContract {
+        /// Generate this contract
         #[ink(constructor)]
         pub fn new(controller: AccountId) -> Self {
             let mut instance = Self::default();

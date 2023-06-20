@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
+/// Definition of Controller Contract
 #[openbrush::contract]
 pub mod contract {
     use ink::codegen::{
@@ -13,6 +14,7 @@ pub mod contract {
     };
     use openbrush::traits::Storage;
 
+    /// Contract's Storage
     #[ink(storage)]
     #[derive(Default, Storage)]
     pub struct ControllerContract {
@@ -20,6 +22,7 @@ pub mod contract {
         controller: Data,
     }
 
+    /// Event: Controller starts to support Pool
     #[ink(event)]
     pub struct MarketListed {
         pool: AccountId,
@@ -28,6 +31,7 @@ pub mod contract {
     impl Controller for ControllerContract {}
 
     impl ControllerContract {
+        /// Generate this contract
         #[ink(constructor)]
         pub fn new(manager: AccountId) -> Self {
             let mut instance = Self::default();

@@ -30,6 +30,7 @@ pub trait Manager {
     #[ink(message)]
     fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
 
+    /// Sets a new flashloan gateway for the controller
     #[ink(message)]
     fn set_flashloan_gateway(&mut self, new_flashloan_gateway: AccountId) -> Result<()>;
 
@@ -94,6 +95,7 @@ pub trait Manager {
     fn sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()>;
 }
 
+/// Custom error definitions for Manager
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {

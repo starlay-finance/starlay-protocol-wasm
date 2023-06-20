@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
+/// Definition of WETH Gateway Contract
 #[openbrush::contract]
 pub mod contract {
     use ink::codegen::{
@@ -18,6 +19,7 @@ pub mod contract {
         traits::Storage,
     };
 
+    /// Contract's Storage
     #[ink(storage)]
     #[derive(Default, Storage)]
     pub struct WETHGatewayContract {
@@ -27,6 +29,7 @@ pub mod contract {
         ownable: ownable::Data,
     }
 
+    /// Event: DepositETH is executed.
     #[ink(event)]
     pub struct DepositEth {
         #[ink(topic)]
@@ -36,6 +39,7 @@ pub mod contract {
         value: Balance,
     }
 
+    /// Event: WithdrawEth is executed.
     #[ink(event)]
     pub struct WithdrawEth {
         #[ink(topic)]
@@ -45,6 +49,7 @@ pub mod contract {
         value: Balance,
     }
 
+    /// Event: BorrowEth is executed.
     #[ink(event)]
     pub struct BorrowEth {
         #[ink(topic)]
@@ -54,6 +59,7 @@ pub mod contract {
         value: Balance,
     }
 
+    /// Event: RepayEth is executed.
     #[ink(event)]
     pub struct RepayEth {
         #[ink(topic)]
@@ -85,6 +91,7 @@ pub mod contract {
     impl WETHGateway for WETHGatewayContract {}
 
     impl WETHGatewayContract {
+        /// Generate this contract
         #[ink(constructor)]
         pub fn new(weth: AccountId) -> Self {
             let mut instance = Self::default();

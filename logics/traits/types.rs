@@ -1,10 +1,3 @@
-// use core::ops::{
-//     Add,
-//     Div,
-//     Mul,
-//     Sub,
-// };
-
 #[cfg(feature = "std")]
 use ink::metadata::layout::{
     Layout,
@@ -21,6 +14,7 @@ use scale::{
     Encode,
 };
 
+/// Wrapper definition for easier handling of U256
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct WrappedU256(U256);

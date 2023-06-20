@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
+/// Definition of Pool Contract
 #[openbrush::contract]
 pub mod contract {
     use ink::{
@@ -33,6 +34,7 @@ pub mod contract {
         },
     };
 
+    /// Contract's Storage
     #[ink(storage)]
     #[derive(Default, Storage)]
     pub struct PoolContract {
@@ -44,17 +46,20 @@ pub mod contract {
         metadata: metadata::Data,
     }
 
+    /// Event: Execute `Mint`
     #[ink(event)]
     pub struct Mint {
         minter: AccountId,
         mint_amount: Balance,
         mint_tokens: Balance,
     }
+    /// Event: Execute `Redeem`
     #[ink(event)]
     pub struct Redeem {
         redeemer: AccountId,
         redeem_amount: Balance,
     }
+    /// Event: Execute `Borrow`
     #[ink(event)]
     pub struct Borrow {
         borrower: AccountId,
@@ -62,6 +67,7 @@ pub mod contract {
         account_borrows: Balance,
         total_borrows: Balance,
     }
+    /// Event: Execute `RepayBorrow`
     #[ink(event)]
     pub struct RepayBorrow {
         payer: AccountId,
@@ -70,6 +76,7 @@ pub mod contract {
         account_borrows: Balance,
         total_borrows: Balance,
     }
+    /// Event: Execute `LiquidateBorrow`
     #[ink(event)]
     pub struct LiquidateBorrow {
         liquidator: AccountId,
@@ -78,12 +85,18 @@ pub mod contract {
         token_collateral: AccountId,
         seize_tokens: Balance,
     }
+    /// Event: Adding to Reserves
     #[ink(event)]
     pub struct ReservesAdded {
         benefactor: AccountId,
         add_amount: Balance,
         new_total_reserves: Balance,
     }
+
+    /// Event: Transfer Pool Token
+    ///
+    /// NOTE: Use event emitter included in PSP22 Interface
+    /// [PSP22 | Brushfam](https://learn.brushfam.io/docs/OpenBrush/smart-contracts/PSP22/)
     #[ink(event)]
     pub struct Transfer {
         #[ink(topic)]
@@ -92,6 +105,10 @@ pub mod contract {
         to: Option<AccountId>,
         value: Balance,
     }
+    /// Event: Allowance of a spender for an owner is set
+    ///
+    /// NOTE: Use event emitter included in PSP22 Interface
+    /// [PSP22 | Brushfam](https://learn.brushfam.io/docs/OpenBrush/smart-contracts/PSP22/)
     #[ink(event)]
     pub struct Approval {
         #[ink(topic)]
@@ -101,6 +118,7 @@ pub mod contract {
         value: Balance,
     }
 
+    /// Event: Delegation Allowance for Borrowing is changed
     #[ink(event)]
     pub struct DelegateApproval {
         #[ink(topic)]
@@ -290,6 +308,7 @@ pub mod contract {
     impl metadata::PSP22Metadata for PoolContract {}
 
     impl PoolContract {
+        /// Generate this contract
         #[ink(constructor)]
         pub fn new(
             underlying: AccountId,
@@ -322,6 +341,7 @@ pub mod contract {
             instance
         }
 
+        /// Generate this contract
         #[ink(constructor)]
         pub fn new_from_asset(
             underlying: AccountId,
