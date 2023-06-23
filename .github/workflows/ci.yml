@@ -7,6 +7,55 @@ on:
     branches: [main]
 
 jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - id: cache-rustup
+        name: Cache Save restore toolchain
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo
+            ~/.rustup
+          key: ${{ runner.os }}-rust-${{ hashFiles('rust-toolchain.toml') }}
+      - if: ${{ steps.cache-rustup.outputs.cache-hit != 'true' }}
+        name: Install & display rust toolchain
+        run: |
+          rustup show
+          rustup component add rust-src
+      - name: Checkout the source code
+        uses: actions/checkout@v3
+      - name: Check Formatting
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --check
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps: 
+      - id: cache-rustup
+        name: Cache Save restore toolchain
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo
+            ~/.rustup
+          key: ${{ runner.os }}-rust-${{ hashFiles('rust-toolchain.toml') }}
+      - if: ${{ steps.cache-rustup.outputs.cache-hit != 'true' }}
+        name: Install & display rust toolchain
+        run: |
+          rustup show
+          rustup component add rust-src
+      - name: Checkout the source code
+        uses: actions/checkout@v3
+      - name: Clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: -- -D warnings
+
+
   unit-test:
     runs-on: ubuntu-latest
     steps:

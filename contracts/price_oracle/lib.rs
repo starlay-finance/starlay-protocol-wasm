@@ -17,6 +17,12 @@ pub mod contract {
 
     impl PriceOracle for PriceOracleContract {}
 
+    impl Default for PriceOracleContract {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl PriceOracleContract {
         /// Generate this contract
         #[ink(constructor)]
