@@ -59,7 +59,7 @@ Here, we will provide an explanation of the templates constructed in this reposi
 
 - Based on the code of Compound on Ethereum.
 - using the following as the core libraries for the contracts in this template.
-  - [openbrush](https://github.com/727-Ventures/openbrush-contracts)
+  - [openbrush](https://github.com/Brushfam/openbrush-contracts)
     - framework for ink! development (equivalent to OpenZeppelin in Ethereum)
   - [primitive-types](https://github.com/paritytech/parity-common/tree/master/primitive-types)
     - primitive types shared by Substrate and Parity Ethereum
