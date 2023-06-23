@@ -265,14 +265,14 @@ pub mod contract {
         fn decode_role_granted_event(event: test::EmittedEvent) -> RoleGranted {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..]);
             match decoded_event {
-                Ok(Event::RoleGranted(x)) => return x,
+                Ok(Event::RoleGranted(x)) => x,
                 _ => panic!("unexpected event kind: expected RoleGranted event"),
             }
         }
         fn decode_role_revoked_event(event: test::EmittedEvent) -> RoleRevoked {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..]);
             match decoded_event {
-                Ok(Event::RoleRevoked(x)) => return x,
+                Ok(Event::RoleRevoked(x)) => x,
                 _ => panic!("unexpected event kind: expected RoleRevoked event"),
             }
         }
