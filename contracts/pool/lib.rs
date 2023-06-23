@@ -307,6 +307,7 @@ pub mod contract {
 
     impl metadata::PSP22Metadata for PoolContract {}
 
+    #[allow(clippy::too_many_arguments)]
     impl PoolContract {
         /// Generate this contract
         #[ink(constructor)]
@@ -380,6 +381,7 @@ pub mod contract {
             instance
         }
 
+        #[allow(clippy::too_many_arguments)]
         fn _initialize(
             &mut self,
             underlying: AccountId,
