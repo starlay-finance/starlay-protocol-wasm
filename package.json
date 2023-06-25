@@ -21,6 +21,7 @@
     "ts-node": "^10.9.1"
   },
   "scripts": {
+    "build": "manifest_paths=`find contracts -type f -name Cargo.toml` && for manifest_path in $manifest_paths; do cargo contract build --manifest-path $manifest_path; done",
     "compile": "typechain-compiler --toolchain nightly-2023-03-05 --nt && yarn generate",
     "compile:release": "typechain-compiler --release --toolchain nightly-2023-03-05 --nt && yarn generate",
     "test:typechain": "jest --testPathPattern \".spec.ts$\" --runInBand",
