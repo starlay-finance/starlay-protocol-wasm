@@ -361,10 +361,8 @@ pub mod contract {
             let base_symbol = PSP22MetadataRef::token_symbol(&underlying);
             let decimals = PSP22MetadataRef::token_decimals(&underlying);
 
-            let mut name = "Starlay ".as_bytes().to_vec();
-            name.append(&mut base_name.unwrap());
-            let mut symbol = "s".as_bytes().to_vec();
-            symbol.append(&mut base_symbol.unwrap());
+            let name = String::from("Starlay ") + &base_name.unwrap();
+            let symbol = String::from("s") + &base_symbol.unwrap();
 
             let mut instance = Self::default();
             instance._initialize(
