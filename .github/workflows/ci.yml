@@ -55,7 +55,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: -- -D warnings
 
-
   unit-test:
     runs-on: ubuntu-latest
     steps:
@@ -112,3 +111,52 @@ jobs:
           key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
       - name: test
         run: cargo test
+
+  integration-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the source code
+        uses: actions/checkout@v3
+      - id: cache-rustup
+        name: Cache Save restore toolchain
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo
+            ~/.rustup
+          key: ${{ runner.os }}-rust-${{ hashFiles('rust-toolchain.toml') }}
+      - if: ${{ steps.cache-rustup.outputs.cache-hit != 'true' }}
+        name: Install & display rust toolchain
+        run: |
+          rustup show
+          rustup component add rust-src
+      - name: Check targets are installed correctly
+        run: rustup target list --installed
+      - name: Restore cached Primes
+        id: cache-primes-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            **/target
+          key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            artifacts-${{ runner.os }}-${{ runner.arch }}-
+      - name: Check if cargo-contract exists
+        id: check-cargo-contract
+        continue-on-error: true
+        run: cargo contract --version
+      - name: Install cargo contract
+        if: ${{ steps.check-cargo-contract.outcome == 'failure' }}
+        run: |
+          cargo install cargo-contract --version 2.0.1 --force
+      - name: Check if contracts-node exists
+        id: check-contracts-node
+        continue-on-error: true
+        run: substrate-contracts-node --version
+      - name: Install substrate-contracts-node
+        if: ${{ steps.check-contracts-node.outcome == 'failure' }}
+        # TODO: update to latest version after new ink_env release. see: https://github.com/paritytech/ink/pull/1795/files#diff-9db0b36a33b3397b6f6b71ab7a529da90f8fde04ba62d92a8512b44859a3b86aR175
+        run: |
+          cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --tag v0.26.0 
+      - name: test
+        run: cargo test --features e2e-test
