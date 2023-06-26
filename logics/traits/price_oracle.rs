@@ -20,6 +20,7 @@ pub trait PriceOracle {
     fn set_fixed_price(&mut self, asset: AccountId, value: u128) -> Result<()>;
 }
 
+/// Custom error definitions for PriceOracle
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {}

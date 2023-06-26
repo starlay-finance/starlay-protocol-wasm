@@ -1,11 +1,13 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 #![feature(min_specialization)]
 
+/// Definition of PriceOracle Contract
 #[openbrush::contract]
 pub mod contract {
     use logics::impls::price_oracle::*;
     use openbrush::traits::Storage;
 
+    /// Contract's Storage
     #[ink(storage)]
     #[derive(Storage)]
     pub struct PriceOracleContract {
@@ -15,7 +17,14 @@ pub mod contract {
 
     impl PriceOracle for PriceOracleContract {}
 
+    impl Default for PriceOracleContract {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl PriceOracleContract {
+        /// Generate this contract
         #[ink(constructor)]
         pub fn new() -> Self {
             Self {

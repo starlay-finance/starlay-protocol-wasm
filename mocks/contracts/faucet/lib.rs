@@ -54,7 +54,7 @@ pub mod token {
         ) -> Result<(), PSP22Error> {
             let pools = ControllerRef::markets(&controller);
             for pool in pools.iter() {
-                self._mint_underlying(&pool, amount, account)?;
+                self._mint_underlying(pool, amount, account)?;
             }
             Ok(())
         }
