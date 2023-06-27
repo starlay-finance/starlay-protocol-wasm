@@ -1,9 +1,9 @@
-#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(not(feature = "std"), no_std, no_main)]
 #![feature(min_specialization)]
 
 /// Definition of Controller Contract
 #[openbrush::contract]
-pub mod contract {
+pub mod controller {
     use ink::codegen::{
         EmitEvent,
         Env,
@@ -456,6 +456,31 @@ pub mod contract {
             for func in admin_funcs {
                 assert_eq!(func.unwrap_err(), Error::CallerIsNotManager);
             }
+        }
+    }
+
+    #[cfg(all(test, feature = "e2e-tests"))]
+    mod e2e_tests {
+
+        use super::*;
+        use ink_e2e::{
+            build_message,
+            subxt::ext::sp_runtime::AccountId32,
+            AccountKeyring,
+        };
+        type E2EResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+        #[ink_e2e::test]
+        async fn test_flipper(mut client: ink_e2e::Client<C, E>) -> E2EResult<()> {
+            let constructor =
+                ControllerContractRef::new(ink_e2e::account_id(AccountKeyring::Alice));
+            let controller_id = client
+                .instantiate("controller", &ink_e2e::alice(), constructor, 0, None)
+                .await
+                .expect("instantiate failed")
+                .account_id;
+            assert!(controller_id == AccountId::from([0x0; 32]));
+            Ok(())
         }
     }
 }
