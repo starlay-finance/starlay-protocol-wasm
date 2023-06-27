@@ -1,6 +1,6 @@
 import { ReturnNumber } from '@727-ventures/typechain-types'
 import type { WeightV2 } from '@polkadot/types/interfaces'
-import { BN } from '@polkadot/util'
+import { BN, BN_ONE } from '@polkadot/util'
 import { ReplacedType } from '../scripts/helper/utilityTypes'
 import { waitForTx } from '../scripts/helper/utils'
 
@@ -34,22 +34,31 @@ const generateNewArgsWithGasLimit = <
   fn: F,
   args: Parameters<C['tx'][F]>,
   gasLimit: WeightV2,
+  storageDepositLimit: WeightV2 | null,
 ): Parameters<C['tx'][F]> => {
   if (args.length == contract.tx[fn].length) {
     const option: object = args[args.length - 1] as object
     return [
       ...args.slice(0, args.length - 1),
-      { ...option, gasLimit, storageDepositLimit: null },
+      {
+        ...option,
+        gasLimit,
+        storageDepositLimit,
+      },
     ] as Parameters<C['tx'][F]>
   } else {
-    return [...args, { gasLimit, storageDepositLimit: null }] as Parameters<
-      C['tx'][F]
-    >
+    return [
+      ...args,
+      {
+        gasLimit,
+        storageDepositLimit,
+      },
+    ] as Parameters<C['tx'][F]>
   }
 }
 
-// const MAX_CALL_WEIGHT = new BN(5_000_000_000_000_000).isub(BN_ONE)
-// const PROOFSIZE = new BN(1_000_000_000)
+const MAX_CALL_WEIGHT = new BN(5_000_000_000_000_000).isub(BN_ONE)
+const PROOFSIZE = new BN(1_000_000_000)
 export const shouldNotRevert = async <
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   C extends { tx: any; query: any; name: string },
@@ -63,7 +72,18 @@ export const shouldNotRevert = async <
   let gasRequired: WeightV2
   const { api } = globalThis.setup
   try {
-    const preview = await contract.query[fn](...args)
+    const gasLimit = api?.registry.createType('WeightV2', {
+      refTime: MAX_CALL_WEIGHT,
+      proofSize: PROOFSIZE,
+    }) as WeightV2
+    const newArgs = generateNewArgsWithGasLimit(
+      contract,
+      fn,
+      args,
+      gasLimit,
+      null,
+    )
+    const preview = await contract.query[fn](...newArgs)
     expect(preview.value.ok.err).toBeUndefined()
     gasRequired = preview.gasRequired as WeightV2
   } catch (e) {
@@ -73,14 +93,16 @@ export const shouldNotRevert = async <
       )}): ${JSON.stringify(e)}`,
     )
   }
-  console.log(fn, 'gasRequired.refTime', gasRequired.refTime.toString())
-  console.log(fn, 'gasRequired.proofSize', gasRequired.proofSize.toString())
-  // const gasLimit = api?.registry.createType('WeightV2', {
-  //   refTime: MAX_CALL_WEIGHT,
-  //   proofSize: PROOFSIZE,
-  // }) as WeightV2
+  // console.log(fn, 'gasRequired.refTime', gasRequired.refTime.toString())
+  // console.log(fn, 'gasRequired.proofSize', gasRequired.proofSize.toString())
   const gasLimit = api?.registry.createType('WeightV2', gasRequired) as WeightV2
-  const newArgs = generateNewArgsWithGasLimit(contract, fn, args, gasLimit)
+  const newArgs = generateNewArgsWithGasLimit(
+    contract,
+    fn,
+    args,
+    gasLimit,
+    null,
+  )
   const res = await contract.tx[fn](...newArgs)
   await waitForTx(res)
   return res
