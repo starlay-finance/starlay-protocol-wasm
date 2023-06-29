@@ -157,8 +157,6 @@ jobs:
         if: ${{ steps.check-contracts-node.outcome == 'failure' }}
         # TODO: update to latest version after new ink_env release. see: https://github.com/paritytech/ink/pull/1795/files#diff-9db0b36a33b3397b6f6b71ab7a529da90f8fde04ba62d92a8512b44859a3b86aR175
         run: |
-          apt update && apt upgrade -y
-          apt install -y protobuf-compiler libprotobuf-dev
           cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --tag v0.26.0 
       - name: test
         run: cargo test --features e2e-test
