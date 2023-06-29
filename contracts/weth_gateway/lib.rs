@@ -1,9 +1,12 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
+#[cfg(test)]
+mod tests;
+
 /// Definition of WETH Gateway Contract
 #[openbrush::contract]
-pub mod contract {
+pub mod weth_gateway {
     use ink::codegen::{
         EmitEvent,
         Env,

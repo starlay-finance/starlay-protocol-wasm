@@ -1,9 +1,12 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
+#[cfg(test)]
+mod tests;
+
 /// Definition of Flashloan Gateway Contract
 #[openbrush::contract]
-pub mod contract {
+pub mod flashloan_gateway {
     use ink::codegen::{
         EmitEvent,
         Env,

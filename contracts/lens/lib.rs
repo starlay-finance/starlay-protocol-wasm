@@ -1,11 +1,14 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![feature(min_specialization)]
 
+#[cfg(test)]
+mod tests;
+
 /// Definition of Lens Contract
 ///
 /// This is a contract to make it easier to get protocol status and data for the frontend
 #[openbrush::contract]
-pub mod contract {
+pub mod lens {
     use ink::prelude::vec::Vec;
     use logics::traits::{
         controller::ControllerRef,
@@ -252,33 +255,6 @@ pub mod contract {
         fn _underlying_balance(&self, pool: &AccountId, account: AccountId) -> Balance {
             let underlying = PoolRef::underlying(pool);
             PSP22Ref::balance_of(&underlying, account)
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-        use ink::env::{
-            test::{
-                self,
-                DefaultAccounts,
-            },
-            DefaultEnvironment,
-        };
-
-        fn default_accounts() -> DefaultAccounts<DefaultEnvironment> {
-            test::default_accounts::<DefaultEnvironment>()
-        }
-        fn set_caller(id: AccountId) {
-            test::set_caller::<DefaultEnvironment>(id);
-        }
-
-        #[ink::test]
-        fn new_works() {
-            let accounts = default_accounts();
-            set_caller(accounts.bob);
-
-            let _contract = LensContract::new();
         }
     }
 }
