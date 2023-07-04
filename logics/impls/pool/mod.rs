@@ -706,11 +706,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         if spender == src {
             // copied from PSP22#transfer
-            // ref: https://github.com/727-Ventures/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L75-L79
+            // ref: https://github.com/Brushfam/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L75-L79
             self._transfer_from_to(src, dst, psp22_transfer_amount, data)?;
         } else {
             // copied from PSP22#transfer_from
-            // ref: https://github.com/727-Ventures/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L81-L98
+            // ref: https://github.com/Brushfam/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L81-L98
             let allowance = self._allowance(&src, &spender);
 
             if allowance < psp22_transfer_amount {

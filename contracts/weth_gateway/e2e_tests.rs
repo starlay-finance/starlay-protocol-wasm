@@ -1,46 +1,29 @@
 use crate::weth_gateway::WETHGatewayContractRef;
 use controller::controller::ControllerContractRef;
 use default_interest_rate_model::default_interest_rate_model::DefaultInterestRateModelContractRef;
-use pool::pool::PoolContractRef;
+// use pool::pool::PoolContractRef;
 use price_oracle::price_oracle::PriceOracleContractRef;
 use weth::weth::WETHContractRef;
 
-use logics::traits::{
-    controller::Controller,
-    types::WrappedU256,
+use logics::{
+    impls::controller::controller_external::Controller,
+    traits::types::WrappedU256,
 };
 
-use core::ops::{
-    Add,
-    Div,
-    Mul,
-    Sub,
-};
+use core::ops::Mul;
 use primitive_types::U256;
 use serial_test::serial;
 
+use ink::env::DefaultEnvironment;
 #[cfg(all(test, feature = "e2e-tests"))]
 use ink_e2e::{
-    build_message,
-    subxt::ext::sp_runtime::AccountId32,
+    // build_message,
+    // subxt::ext::sp_runtime::AccountId32,
     AccountKeyring,
+    MessageBuilder,
 };
-use openbrush::{
-    contracts::psp22::extensions::metadata::PSP22Metadata,
-    traits::{
-        AccountId,
-        ZERO_ADDRESS,
-    },
-};
+use openbrush::traits::AccountId;
 type E2EResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
-
-// Global Variable
-static mut CONTROLLER_ID: Option<AccountId> = None;
-static mut WETH_GATEWAY_ID: Option<AccountId> = None;
-static mut PRICE_ORACLE_ID: Option<AccountId> = None;
-static mut RATE_MODEL_ID: Option<AccountId> = None;
-static mut WETH_ID: Option<AccountId> = None;
-static mut POOL_ID: Option<AccountId> = None;
 
 #[ink_e2e::test]
 #[serial]
@@ -147,28 +130,11 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
 
     // assert_eq!(get_token_decimals_result, 18);
 
-    // Set Global Variable for AccountIds
-    unsafe {
-        CONTROLLER_ID = Some(controller_id);
-        WETH_GATEWAY_ID = Some(weth_gateway_id);
-        PRICE_ORACLE_ID = Some(price_oracle_id);
-        RATE_MODEL_ID = Some(rate_model_id);
-        WETH_ID = Some(weth_id);
-    }
+    let get_manager = MessageBuilder::<DefaultEnvironment, ControllerContractRef>::from_account_id(
+        controller_id.clone(),
+    )
+    .call(|controller| controller.manager());
 
-    Ok(())
-}
-
-#[ink_e2e::test]
-#[serial]
-async fn _2_deposit_eth(mut client: ink_e2e::Client<C, E>) -> E2EResult<()> {
-    let controller_id: AccountId;
-    unsafe {
-        assert!(!CONTROLLER_ID.is_none());
-        controller_id = CONTROLLER_ID.unwrap();
-    }
-    let get_manager = build_message::<ControllerContractRef>(controller_id.clone())
-        .call(|controller| controller.manager());
     let manager = client
         .call_dry_run(&ink_e2e::alice(), &get_manager, 0, None)
         .await
