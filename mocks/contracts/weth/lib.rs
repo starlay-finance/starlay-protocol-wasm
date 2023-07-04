@@ -2,10 +2,10 @@
 #![feature(min_specialization)]
 
 #[openbrush::contract]
-pub mod contract {
-    use ink::codegen::{
-        EmitEvent,
-        Env,
+pub mod weth {
+    use ink::env::{
+        emit_event,
+        DefaultEnvironment,
     };
     use logics::impls::weth::{
         Internal,
@@ -49,10 +49,10 @@ pub mod contract {
 
     impl Internal for WETHContract {
         fn _emit_deposit_event(&mut self, dst: AccountId, wad: Balance) {
-            self.env().emit_event(Deposit { dst, wad });
+            emit_event::<DefaultEnvironment, _>(Deposit { dst, wad });
         }
         fn _emit_withdraw_event(&mut self, src: AccountId, wad: Balance) {
-            self.env().emit_event(Withdraw { src, wad });
+            emit_event::<DefaultEnvironment, _>(Withdraw { src, wad });
         }
     }
 

@@ -20,7 +20,6 @@ logics = { path = "../../../logics", default-features = false }
 [lib]
 name = "weth"
 path = "lib.rs"
-crate-type = ["cdylib"]
 
 [features]
 default = ["std"]

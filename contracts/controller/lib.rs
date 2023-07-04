@@ -7,9 +7,9 @@ mod tests;
 /// Definition of Controller Contract
 #[openbrush::contract]
 pub mod controller {
-    use ink::codegen::{
-        EmitEvent,
-        Env,
+    use ink::env::{
+        emit_event,
+        DefaultEnvironment,
     };
     use logics::impls::controller::{
         Internal,
@@ -45,7 +45,7 @@ pub mod controller {
 
     impl Internal for ControllerContract {
         fn _emit_market_listed_event(&self, pool: AccountId) {
-            self.env().emit_event(MarketListed { pool });
+            emit_event::<DefaultEnvironment, _>(MarketListed { pool });
         }
     }
 
