@@ -31,6 +31,12 @@ impl From<U256> for WrappedU256 {
     }
 }
 
+impl From<u128> for WrappedU256 {
+    fn from(value: u128) -> Self {
+        WrappedU256(U256::from(value))
+    }
+}
+
 #[cfg(feature = "std")]
 impl StorageLayout for WrappedU256 {
     fn layout(key: &Key) -> Layout {
