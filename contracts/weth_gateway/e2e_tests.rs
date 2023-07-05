@@ -19,6 +19,8 @@ use primitive_types::U256;
 
 #[cfg(all(test, feature = "e2e-tests"))]
 use ink_e2e::{
+    account_id,
+    alice,
     build_message,
     AccountKeyring,
 };
@@ -33,16 +35,9 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
     let one_ether = 10_u128.pow(18);
     let rate_model_arg: WrappedU256 = WrappedU256::from(U256::from(100).mul(U256::from(one_ether)));
     // Deploy Controller
-    let controller_constructor =
-        ControllerContractRef::new(ink_e2e::account_id(AccountKeyring::Alice));
+    let controller_constructor = ControllerContractRef::new(account_id(AccountKeyring::Alice));
     let controller_id = client
-        .instantiate(
-            "controller",
-            &ink_e2e::alice(),
-            controller_constructor,
-            0,
-            None,
-        )
+        .instantiate("controller", &alice(), controller_constructor, 0, None)
         .await
         .expect("instantiate failed")
         .account_id;
@@ -51,13 +46,7 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
     // Deploy Price Oracle
     let price_oracle_constructor = PriceOracleContractRef::new();
     let price_oracle_id = client
-        .instantiate(
-            "price_oracle",
-            &ink_e2e::alice(),
-            price_oracle_constructor,
-            0,
-            None,
-        )
+        .instantiate("price_oracle", &alice(), price_oracle_constructor, 0, None)
         .await
         .expect("instantiate failed")
         .account_id;
@@ -73,7 +62,7 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
     let rate_model_id = client
         .instantiate(
             "default_interest_rate_model",
-            &ink_e2e::alice(),
+            &alice(),
             rate_model_constructor,
             0,
             None,
@@ -86,7 +75,7 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
     // Deploy WETH
     let weth_constructor = WETHContractRef::new();
     let weth_id = client
-        .instantiate("weth", &ink_e2e::alice(), weth_constructor, 0, None)
+        .instantiate("weth", &alice(), weth_constructor, 0, None)
         .await
         .expect("instantiate failed")
         .account_id;
@@ -95,13 +84,7 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
     // Deploy WETH Gateway
     let weth_gateway_constructor = WETHGatewayContractRef::new(weth_id);
     let weth_gateway_id = client
-        .instantiate(
-            "weth_gateway",
-            &ink_e2e::alice(),
-            weth_gateway_constructor,
-            0,
-            None,
-        )
+        .instantiate("weth_gateway", &alice(), weth_gateway_constructor, 0, None)
         .await
         .expect("instantiate failed")
         .account_id;
@@ -110,7 +93,7 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
     // Prepare Pool with Token
     let get_token_name = build_message::<WETHContractRef>(weth_id).call(|weth| weth.token_name());
     let get_token_name_result = client
-        .call_dry_run(&ink_e2e::alice(), &get_token_name, 0, None)
+        .call_dry_run(&alice(), &get_token_name, 0, None)
         .await
         .return_value();
     assert!(!get_token_name_result.is_none());
@@ -120,7 +103,7 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
     let get_token_symbol =
         build_message::<WETHContractRef>(weth_id).call(|weth| weth.token_symbol());
     let get_token_symbol_result = client
-        .call_dry_run(&ink_e2e::alice(), &get_token_symbol, 0, None)
+        .call_dry_run(&alice(), &get_token_symbol, 0, None)
         .await
         .return_value();
     assert!(!get_token_symbol_result.is_none());
@@ -130,7 +113,7 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
     let get_token_decimals =
         build_message::<WETHContractRef>(weth_id).call(|weth| weth.token_decimals());
     let token_decimals = client
-        .call_dry_run(&ink_e2e::alice(), &get_token_decimals, 0, None)
+        .call_dry_run(&alice(), &get_token_decimals, 0, None)
         .await
         .return_value();
     assert_eq!(token_decimals, 18);
@@ -147,7 +130,7 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
         token_decimals,
     );
     let pool_id = client
-        .instantiate("pool", &ink_e2e::alice(), pool_constructor, 0, None)
+        .instantiate("pool", &alice(), pool_constructor, 0, None)
         .await
         .expect("instantiate failed")
         .account_id;
@@ -157,14 +140,14 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
     let set_price_oracle = build_message::<ControllerContractRef>(controller_id)
         .call(|controller| controller.set_price_oracle(price_oracle_id));
     client
-        .call(&ink_e2e::alice(), set_price_oracle, 0, None)
+        .call(&alice(), set_price_oracle, 0, None)
         .await
         .expect("Failed to set Price Oracle");
 
     let set_close_factor_mantissa = build_message::<ControllerContractRef>(controller_id)
         .call(|controller| controller.set_close_factor_mantissa(WrappedU256::from(one_ether)));
     client
-        .call(&ink_e2e::alice(), set_close_factor_mantissa, 0, None)
+        .call(&alice(), set_close_factor_mantissa, 0, None)
         .await
         .expect("Failed to set Close Factor Mantissa");
 
@@ -172,7 +155,7 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
     let set_fixed_price_weth = build_message::<PriceOracleContractRef>(price_oracle_id)
         .call(|price_oracle| price_oracle.set_fixed_price(weth_id, one_ether));
     client
-        .call(&ink_e2e::alice(), set_fixed_price_weth, 0, None)
+        .call(&alice(), set_fixed_price_weth, 0, None)
         .await
         .expect("Failed to set Price of WETH");
 
@@ -184,7 +167,7 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
         )
     });
     client
-        .call(&ink_e2e::alice(), support_market, 0, None)
+        .call(&alice(), support_market, 0, None)
         .await
         .expect("Failed to Support Market");
 
@@ -192,10 +175,34 @@ async fn _1_initialize_e2e_test(mut client: ink_e2e::Client<C, E>) -> E2EResult<
     let get_weth_address = build_message::<WETHGatewayContractRef>(weth_gateway_id)
         .call(|weth_gateway| weth_gateway.get_weth_address());
     let get_weth_address_result = client
-        .call_dry_run(&ink_e2e::alice(), &get_weth_address, 0, None)
+        .call_dry_run(&alice(), &get_weth_address, 0, None)
         .await
         .return_value();
     assert_eq!(get_weth_address_result, weth_id);
+
+    // Deposit Test
+    let before_deposit_weth_contract_balance = client
+        .balance(weth_id)
+        .await
+        .expect("Failed to get balance");
+
+    let deposit_amount: u128 = 3000;
+    let deposit_eth = build_message::<WETHGatewayContractRef>(weth_gateway_id)
+        .call(|weth_gateway| weth_gateway.deposit_eth(pool_id));
+    client
+        .call(&alice(), deposit_eth, deposit_amount, None)
+        .await
+        .expect("Failed to Deposit Eth");
+
+    let after_deposit_weth_contract_balance = client
+        .balance(weth_id)
+        .await
+        .expect("Failed to get balance");
+
+    assert_eq!(
+        before_deposit_weth_contract_balance + deposit_amount,
+        after_deposit_weth_contract_balance
+    );
 
     Ok(())
 }
