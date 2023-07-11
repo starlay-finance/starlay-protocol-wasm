@@ -30,7 +30,6 @@ std = [
     "scale/std",
     "scale-info/std",
     "openbrush/std",
-    "openbrush/std",
     "primitive-types/std",
     "primitive-types/scale-info",
 ]
