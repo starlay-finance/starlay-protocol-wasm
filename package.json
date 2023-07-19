@@ -21,8 +21,8 @@
     "ts-node": "^10.9.1"
   },
   "scripts": {
-    "compile": "typechain-compiler --toolchain nightly-2023-03-05 --nt && yarn generate",
-    "compile:release": "typechain-compiler --release --toolchain nightly-2023-03-05 --nt && yarn generate",
+    "compile": "typechain-compiler --toolchain nightly-2023-03-03 --nt && yarn generate",
+    "compile:release": "typechain-compiler --release --toolchain nightly-2023-03-03 --nt && yarn generate",
     "test:typechain": "jest --testPathPattern \".spec.ts$\" --runInBand",
     "test:single": "jest",
     "test": "yarn compile && yarn test:typechain",

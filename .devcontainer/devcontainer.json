@@ -16,5 +16,8 @@
 	"mutantdino.resourcemonitor",
 	"ms-azuretools.vscode-docker",
 	"rust-lang.rust-analyzer"
-]
+  ],
+  "mounts": [
+    "source=build,target=${containerWorkspaceFolder}/target,type=volume"
+  ]
 }
