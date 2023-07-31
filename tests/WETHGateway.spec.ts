@@ -1,5 +1,6 @@
 import type { KeyringPair } from '@polkadot/keyring/types'
-import { BN } from '@polkadot/util'
+import { WeightV2 } from '@polkadot/types/interfaces'
+import { BN, BN_ONE, BN_TEN } from '@polkadot/util'
 import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
@@ -8,34 +9,31 @@ import {
   deployWETH,
   deployWETHGateway,
 } from '../scripts/helper/deploy_helper'
-import Controller from '../types/contracts/controller'
-import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
-import PriceOracle from '../types/contracts/price_oracle'
+import { getGasLimit } from '../scripts/helper/utils'
 import WETH from '../types/contracts/weth'
 import WETHGateway from '../types/contracts/weth_gateway'
 import { Pools, preparePoolsWithPreparedTokens } from './testContractHelper'
 import { shouldNotRevert } from './testHelpers'
 
+const MAX_CALL_WEIGHT = new BN(100_000_000_000).isub(BN_ONE).mul(BN_TEN)
+const PROOFSIZE = new BN(2_000_000)
 describe('WETHGateway spec', () => {
   const rateModelArg = new BN(100).mul(ONE_ETHER)
 
   let api
   let deployer: KeyringPair
   let pools: Pools
-  let rateModel: DefaultInterestRateModel
-  let controller: Controller
-  let priceOracle: PriceOracle
-  let users: KeyringPair[]
+  // let rateModel: DefaultInterestRateModel
+  // let controller: Controller
+  // let priceOracle: PriceOracle
+  // let users: KeyringPair[]
   let weth: WETH
   let wethGateway: WETHGateway
-  let gasLimit
+  let gasLimit: WeightV2
 
   const setup = async () => {
     const { api, alice: deployer, bob, charlie, django } = globalThis.setup
-    gasLimit = api.registry.createType('WeightV2', {
-      refTime: new BN('10000000000'),
-      proofSize: new BN('10000000000'),
-    })
+    gasLimit = getGasLimit(api, MAX_CALL_WEIGHT, PROOFSIZE)
     const controller = await deployController({
       api,
       signer: deployer,
@@ -110,10 +108,10 @@ describe('WETHGateway spec', () => {
       api,
       deployer,
       pools,
-      rateModel,
-      controller,
-      priceOracle,
-      users,
+      // rateModel,
+      // controller,
+      // priceOracle,
+      // users,
     } = await setup())
 
     expect(weth.address).not.toBe(ZERO_ADDRESS)
@@ -131,7 +129,6 @@ describe('WETHGateway spec', () => {
   const depositAmount = 3000
   it('Deposit WETH', async () => {
     const { pool } = pools.weth
-
     const {
       data: { free: beforeWethContractBalance },
     } = await api.query.system.account(weth.address)
@@ -140,6 +137,7 @@ describe('WETHGateway spec', () => {
       pool.address,
       {
         value: depositAmount,
+        gasLimit,
       },
     ])
 
@@ -186,6 +184,7 @@ describe('WETHGateway spec', () => {
       await shouldNotRevert(pool, 'approveDelegate', [
         wethGateway.address,
         borrowAmount,
+        { gasLimit },
       ])
       const {
         data: { free: beforeWethContractBalance },
@@ -193,6 +192,7 @@ describe('WETHGateway spec', () => {
       await shouldNotRevert(wethGateway, 'borrowEth', [
         pool.address,
         borrowAmount,
+        { gasLimit },
       ])
       const {
         data: { free: afterWethContractBalance },
@@ -216,7 +216,11 @@ describe('WETHGateway spec', () => {
   const repayAmount = 2000
   it('Repay WETH', async () => {
     const { pool } = pools.weth
-    await shouldNotRevert(weth, 'approve', [wethGateway.address, repayAmount])
+    await shouldNotRevert(weth, 'approve', [
+      wethGateway.address,
+      repayAmount,
+      { gasLimit },
+    ])
     const {
       data: { free: beforeWethContractBalance },
     } = await api.query.system.account(weth.address)
@@ -225,6 +229,7 @@ describe('WETHGateway spec', () => {
       repayAmount,
       {
         value: repayAmount,
+        gasLimit,
       },
     ])
     const {
@@ -256,6 +261,7 @@ describe('WETHGateway spec', () => {
     await shouldNotRevert(pool, 'approve', [
       wethGateway.address,
       withdrawAmount,
+      { gasLimit },
     ])
 
     const {
@@ -264,6 +270,7 @@ describe('WETHGateway spec', () => {
     await shouldNotRevert(wethGateway, 'withdrawEth', [
       pool.address,
       withdrawAmount,
+      { gasLimit },
     ])
 
     expect(

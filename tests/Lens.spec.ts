@@ -1,16 +1,18 @@
 import { ReturnNumber } from '@727-ventures/typechain-types'
 import type { KeyringPair } from '@polkadot/keyring/types'
-import { BN } from '@polkadot/util'
+import { WeightV2 } from '@polkadot/types/interfaces'
+import { BN, BN_ONE, BN_TEN } from '@polkadot/util'
 import { ONE_ETHER } from '../scripts/helper/constants'
 import {
   deployController,
   deployDefaultInterestRateModel,
   deployFaucet,
   deployLens,
+  deployPSP22Token,
   deployPoolFromAsset,
   deployPriceOracle,
-  deployPSP22Token,
 } from '../scripts/helper/deploy_helper'
+import { getGasLimit } from '../scripts/helper/utils'
 import Controller from '../types/contracts/controller'
 import Faucet from '../types/contracts/faucet'
 import Lens from '../types/contracts/lens'
@@ -19,6 +21,8 @@ import PriceOracle from '../types/contracts/price_oracle'
 import PSP22Token from '../types/contracts/psp22_token'
 import { shouldNotRevert } from './testHelpers'
 
+const MAX_CALL_WEIGHT = new BN(100_000_000_000).isub(BN_ONE).mul(BN_TEN)
+const PROOFSIZE = new BN(2_000_000)
 const setup = async (
   args: Partial<{
     price: string | number | BN
@@ -32,9 +36,9 @@ const setup = async (
   const {
     price = 1,
     collateralFactor = ONE_ETHER.mul(new BN(90)).div(new BN(100)),
-    reserveFactor = ONE_ETHER.mul(new BN(10)).div(new BN(100)),
+    reserveFactor = ONE_ETHER.mul(BN_TEN).div(new BN(100)),
     borrowCap = ONE_ETHER,
-    liquidationIncentive = ONE_ETHER.mul(new BN(10)).div(new BN(100)),
+    liquidationIncentive = ONE_ETHER.mul(BN_TEN).div(new BN(100)),
     closeFactor = ONE_ETHER.mul(new BN(90)).div(new BN(100)),
   } = args
   const { api, alice: deployer, bob, charlie } = globalThis.setup
@@ -120,6 +124,8 @@ const setup = async (
   const lens = await deployLens({ api, signer: deployer, args: [] })
   const faucet = await deployFaucet({ api, signer: deployer, args: [] })
 
+  const gasLimit = getGasLimit(api, MAX_CALL_WEIGHT, PROOFSIZE)
+
   return {
     api,
     deployer,
@@ -130,6 +136,7 @@ const setup = async (
     lens,
     faucet,
     users,
+    gasLimit,
   }
 }
 
@@ -142,13 +149,14 @@ describe('Lens', () => {
   let faucet: Faucet
   let signer: KeyringPair
   let deployer: KeyringPair
+  let gasLimit: WeightV2
 
   describe('returns value', () => {
     const price = 1
     const collateralFactor = ONE_ETHER.mul(new BN(90)).div(new BN(100))
-    const reserveFactor = ONE_ETHER.mul(new BN(10)).div(new BN(100))
+    const reserveFactor = ONE_ETHER.mul(BN_TEN).div(new BN(100))
     const borrowCap = ONE_ETHER.mul(new BN(100))
-    const liquidationIncentive = ONE_ETHER.mul(new BN(10)).div(new BN(100))
+    const liquidationIncentive = ONE_ETHER.mul(BN_TEN).div(new BN(100))
     const closeFactor = ONE_ETHER.mul(new BN(90)).div(new BN(100))
     beforeAll(async () => {
       ;({
@@ -159,6 +167,7 @@ describe('Lens', () => {
         priceOracle,
         users: [signer],
         deployer,
+        gasLimit,
       } = await setup({
         price,
         collateralFactor,
@@ -341,7 +350,7 @@ describe('Lens', () => {
       const token = tokens[0].withSigner(signer)
 
       await shouldNotRevert(token, 'approve', [pool.address, depositAmount])
-      await shouldNotRevert(pool, 'mint', [depositAmount])
+      await shouldNotRevert(pool, 'mint', [depositAmount, { gasLimit }])
 
       const {
         value: { ok: metadata },
@@ -366,8 +375,8 @@ describe('Lens', () => {
       const token = tokens[0].withSigner(signer)
 
       await shouldNotRevert(token, 'approve', [pool.address, depositAmount])
-      await shouldNotRevert(pool, 'mint', [depositAmount])
-      await shouldNotRevert(pool, 'redeem', [redeemAmount])
+      await shouldNotRevert(pool, 'mint', [depositAmount, { gasLimit }])
+      await shouldNotRevert(pool, 'redeem', [redeemAmount, { gasLimit }])
 
       const {
         value: { ok: metadata },
@@ -394,8 +403,8 @@ describe('Lens', () => {
       const token = tokens[0].withSigner(signer)
 
       await shouldNotRevert(token, 'approve', [pool.address, depositAmount])
-      await shouldNotRevert(pool, 'mint', [depositAmount])
-      await shouldNotRevert(pool, 'borrow', [borrowAmount])
+      await shouldNotRevert(pool, 'mint', [depositAmount, { gasLimit }])
+      await shouldNotRevert(pool, 'borrow', [borrowAmount, { gasLimit }])
 
       const {
         value: { ok: metadata },
@@ -428,9 +437,9 @@ describe('Lens', () => {
         pool.address,
         depositAmount + repayAmount,
       ])
-      await shouldNotRevert(pool, 'mint', [depositAmount])
-      await shouldNotRevert(pool, 'borrow', [borrowAmount])
-      await shouldNotRevert(pool, 'repayBorrow', [repayAmount])
+      await shouldNotRevert(pool, 'mint', [depositAmount, { gasLimit }])
+      await shouldNotRevert(pool, 'borrow', [borrowAmount, { gasLimit }])
+      await shouldNotRevert(pool, 'repayBorrow', [repayAmount, { gasLimit }])
 
       const {
         value: { ok: metadata },

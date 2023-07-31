@@ -1,4 +1,4 @@
-import { BN } from '@polkadot/util'
+import { BN, BN_TEN } from '@polkadot/util'
 import { ONE_ETHER, ROLE } from './helper/constants'
 
 export type Config = {
@@ -15,7 +15,7 @@ export type Config = {
 }
 
 export const CONFIG: Config = {
-  liquidationIncentive: ONE_ETHER.mul(new BN(10)).div(new BN(90)),
+  liquidationIncentive: ONE_ETHER.mul(BN_TEN).div(new BN(90)),
   closeFactor: ONE_ETHER,
   collateralNamePrefix: 'Starlay ',
   collateralSymbolPrefix: 'l',
