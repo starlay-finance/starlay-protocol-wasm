@@ -18,7 +18,7 @@ RUN rustup target add wasm32-unknown-unknown
 RUN cargo install cargo-edit
 
 # for ink!
-RUN cargo install cargo-contract --version 2.0.1 --force
+RUN cargo install cargo-contract --version 3.0.1 --force
 RUN rustc --version
 
 # nodejs
@@ -30,4 +30,7 @@ RUN npm install -g yarn
 
 # contracts-node
 RUN apt install -y protobuf-compiler
-RUN cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --tag v0.25.0
+RUN git clone https://github.com/paritytech/substrate-contracts-node.git
+# to reflect the latest changes for gas in substrate, we need to run `cargo udpate`
+RUN cd substrate-contracts-node && cargo update && cargo build --release
+RUN cp substrate-contracts-node/target/release/substrate-contracts-node /usr/local/bin

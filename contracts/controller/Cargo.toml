@@ -21,8 +21,6 @@ primitive-types = { version = "0.11.1", default-features = false, features = [
 ] }
 
 [lib]
-name = "controller"
-crate-type = ["cdylib", "rlib"]
 path = "lib.rs"
 
 [features]

@@ -21,8 +21,6 @@ primitive-types = { version = "0.11.1", default-features = false, features = [
 ] }
 
 [lib]
-name = "default_interest_rate_model"
-crate-type = ["cdylib", "rlib"]
 path = "lib.rs"
 
 [features]

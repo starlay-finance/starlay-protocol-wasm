@@ -19,8 +19,6 @@ openbrush = { tag = "3.1.1", git = "https://github.com/Brushfam/openbrush-contra
 ] }
 
 [lib]
-name = "psp22_token"
-crate-type = ["cdylib", "rlib"]
 path = "lib.rs"
 
 [features]
