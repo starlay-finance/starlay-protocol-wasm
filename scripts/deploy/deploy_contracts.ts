@@ -5,8 +5,10 @@ import { defaultOption } from '../helper/utils'
 import { DummyToken } from '../tokens'
 import {
   deployFaucet,
+  deployFlashLoanGateway,
   deployLens,
   deployPriceOracle,
+  deployWETHGateway,
 } from './../helper/deploy_helper'
 import { deployManagerAndController } from './deploy_manager_and_controller'
 import { deployPools } from './deploy_pools'
@@ -48,6 +50,19 @@ export const deployContracts = async ({
     option,
   })
 
+  const wethGateway = await deployWETHGateway({
+    api,
+    signer,
+    args: [pools.WASTR.token.address],
+  })
+
+  const flashloanGateway = await deployFlashLoanGateway({
+    api,
+    signer,
+    args: [controller.address],
+  })
+  await controller.tx.setFlashloanGateway(flashloanGateway.address)
+
   return {
     lens,
     faucet,
@@ -55,5 +70,7 @@ export const deployContracts = async ({
     manager,
     priceOracle,
     pools,
+    wethGateway,
+    flashloanGateway,
   }
 }

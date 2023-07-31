@@ -95,7 +95,7 @@ export const deployFaucet = async ({
   signer,
   args,
   option = defaultOption(api),
-}: FactoryArgs<Lens_factory['new']>): Promise<Faucet> => {
+}: FactoryArgs<Faucet_factory['new']>): Promise<Faucet> => {
   const factory = new Faucet_factory(api, signer)
   const contract = await factory.new(...args, option)
   const result = new Faucet(contract.address, signer, api)

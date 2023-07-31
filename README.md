@@ -4,6 +4,16 @@
 
 This repository is a Lending Protocol Template for WASM contracts using [ink!](https://use.ink/).
 
+## Prerequisites
+
+| Name           | Version           |
+| -------------- | ----------------- |
+| rustc          | 1.70.0            |
+| cargo-contract | 2.0.1             |
+| swanky-node    | 1.6.0-e5e6b8f914b |
+| node           | 20.2.0            |
+| yarn           | 1.22.19           |
+
 ## Contracts
 
 We detail a few of the contracts in this repository.
