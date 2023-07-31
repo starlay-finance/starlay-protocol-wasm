@@ -2,7 +2,7 @@ import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
 import { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { WeightV2 } from '@polkadot/types/interfaces'
-import { BN, BN_ONE } from '@polkadot/util'
+import { BN, BN_ONE, BN_TEN } from '@polkadot/util'
 import { LastArrayElement } from 'type-fest'
 import { Config } from '../config'
 import { ENV, getCurrentEnv } from '../env'
@@ -10,7 +10,7 @@ import { ONE_ETHER } from './constants'
 import { ExcludeLastArrayElement } from './utilityTypes'
 
 const WAIT_FINALIZED_SECONDS = 10000
-const MAX_CALL_WEIGHT = new BN(2_000_000_000).isub(BN_ONE).mul(new BN(10))
+const MAX_CALL_WEIGHT = new BN(2_000_000_000).isub(BN_ONE).mul(BN_TEN)
 const PROOFSIZE = new BN(2_000_000)
 
 export const isTest = (): boolean => process.env.NODE_ENV === 'test'
@@ -80,7 +80,7 @@ export const defaultOption = (
   | undefined => {
   if (isTest()) return undefined
   return {
-    storageDepositLimit: new BN(10).pow(new BN(18)),
+    storageDepositLimit: BN_TEN.pow(new BN(18)),
     gasLimit: getGasLimit(api),
   }
 }

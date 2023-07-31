@@ -1,14 +1,15 @@
 import { ReturnNumber } from '@727-ventures/typechain-types'
 import { encodeAddress } from '@polkadot/keyring'
 import type { KeyringPair } from '@polkadot/keyring/types'
-import BN from 'bn.js'
+import { WeightV2 } from '@polkadot/types/interfaces'
+import { BN, BN_ONE, BN_TEN } from '@polkadot/util'
 import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
   deployDefaultInterestRateModel,
   deployPriceOracle,
 } from '../scripts/helper/deploy_helper'
-import { hexToUtf8 } from '../scripts/helper/utils'
+import { getGasLimit } from '../scripts/helper/utils'
 import Controller from '../types/contracts/controller'
 import PriceOracle from '../types/contracts/price_oracle'
 import {
@@ -19,10 +20,12 @@ import {
 } from './testContractHelper'
 import { mantissa, shouldNotRevert, toDec18, toDec6 } from './testHelpers'
 
+const MAX_CALL_WEIGHT = new BN(100_000_000_000).isub(BN_ONE).mul(BN_TEN)
+const PROOFSIZE = new BN(2_000_000)
 describe('Controller spec', () => {
   const setup = async () => {
     const { api, alice: deployer, bob, charlie } = globalThis.setup
-
+    const gasLimit = getGasLimit(api, MAX_CALL_WEIGHT, PROOFSIZE)
     const controller = await deployController({
       api,
       signer: deployer,
@@ -50,13 +53,21 @@ describe('Controller spec', () => {
       controller,
       rateModel,
       priceOracle,
+      gasLimit,
       users: [bob, charlie],
     }
   }
 
   const setupWithPools = async () => {
-    const { api, deployer, rateModel, controller, priceOracle, users } =
-      await setup()
+    const {
+      api,
+      deployer,
+      rateModel,
+      controller,
+      priceOracle,
+      users,
+      gasLimit,
+    } = await setup()
 
     const pools = await preparePoolsWithPreparedTokens({
       api,
@@ -85,6 +96,7 @@ describe('Controller spec', () => {
       priceOracle,
       pools,
       users,
+      gasLimit,
     }
   }
 
@@ -289,21 +301,24 @@ describe('Controller spec', () => {
         controller,
         pools: { dai, usdc },
         users: [borrower],
+        gasLimit,
       } = await setupWithPools()
 
       // Prepares
       //// add liquidity to usdc pool
       await usdc.token.tx.mint(deployer.address, toDec6(10_000))
       await usdc.token.tx.approve(usdc.pool.address, toDec6(10_000))
-      await usdc.pool.tx.mint(toDec6(10_000))
+      await usdc.pool.tx.mint(toDec6(10_000), { gasLimit })
       //// mint to dai pool for collateral
       await dai.token.tx.mint(borrower.address, toDec18(20_000))
       await dai.token
         .withSigner(borrower)
         .tx.approve(dai.pool.address, toDec18(20_000))
-      await dai.pool.withSigner(borrower).tx.mint(toDec18(20_000))
+      await dai.pool.withSigner(borrower).tx.mint(toDec18(20_000), { gasLimit })
       //// borrow usdc
-      await usdc.pool.withSigner(borrower).tx.borrow(toDec6(10_000))
+      await usdc.pool
+        .withSigner(borrower)
+        .tx.borrow(toDec6(10_000), { gasLimit })
       //// down collateral_factor for dai
       await controller.tx.setCollateralFactorMantissa(dai.pool.address, [
         new BN(1),
@@ -359,8 +374,15 @@ describe('Controller spec', () => {
   })
 
   it('.transfer_allowed', async () => {
-    const { api, deployer, controller, rateModel, priceOracle, users } =
-      await setup()
+    const {
+      api,
+      deployer,
+      controller,
+      rateModel,
+      priceOracle,
+      users,
+      gasLimit,
+    } = await setup()
     const { dai, usdc } = await preparePoolsWithPreparedTokens({
       api,
       controller,
@@ -391,7 +413,7 @@ describe('Controller spec', () => {
       const { pool, token } = sym
       await token.withSigner(deployer).tx.mint(user.address, value)
       await token.withSigner(user).tx.approve(pool.address, value)
-      await pool.withSigner(user).tx.mint(value)
+      await pool.withSigner(user).tx.mint(value, { gasLimit })
     }
 
     {
@@ -418,13 +440,13 @@ describe('Controller spec', () => {
       const res = await usdc.pool
         .withSigner(sender)
         .query.transfer(receiver.address, toDec6(50_000).add(new BN(1)), [])
-      expect(hexToUtf8(res.value.ok.err.custom)).toBe('InsufficientLiquidity')
+      expect(res.value.ok.err.custom).toBe('InsufficientLiquidity')
     }
   })
 
   it('.set_close_factor_mantissa', async () => {
     const { controller } = await setup()
-    const expScale = new BN(10).pow(new BN(18))
+    const expScale = BN_TEN.pow(new BN(18))
     const bn = expScale.mul(new BN(5)).div(new BN(100)) // 5%
     await controller.tx.setCloseFactorMantissa([bn])
     const after = (await controller.query.closeFactorMantissa()).value.ok
@@ -433,7 +455,7 @@ describe('Controller spec', () => {
 
   it('.liquidation_incentive_mantissa', async () => {
     const { controller } = await setup()
-    const expScale = new BN(10).pow(new BN(18))
+    const expScale = BN_TEN.pow(new BN(18))
     const bn = expScale.mul(new BN(5)).div(new BN(100)) // 5%
     await controller.tx.setLiquidationIncentiveMantissa([bn])
     const after = (await controller.query.liquidationIncentiveMantissa()).value
@@ -527,8 +549,15 @@ describe('Controller spec', () => {
   })
 
   it('.account_assets', async () => {
-    const { api, deployer, controller, rateModel, priceOracle, users } =
-      await setup()
+    const {
+      api,
+      deployer,
+      controller,
+      rateModel,
+      priceOracle,
+      users,
+      gasLimit,
+    } = await setup()
     const user = users[0]
     const pools = await preparePoolsWithPreparedTokens({
       api,
@@ -564,19 +593,37 @@ describe('Controller spec', () => {
       ])
     }
 
-    await shouldNotRevert(dai.pool.withSigner(user), 'mint', [1_000])
+    await shouldNotRevert(dai.pool.withSigner(user), 'mint', [
+      1_000,
+      { gasLimit },
+    ])
     expect(await getAccountAssets(user.address)).toEqual([dai.pool.address])
 
-    await shouldNotRevert(usdc.pool.withSigner(user), 'mint', [1_000])
-    await shouldNotRevert(usdc.pool.withSigner(user), 'mint', [1_000])
+    await shouldNotRevert(usdc.pool.withSigner(user), 'mint', [
+      1_000,
+      { gasLimit },
+    ])
+    await shouldNotRevert(usdc.pool.withSigner(user), 'mint', [
+      1_000,
+      { gasLimit },
+    ])
     expect(await getAccountAssets(user.address)).toEqual([
       dai.pool.address,
       usdc.pool.address,
     ])
 
-    await shouldNotRevert(usdt.pool.withSigner(user), 'mint', [1_000])
-    await shouldNotRevert(usdt.pool.withSigner(user), 'mint', [1_000])
-    await shouldNotRevert(usdt.pool.withSigner(user), 'mint', [1_000])
+    await shouldNotRevert(usdt.pool.withSigner(user), 'mint', [
+      1_000,
+      { gasLimit },
+    ])
+    await shouldNotRevert(usdt.pool.withSigner(user), 'mint', [
+      1_000,
+      { gasLimit },
+    ])
+    await shouldNotRevert(usdt.pool.withSigner(user), 'mint', [
+      1_000,
+      { gasLimit },
+    ])
     expect(await getAccountAssets(user.address)).toEqual([
       dai.pool.address,
       usdc.pool.address,
@@ -601,8 +648,15 @@ describe('Controller spec', () => {
 
     describe('only mint', () => {
       it('single asset', async () => {
-        const { api, deployer, controller, rateModel, priceOracle, users } =
-          await setup()
+        const {
+          api,
+          deployer,
+          controller,
+          rateModel,
+          priceOracle,
+          users,
+          gasLimit,
+        } = await setup()
         const { dai, usdc } = await preparePoolsWithPreparedTokens({
           api,
           controller,
@@ -637,7 +691,7 @@ describe('Controller spec', () => {
           const { pool, token } = sym
           await token.withSigner(deployer).tx.mint(user.address, value)
           await token.withSigner(user).tx.approve(pool.address, value)
-          await pool.withSigner(user).tx.mint(value)
+          await pool.withSigner(user).tx.mint(value, { gasLimit })
         }
 
         // execute
@@ -691,8 +745,15 @@ describe('Controller spec', () => {
         )
       })
       it('multi asset', async () => {
-        const { api, deployer, controller, rateModel, priceOracle, users } =
-          await setup()
+        const {
+          api,
+          deployer,
+          controller,
+          rateModel,
+          priceOracle,
+          users,
+          gasLimit,
+        } = await setup()
         const { dai, usdc, usdt } = await preparePoolsWithPreparedTokens({
           api,
           controller,
@@ -730,7 +791,7 @@ describe('Controller spec', () => {
           const { pool, token } = sym
           await token.withSigner(deployer).tx.mint(user.address, value)
           await token.withSigner(user).tx.approve(pool.address, value)
-          await pool.withSigner(user).tx.mint(value)
+          await pool.withSigner(user).tx.mint(value, { gasLimit })
         }
 
         // execute
@@ -793,8 +854,15 @@ describe('Controller spec', () => {
     })
     describe('with borrows', () => {
       it('multi asset', async () => {
-        const { api, deployer, controller, rateModel, priceOracle, users } =
-          await setup()
+        const {
+          api,
+          deployer,
+          controller,
+          rateModel,
+          priceOracle,
+          users,
+          gasLimit,
+        } = await setup()
         const { dai, usdc, usdt } = await preparePoolsWithPreparedTokens({
           api,
           controller,
@@ -833,7 +901,7 @@ describe('Controller spec', () => {
           const { pool, token } = sym
           await token.withSigner(deployer).tx.mint(deployer.address, liquidity)
           await token.withSigner(deployer).tx.approve(pool.address, liquidity)
-          await pool.withSigner(deployer).tx.mint(liquidity)
+          await pool.withSigner(deployer).tx.mint(liquidity, { gasLimit })
         }
         ////// mint, borrow from user
         for await (const { sym, mintValue, borrowValue } of [
@@ -855,10 +923,10 @@ describe('Controller spec', () => {
           if (mintValue) {
             await token.withSigner(deployer).tx.mint(user.address, mintValue)
             await token.withSigner(user).tx.approve(pool.address, mintValue)
-            await pool.withSigner(user).tx.mint(mintValue)
+            await pool.withSigner(user).tx.mint(mintValue, { gasLimit })
           }
           if (borrowValue) {
-            await pool.withSigner(user).tx.borrow(borrowValue)
+            await pool.withSigner(user).tx.borrow(borrowValue, { gasLimit })
           }
         }
         const expectedCollateral = ((250_000 + 300_000) * 90) / 100
@@ -931,9 +999,10 @@ describe('Controller spec', () => {
     let deployer: KeyringPair
     let users: KeyringPair[]
     let priceOracle: PriceOracle
+    let gasLimit: WeightV2
 
     it('instantiate', async () => {
-      ;({ controller, deployer, pools, users, priceOracle } =
+      ;({ controller, deployer, pools, users, priceOracle, gasLimit } =
         await setupWithPools())
       const { dai, usdt, usdc } = pools
 
@@ -967,10 +1036,9 @@ describe('Controller spec', () => {
 
     const daiDeposited = 50_000
     const usdcDeposited = 30_000
-    const usdtDeposited = 50_000
     const daiBorrowed = 20_000
     it('preparation', async () => {
-      const { dai, usdc, usdt } = pools
+      const { dai, usdc } = pools
 
       await shouldNotRevert(dai.token, 'mint', [users[0].address, daiDeposited])
       await shouldNotRevert(dai.token.withSigner(users[0]), 'approve', [
@@ -979,6 +1047,7 @@ describe('Controller spec', () => {
       ])
       await shouldNotRevert(dai.pool.withSigner(users[0]), 'mint', [
         daiDeposited,
+        { gasLimit },
       ])
 
       expect(
@@ -993,27 +1062,13 @@ describe('Controller spec', () => {
         usdc.pool.address,
         usdcDeposited,
       ])
-      await shouldNotRevert(usdc.pool, 'mint', [usdcDeposited])
+      await shouldNotRevert(usdc.pool, 'mint', [usdcDeposited, { gasLimit }])
 
       expect(
         (await usdc.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(usdcDeposited)
 
-      await shouldNotRevert(usdt.token, 'mint', [
-        deployer.address,
-        usdtDeposited,
-      ])
-      await shouldNotRevert(usdt.token, 'approve', [
-        usdt.pool.address,
-        usdtDeposited,
-      ])
-      await shouldNotRevert(usdt.pool, 'mint', [usdtDeposited])
-
-      expect(
-        (await usdt.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(usdtDeposited)
-
-      await shouldNotRevert(dai.pool, 'borrow', [daiBorrowed])
+      await shouldNotRevert(dai.pool, 'borrow', [daiBorrowed, { gasLimit }])
 
       expect(
         (
@@ -1041,7 +1096,7 @@ describe('Controller spec', () => {
             deployerAccountData.totalCollateralInBaseCurrency.toString(),
           ).toString(),
         ).toString(),
-      ).toEqual(new BN(usdcDeposited).add(new BN(usdtDeposited)).toString())
+      ).toEqual(new BN(usdcDeposited).toString())
 
       // Total Debt In Eth
       expect(

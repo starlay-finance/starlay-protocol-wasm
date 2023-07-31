@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { encodeAddress } from '@polkadot/keyring'
-import { BN } from '@polkadot/util'
+import { BN, BN_TEN } from '@polkadot/util'
 
 export const ROLE = {
   DEFAULT_ADMIN_ROLE: 0,
@@ -14,4 +14,4 @@ export const ZERO_ADDRESS = encodeAddress(
   '0x0000000000000000000000000000000000000000000000000000000000000000',
 )
 
-export const ONE_ETHER = new BN(10).pow(new BN(18))
+export const ONE_ETHER = BN_TEN.pow(new BN(18))

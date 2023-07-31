@@ -1,36 +1,36 @@
+import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
 import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
-import Faucet_factory from '../../types/constructors/faucet'
-import Lens_factory from '../../types/constructors/lens'
-import Manager_factory from '../../types/constructors/manager'
-import PriceOracle_factory from '../../types/constructors/price_oracle'
-import Faucet from '../../types/contracts/faucet'
-import Lens from '../../types/contracts/lens'
-import Manager from '../../types/contracts/manager'
-import PriceOracle from '../../types/contracts/price_oracle'
+import { LastArrayElement } from 'type-fest'
 
 import Controller_factory from '../../types/constructors/controller'
 import DefaultInterestRateModel_factory from '../../types/constructors/default_interest_rate_model'
+import Faucet_factory from '../../types/constructors/faucet'
 import FlashloanGateway_factory from '../../types/constructors/flashloan_gateway'
 import FlashloanReceiver_factory from '../../types/constructors/flashloan_receiver'
+import Lens_factory from '../../types/constructors/lens'
+import Manager_factory from '../../types/constructors/manager'
 import Pool_factory from '../../types/constructors/pool'
+import PriceOracle_factory from '../../types/constructors/price_oracle'
 import PSP22Token_factory from '../../types/constructors/psp22_token'
 import WETH_factory from '../../types/constructors/weth'
 import WETHGateway_factory from '../../types/constructors/weth_gateway'
-import DefaultInterestRateModel from '../../types/contracts/default_interest_rate_model'
-import PSP22Token from '../../types/contracts/psp22_token'
 
-import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
-import { LastArrayElement } from 'type-fest'
 import Controller from '../../types/contracts/controller'
+import DefaultInterestRateModel from '../../types/contracts/default_interest_rate_model'
+import Faucet from '../../types/contracts/faucet'
 import FlashloanGateway from '../../types/contracts/flashloan_gateway'
 import FlashloanReceiver from '../../types/contracts/flashloan_receiver'
+import Lens from '../../types/contracts/lens'
+import Manager from '../../types/contracts/manager'
 import Pool from '../../types/contracts/pool'
-import Token from '../../types/contracts/psp22_token'
+import PriceOracle from '../../types/contracts/price_oracle'
+import PSP22Token from '../../types/contracts/psp22_token'
 import WETH from '../../types/contracts/weth'
 import WETHGateway from '../../types/contracts/weth_gateway'
+
 import { ExcludeLastArrayElement } from './utilityTypes'
-import { defaultOption, hexToUtf8, isTest, waitForTx } from './utils'
+import { defaultOption, isTest, waitForTx } from './utils'
 
 type FactoryArgs<C extends (...args: unknown[]) => unknown> = {
   api: ApiPromise
@@ -122,17 +122,13 @@ export const deployPoolFromAsset = async ({
   option = defaultOption(api),
   token,
 }: FactoryArgs<Pool_factory['newFromAsset']> & {
-  token: Token | WETH
+  token: PSP22Token | WETH
 }): Promise<Pool> => {
   const factory = new Pool_factory(api, signer)
 
   // FIXME: calling token_name or token_symbol on contract will fail
-  const name = `Starlay ${hexToUtf8(
-    (await token.query.tokenName()).value.ok,
-  )}` as unknown as string[]
-  const symbol = `s${hexToUtf8(
-    (await token.query.tokenSymbol()).value.ok,
-  )}` as unknown as string[]
+  const name = `Starlay ${(await token.query.tokenName()).value.ok}`
+  const symbol = `s${(await token.query.tokenSymbol()).value.ok}`
   const decimals = (await token.query.tokenDecimals()).value.ok
   const contract = await factory.new(...args, name, symbol, decimals, option)
 
@@ -224,12 +220,8 @@ export const deployWETHPool = async ({
   const factory = new Pool_factory(api, signer)
 
   // FIXME: calling token_name or token_symbol on contract will fail
-  const name = `Starlay ${hexToUtf8(
-    (await token.query.tokenName()).value.ok,
-  )}` as unknown as string[]
-  const symbol = `s${hexToUtf8(
-    (await token.query.tokenSymbol()).value.ok,
-  )}` as unknown as string[]
+  const name = `Starlay ${(await token.query.tokenName()).value.ok}`
+  const symbol = `s${(await token.query.tokenSymbol()).value.ok}`
   const decimals = (await token.query.tokenDecimals()).value.ok
   const contract = await factory.new(...args, name, symbol, decimals, option)
 

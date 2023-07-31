@@ -82,12 +82,7 @@ export const preparePoolWithMockToken = async ({
   const token = await deployPSP22Token({
     api,
     signer: manager,
-    args: [
-      0,
-      metadata.name as unknown as string[],
-      metadata.symbol as unknown as string[],
-      metadata.decimals,
-    ],
+    args: [0, metadata.name, metadata.symbol, metadata.decimals],
   })
 
   const pool = await deployPoolFromAsset({

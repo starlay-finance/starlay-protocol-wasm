@@ -31,3 +31,5 @@ target/
 
 .env
 .log
+
+substrate-contracts-node/

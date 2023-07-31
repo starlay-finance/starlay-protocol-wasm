@@ -1,6 +1,6 @@
-import { RiskParameter, RISK_PARAMETERS } from './risk_parameters'
+import { RISK_PARAMETERS, RiskParameter } from './risk_parameters'
 /* eslint-disable @typescript-eslint/naming-convention */
-import { BN } from '@polkadot/util'
+import { BN, BN_TEN } from '@polkadot/util'
 import { ONE_ETHER } from './helper/constants'
 import { InterestRateModel, RATE_MODELS } from './interest_rates'
 
@@ -132,7 +132,7 @@ export const DUMMY_TOKENS: DummyToken[] = Object.values(SUPPORTED_TOKENS).map(
   (t) => {
     return {
       ...t,
-      totalSupply: new BN(10).pow(new BN(18)).mul(new BN(100_000_000_000)),
+      totalSupply: BN_TEN.pow(new BN(18)).mul(new BN(100_000_000_000)),
     }
   },
 )

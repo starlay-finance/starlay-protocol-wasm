@@ -50,12 +50,7 @@ const deployDummyTokens = async (
     const token = await deployPSP22Token({
       api,
       signer,
-      args: [
-        config.totalSupply,
-        config.name as unknown as string[],
-        config.symbol as unknown as string[],
-        config.decimals,
-      ],
+      args: [config.totalSupply, config.name, config.symbol, config.decimals],
     })
     res.push({ token, config })
   }
@@ -102,8 +97,8 @@ const deployAndSetupPool = async (
       interestRateModel.address,
       [config.riskParameter.initialExchangeRateMantissa],
       config.riskParameter.liquidationThreshold,
-      [collateralNamePrefix + config.name],
-      [collateralSymbolPrefix + config.symbol],
+      collateralNamePrefix + config.name,
+      collateralSymbolPrefix + config.symbol,
       config.decimals,
     ],
   })

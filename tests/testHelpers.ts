@@ -1,5 +1,5 @@
 import { ReturnNumber } from '@727-ventures/typechain-types'
-import { BN } from '@polkadot/util'
+import { BN, BN_TEN } from '@polkadot/util'
 import { ReplacedType } from '../scripts/helper/utilityTypes'
 import { waitForTx } from '../scripts/helper/utils'
 
@@ -7,7 +7,7 @@ export const mantissa = () => pow10(18)
 export const toDec6 = (value: number): BN => toDec(value, 6)
 export const toDec18 = (value: number): BN => toDec(value, 18)
 
-const pow10 = (exponent: number) => new BN(10).pow(new BN(exponent))
+const pow10 = (exponent: number) => BN_TEN.pow(new BN(exponent))
 const toDec = (value: number, decimals: number): BN =>
   new BN(value).mul(pow10(decimals))
 
@@ -44,6 +44,7 @@ export const shouldNotRevert = async <
       )}): ${JSON.stringify(e)}`,
     )
   }
+
   const res = await contract.tx[fn](...args)
   await waitForTx(res)
   return res

@@ -9,15 +9,17 @@
       "**/target/**": true
     }
   },
-  
+
   "extensions": [
-	"bungcip.better-toml",
-	"vadimcn.vscode-lldb",
-	"mutantdino.resourcemonitor",
-	"ms-azuretools.vscode-docker",
-	"rust-lang.rust-analyzer"
+    "bungcip.better-toml",
+    "vadimcn.vscode-lldb",
+    "mutantdino.resourcemonitor",
+    "ms-azuretools.vscode-docker",
+    "rust-lang.rust-analyzer"
   ],
   "mounts": [
-    "source=build,target=${containerWorkspaceFolder}/target,type=volume"
+    "source=build,target=${containerWorkspaceFolder}/target,type=volume",
+    "source=node_mod,target=${containerWorkspaceFolder}/node_modules,type=volume",
+    "source=contracts_node_build,target=${containerWorkspaceFolder}/substrate-contracts-node/target,type=volume"
   ]
 }
