@@ -49,7 +49,10 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _get_underlying_price(&self, pool: AccountId) -> Option<u128> {
         let underlying = PoolRef::underlying(&pool);
-        self._get_price(underlying)
+        if underlying.is_none() {
+            return None
+        }
+        self._get_price(underlying.unwrap())
     }
     default fn _set_fixed_price(&mut self, asset: AccountId, value: u128) -> Result<()> {
         self.data().fixed_prices.insert(&asset, &value);

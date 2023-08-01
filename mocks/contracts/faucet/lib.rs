@@ -19,7 +19,10 @@ pub mod token {
             extensions::mintable::PSP22MintableRef,
             PSP22Error,
         },
-        traits::Storage,
+        traits::{
+            Storage,
+            String,
+        },
     };
 
     #[ink(storage)]
@@ -73,7 +76,10 @@ pub mod token {
             account: Option<AccountId>,
         ) -> Result<(), PSP22Error> {
             let underlying = PoolRef::underlying(pool);
-            self._mint(&underlying, amount, account)
+            if underlying.is_none() {
+                return Err(PSP22Error::Custom(String::from("UnderlyingIsNotSet")))
+            }
+            self._mint(&underlying.unwrap(), amount, account)
         }
 
         fn _mint(

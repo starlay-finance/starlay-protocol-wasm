@@ -165,11 +165,11 @@ pub trait Pool: PSP22 + PSP22Metadata {
 
     // view functions
     #[ink(message)]
-    fn underlying(&self) -> AccountId;
+    fn underlying(&self) -> Option<AccountId>;
     #[ink(message)]
-    fn controller(&self) -> AccountId;
+    fn controller(&self) -> Option<AccountId>;
     #[ink(message)]
-    fn manager(&self) -> AccountId;
+    fn manager(&self) -> Option<AccountId>;
     #[ink(message)]
     fn get_cash_prior(&self) -> Balance;
     #[ink(message)]
@@ -231,6 +231,10 @@ pub enum Error {
     InsufficientDelegateAllowance,
     DepositAlreadyInUse,
     CallerIsNotFlashloanGateway,
+    ControllerIsNotSet,
+    InterestRateModelIsNotSet,
+    UnderlyingIsNotSet,
+    ManagerIsNotSet,
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),

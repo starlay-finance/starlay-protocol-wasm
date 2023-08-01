@@ -54,7 +54,6 @@ use openbrush::{
         Storage,
         String,
         Timestamp,
-        ZERO_ADDRESS,
     },
 };
 use primitive_types::U256;
@@ -78,13 +77,13 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
     /// AccountId of underlying asset
-    pub underlying: AccountId,
+    pub underlying: Option<AccountId>,
     /// AccountId of Controller managing this pool
-    pub controller: AccountId,
+    pub controller: Option<AccountId>,
     /// AccountId of Manager, the administrator of this pool
-    pub manager: AccountId,
+    pub manager: Option<AccountId>,
     /// AccountId of Rate Model
-    pub rate_model: AccountId,
+    pub rate_model: Option<AccountId>,
     pub borrows_scaled: Balance,
     pub reserves_scaled: Balance,
     pub account_borrows: Mapping<AccountId, Balance>,
@@ -112,10 +111,10 @@ impl<'a> TypeGuard<'a> for AllowancesKey {
 impl Default for Data {
     fn default() -> Self {
         Data {
-            underlying: ZERO_ADDRESS.into(),
-            controller: ZERO_ADDRESS.into(),
-            manager: ZERO_ADDRESS.into(),
-            rate_model: ZERO_ADDRESS.into(),
+            underlying: None,
+            controller: None,
+            manager: None,
+            rate_model: None,
             borrows_scaled: Default::default(),
             reserves_scaled: Default::default(),
             account_borrows: Default::default(),
@@ -208,15 +207,15 @@ pub trait Internal {
         use_as_collateral: bool,
     ) -> Result<()>;
     // view functions
-    fn _underlying(&self) -> AccountId;
-    fn _controller(&self) -> AccountId;
-    fn _manager(&self) -> AccountId;
+    fn _underlying(&self) -> Option<AccountId>;
+    fn _controller(&self) -> Option<AccountId>;
+    fn _manager(&self) -> Option<AccountId>;
     fn _get_cash_prior(&self) -> Balance;
     fn _total_borrows(&self) -> Balance;
     fn _borrows_scaled(&self) -> Balance;
     fn _total_reserves(&self) -> Balance;
     fn _reserves_scaled(&self) -> Balance;
-    fn _rate_model(&self) -> AccountId;
+    fn _rate_model(&self) -> Option<AccountId>;
     fn _borrow_rate_per_msec(
         &self,
         cash: Balance,
@@ -282,8 +281,8 @@ pub trait Internal {
         new_total_reserves: Balance,
     );
     fn _emit_reserves_reduced_event(&self, reduce_amount: Balance, total_reserves_new: Balance);
-    fn _emit_new_controller_event(&self, old: AccountId, new: AccountId);
-    fn _emit_new_interest_rate_model_event(&self, old: AccountId, new: AccountId);
+    fn _emit_new_controller_event(&self, old: Option<AccountId>, new: Option<AccountId>);
+    fn _emit_new_interest_rate_model_event(&self, old: Option<AccountId>, new: Option<AccountId>);
     fn _emit_new_reserve_factor_event(&self, old: WrappedU256, new: WrappedU256);
     fn _emit_delegate_approval_event(
         &self,
@@ -323,8 +322,13 @@ where
     F: FnOnce(&mut T) -> Result<R>,
 {
     let caller = T::env().caller();
-    let flashloan_gateway = ControllerRef::flashloan_gateway(&instance._controller());
-    if caller != flashloan_gateway {
+    let controller = instance._controller();
+    if controller.is_none() {
+        return Err(Error::ControllerIsNotSet)
+    }
+    let _controller = controller.unwrap();
+    let flashloan_gateway = ControllerRef::flashloan_gateway(&_controller);
+    if flashloan_gateway.is_none() || caller != flashloan_gateway.unwrap() {
         return Err(Error::CallerIsNotFlashloanGateway)
     }
     body(instance)
@@ -447,7 +451,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._assert_manager()?;
         let old = self._controller();
         self._set_controller(new_controller)?;
-        self._emit_new_controller_event(old, new_controller);
+        self._emit_new_controller_event(old, Some(new_controller));
         Ok(())
     }
 
@@ -469,7 +473,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._assert_manager()?;
         let old = self._rate_model();
         self._set_interest_rate_model(new_interest_rate_model)?;
-        self._emit_new_interest_rate_model_event(old, new_interest_rate_model);
+        self._emit_new_interest_rate_model_event(old, Some(new_interest_rate_model));
         Ok(())
     }
 
@@ -532,15 +536,15 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
 
-    default fn underlying(&self) -> AccountId {
+    default fn underlying(&self) -> Option<AccountId> {
         self._underlying()
     }
 
-    default fn controller(&self) -> AccountId {
+    default fn controller(&self) -> Option<AccountId> {
         self._controller()
     }
 
-    default fn manager(&self) -> AccountId {
+    default fn manager(&self) -> Option<AccountId> {
         self._manager()
     }
 
@@ -659,8 +663,15 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let borrows = self._total_borrows();
         let reserves = self._total_reserves();
         let idx = self._borrow_index();
+
+        let rate_model = self._rate_model();
+        if rate_model.is_none() {
+            return Err(Error::InterestRateModelIsNotSet)
+        }
+        let _rate_model = rate_model.unwrap();
+
         let borrow_rate =
-            InterestRateModelRef::get_borrow_rate(&self._rate_model(), cash, borrows, reserves);
+            InterestRateModelRef::get_borrow_rate(&_rate_model, cash, borrows, reserves);
         calculate_interest(&CalculateInterestInput {
             total_borrows: borrows,
             total_reserves: reserves,
@@ -691,8 +702,15 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             exchange_rate,
             total_borrows: self._total_borrows(),
         };
+
+        let controller = self._controller();
+        if controller.is_none() {
+            return Err(PSP22Error::Custom(String::from("ControllerIsNotSet")))
+        }
+        let _controller = controller.unwrap();
+
         ControllerRef::transfer_allowed(
-            &self._controller(),
+            &_controller,
             contract_addr,
             src,
             dst,
@@ -739,7 +757,14 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()> {
         let contract_addr = Self::env().account_id();
-        ControllerRef::mint_allowed(&self._controller(), contract_addr, minter, mint_amount)?;
+
+        let controller = self._controller();
+        if controller.is_none() {
+            return Err(Error::ControllerIsNotSet)
+        }
+        let _controller = controller.unwrap();
+
+        ControllerRef::mint_allowed(&_controller, contract_addr, minter, mint_amount)?;
 
         let current_timestamp = Self::env().block_timestamp();
         if self._accrual_block_timestamp() != current_timestamp {
@@ -779,18 +804,24 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Ok(())
         }
 
+        let controller = self._controller();
+        if controller.is_none() {
+            return Err(Error::ControllerIsNotSet)
+        }
+        let _controller = controller.unwrap();
+
         let (_, account_borrow_balance, exchange_rate) = self.get_account_snapshot(redeemer);
         let account_balance = Internal::_balance_of(self, &redeemer);
         let contract_addr = Self::env().account_id();
         let pool_attributes = PoolAttributesForWithdrawValidation {
-            pool: contract_addr,
+            pool: Some(contract_addr),
             underlying: self._underlying(),
             liquidation_threshold: self._liquidation_threshold(),
             account_balance,
             account_borrow_balance,
         };
         let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
-            &self.controller(),
+            &_controller,
             pool_attributes,
             redeemer,
             redeem_amount,
@@ -808,7 +839,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             total_borrows: self._total_borrows(),
         };
         ControllerRef::redeem_allowed(
-            &self._controller(),
+            &_controller,
             contract_addr,
             redeemer,
             redeem_amount,
@@ -891,8 +922,15 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             exchange_rate,
             total_borrows: self._total_borrows(),
         };
+
+        let controller = self._controller();
+        if controller.is_none() {
+            return Err(Error::ControllerIsNotSet)
+        }
+        let _controller = controller.unwrap();
+
         ControllerRef::borrow_allowed(
-            &self._controller(),
+            &_controller,
             contract_addr,
             borrower,
             borrow_amount,
@@ -936,8 +974,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         repay_amount: Balance,
     ) -> Result<Balance> {
         let contract_addr = Self::env().account_id();
+        let controller = self._controller();
+        if controller.is_none() {
+            return Err(Error::ControllerIsNotSet)
+        }
+        let _controller = controller.unwrap();
         ControllerRef::repay_borrow_allowed(
-            &self._controller(),
+            &_controller,
             contract_addr,
             payer,
             borrower,
@@ -993,8 +1036,15 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             exchange_rate,
             total_borrows: self._total_borrows(),
         };
+
+        let controller = self._controller();
+        if controller.is_none() {
+            return Err(Error::ControllerIsNotSet)
+        }
+        let _controller = controller.unwrap();
+
         ControllerRef::liquidate_borrow_allowed(
-            &self._controller(),
+            &_controller,
             contract_addr,
             collateral,
             liquidator,
@@ -1027,7 +1077,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let seize_tokens = if collateral == contract_addr {
             let pool_collateral_attributes = pool_borrowed_attributes.clone();
             let seize_tokens = ControllerRef::liquidate_calculate_seize_tokens(
-                &self._controller(),
+                &_controller,
                 contract_addr,
                 collateral,
                 WrappedU256::from(self._exchange_rate_stored()),
@@ -1041,7 +1091,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             seize_tokens
         } else {
             let seize_tokens = ControllerRef::liquidate_calculate_seize_tokens(
-                &self._controller(),
+                &_controller,
                 contract_addr,
                 collateral,
                 PoolRef::exchange_rate_stored(&collateral),
@@ -1080,8 +1130,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         seize_tokens: Balance,
     ) -> Result<()> {
         let contract_addr = Self::env().account_id();
+        let controller = self._controller();
+        if controller.is_none() {
+            return Err(Error::ControllerIsNotSet)
+        }
+        let _controller = controller.unwrap();
         ControllerRef::seize_allowed(
-            &self._controller(),
+            &_controller,
             contract_addr,
             seizer_token,
             liquidator,
@@ -1121,7 +1176,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     // admin functions
     default fn _set_controller(&mut self, new_controller: AccountId) -> Result<()> {
-        self.data::<Data>().controller = new_controller;
+        self.data::<Data>().controller = Some(new_controller);
         Ok(())
     }
 
@@ -1153,7 +1208,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
 
-        self.data::<Data>().rate_model = new_interest_rate_model;
+        self.data::<Data>().rate_model = Some(new_interest_rate_model);
         Ok(())
     }
 
@@ -1208,7 +1263,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _sweep_token(&mut self, asset: AccountId) -> Result<()> {
-        if asset == self._underlying() {
+        let underlying = self._underlying();
+        if underlying.is_none() {
+            return Err(Error::UnderlyingIsNotSet)
+        }
+        let _underlying = underlying.unwrap();
+
+        if asset == _underlying {
             return Err(Error::CannotSweepUnderlyingToken)
         }
 
@@ -1283,14 +1344,21 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         let contract_addr = Self::env().account_id();
         let pool_attributes = PoolAttributesForWithdrawValidation {
-            pool: contract_addr,
+            pool: Some(contract_addr),
             underlying: self._underlying(),
             liquidation_threshold: self._liquidation_threshold(),
             account_balance,
             account_borrow_balance,
         };
+
+        let controller = self._controller();
+        if controller.is_none() {
+            return Err(Error::ControllerIsNotSet)
+        }
+        let _controller = controller.unwrap();
+
         let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
-            &self.controller(),
+            &_controller,
             pool_attributes,
             user,
             account_balance,
@@ -1309,7 +1377,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         to: AccountId,
         value: Balance,
     ) -> Result<()> {
-        PSP22Ref::transfer_from_builder(&self._underlying(), from, to, value, Vec::<u8>::new())
+        let underlying = self._underlying();
+        if underlying.is_none() {
+            return Err(Error::UnderlyingIsNotSet)
+        }
+        let _underlying = underlying.unwrap();
+        PSP22Ref::transfer_from_builder(&_underlying, from, to, value, Vec::<u8>::new())
             .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
             .try_invoke()
             .unwrap()
@@ -1318,31 +1391,46 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()> {
-        PSP22Ref::transfer(&self._underlying(), to, value, Vec::<u8>::new()).map_err(to_psp22_error)
+        let underlying = self._underlying();
+        if underlying.is_none() {
+            return Err(Error::UnderlyingIsNotSet)
+        }
+        let _underlying = underlying.unwrap();
+        PSP22Ref::transfer(&_underlying, to, value, Vec::<u8>::new()).map_err(to_psp22_error)
     }
 
     default fn _assert_manager(&self) -> Result<()> {
-        if Self::env().caller() != self._manager() {
+        let manager = self._manager();
+        if manager.is_none() {
+            return Err(Error::ManagerIsNotSet)
+        }
+        let _manager = manager.unwrap();
+        if Self::env().caller() != _manager {
             return Err(Error::CallerIsNotManager)
         }
         Ok(())
     }
 
     // view functions
-    default fn _underlying(&self) -> AccountId {
+    default fn _underlying(&self) -> Option<AccountId> {
         self.data::<Data>().underlying
     }
 
-    default fn _controller(&self) -> AccountId {
+    default fn _controller(&self) -> Option<AccountId> {
         self.data::<Data>().controller
     }
 
-    default fn _manager(&self) -> AccountId {
+    default fn _manager(&self) -> Option<AccountId> {
         self.data::<Data>().manager
     }
 
     default fn _get_cash_prior(&self) -> Balance {
-        PSP22Ref::balance_of(&self._underlying(), Self::env().account_id())
+        let underlying = self._underlying();
+        if underlying.is_none() {
+            return 0
+        }
+        let _underlying = underlying.unwrap();
+        PSP22Ref::balance_of(&_underlying, Self::env().account_id())
     }
 
     default fn _total_borrows(&self) -> Balance {
@@ -1362,7 +1450,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self.data::<Data>().borrows_scaled
     }
 
-    default fn _rate_model(&self) -> AccountId {
+    default fn _rate_model(&self) -> Option<AccountId> {
         self.data::<Data>().rate_model
     }
 
@@ -1372,7 +1460,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         borrows: Balance,
         reserves: Balance,
     ) -> WrappedU256 {
-        InterestRateModelRef::get_borrow_rate(&self._rate_model(), cash, borrows, reserves)
+        let rate_model = self._rate_model();
+        if rate_model.is_none() {
+            return WrappedU256::from(U256::zero())
+        }
+        let _rate_model = rate_model.unwrap();
+        InterestRateModelRef::get_borrow_rate(&_rate_model, cash, borrows, reserves)
     }
 
     default fn _supply_rate_per_msec(
@@ -1382,8 +1475,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         reserves: Balance,
         reserve_factor_mantissa: WrappedU256,
     ) -> WrappedU256 {
+        let rate_model = self._rate_model();
+        if rate_model.is_none() {
+            return WrappedU256::from(U256::zero())
+        }
+        let _rate_model = rate_model.unwrap();
         InterestRateModelRef::get_supply_rate(
-            &self._rate_model(),
+            &_rate_model,
             cash,
             borrows,
             reserves,
@@ -1556,8 +1654,14 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     ) {
     }
 
-    default fn _emit_new_controller_event(&self, _old: AccountId, _new: AccountId) {}
-    default fn _emit_new_interest_rate_model_event(&self, _old: AccountId, _new: AccountId) {}
+    default fn _emit_new_controller_event(&self, _old: Option<AccountId>, _new: Option<AccountId>) {
+    }
+    default fn _emit_new_interest_rate_model_event(
+        &self,
+        _old: Option<AccountId>,
+        _new: Option<AccountId>,
+    ) {
+    }
     default fn _emit_new_reserve_factor_event(&self, _old: WrappedU256, _new: WrappedU256) {}
     default fn _emit_delegate_approval_event(
         &self,
@@ -1593,6 +1697,10 @@ impl From<controller::Error> for PSP22Error {
             controller::Error::InsufficientShortfall => convert("InsufficientShortfall"),
             controller::Error::CallerIsNotManager => convert("CallerIsNotManager"),
             controller::Error::InvalidCollateralFactor => convert("InvalidCollateralFactor"),
+            controller::Error::UnderlyingIsNotSet => convert("UnderlyingIsNotSet"),
+            controller::Error::PoolIsNotSet => convert("PoolIsNotSet"),
+            controller::Error::ManagerIsNotSet => convert("ManagerIsNotSet"),
+            controller::Error::OracleIsNotSet => convert("OracleIsNotSet"),
         }
     }
 }

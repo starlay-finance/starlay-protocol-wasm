@@ -41,7 +41,7 @@ pub mod contract {
         #[ink(constructor)]
         pub fn new(manager: AccountId) -> Self {
             let mut instance = Self::default();
-            instance.controller.manager = manager;
+            instance.controller.manager = Some(manager);
             instance
         }
     }
@@ -73,7 +73,6 @@ pub mod contract {
             impls::exp_no_err::exp_scale,
             traits::types::WrappedU256,
         };
-        use openbrush::traits::ZERO_ADDRESS;
         use primitive_types::U256;
 
         type Event = <ControllerContract as ink::reflect::ContractEventBase>::Type;
@@ -105,8 +104,8 @@ pub mod contract {
             assert_eq!(contract.markets(), []);
             assert!(!contract.seize_guardian_paused());
             assert!(!contract.transfer_guardian_paused());
-            assert_eq!(contract.oracle(), ZERO_ADDRESS.into());
-            assert_eq!(contract.manager(), accounts.bob);
+            assert_eq!(contract.oracle(), None);
+            assert_eq!(contract.manager().unwrap(), accounts.bob);
             assert_eq!(contract.close_factor_mantissa(), WrappedU256::from(0));
             assert_eq!(
                 contract.liquidation_incentive_mantissa(),
@@ -198,30 +197,17 @@ pub mod contract {
             let pool1 = AccountId::from([0x01; 32]);
             let pool2 = AccountId::from([0x02; 32]);
             let underlying1 = AccountId::from([0x01; 32]);
+            let borrower = AccountId::from([0x04; 32]);
             assert_eq!(
                 contract
-                    .liquidate_borrow_allowed(
-                        pool1,
-                        pool2,
-                        ZERO_ADDRESS.into(),
-                        ZERO_ADDRESS.into(),
-                        0,
-                        None
-                    )
+                    .liquidate_borrow_allowed(pool1, pool2, borrower, borrower, 0, None)
                     .unwrap_err(),
                 Error::MarketNotListed
             );
             assert!(contract.support_market(pool1, underlying1).is_ok());
             assert_eq!(
                 contract
-                    .liquidate_borrow_allowed(
-                        pool1,
-                        pool2,
-                        ZERO_ADDRESS.into(),
-                        ZERO_ADDRESS.into(),
-                        0,
-                        None
-                    )
+                    .liquidate_borrow_allowed(pool1, pool2, borrower, borrower, 0, None)
                     .unwrap_err(),
                 Error::MarketNotListed
             );
@@ -237,16 +223,17 @@ pub mod contract {
             let pool1 = AccountId::from([0x01; 32]);
             let pool2 = AccountId::from([0x02; 32]);
             let underlying1 = AccountId::from([0x01; 32]);
+            let borrower = AccountId::from([0x04; 32]);
             assert_eq!(
                 contract
-                    .seize_allowed(pool1, pool2, ZERO_ADDRESS.into(), ZERO_ADDRESS.into(), 0)
+                    .seize_allowed(pool1, pool2, borrower, borrower, 0)
                     .unwrap_err(),
                 Error::MarketNotListed
             );
             assert!(contract.support_market(pool1, underlying1).is_ok());
             assert_eq!(
                 contract
-                    .seize_allowed(pool1, pool2, ZERO_ADDRESS.into(), ZERO_ADDRESS.into(), 0)
+                    .seize_allowed(pool1, pool2, borrower, borrower, 0)
                     .unwrap_err(),
                 Error::MarketNotListed
             );
@@ -302,6 +289,10 @@ pub mod contract {
 
             let p1 = AccountId::from([0x01; 32]);
             let underlying = AccountId::from([0x01; 32]);
+
+            let oracle_addr = AccountId::from([0x02; 32]);
+            assert_eq!(contract.set_price_oracle(oracle_addr).unwrap(), ());
+
             contract
                 .support_market_with_collateral_factor_mantissa(
                     p1,
@@ -342,10 +333,12 @@ pub mod contract {
             let pool_addr = AccountId::from([0x01; 32]);
             assert_eq!(contract.collateral_factor_mantissa(pool_addr), None);
 
+            let oracle_addr = AccountId::from([0x02; 32]);
+            assert_eq!(contract.set_price_oracle(oracle_addr).unwrap(), ());
             let max = exp_scale().mul(U256::from(90)).div(U256::from(100));
             contract
                 .set_collateral_factor_mantissa(pool_addr, WrappedU256::from(max))
-                .unwrap();
+                .unwrap_err();
         }
 
         #[ink::test]

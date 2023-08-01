@@ -18,29 +18,19 @@ use openbrush::{
         AccountId,
         Balance,
         Storage,
-        ZERO_ADDRESS,
     },
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
     /// Flashloan Fee in percentage * 100.
     /// Default value is 9 = 0.09%
     pub flashloan_premium_total: u128,
     /// AccountId of Controller managing Flashloan Gateway
-    pub controller: AccountId,
-}
-
-impl Default for Data {
-    fn default() -> Self {
-        Data {
-            flashloan_premium_total: Default::default(),
-            controller: ZERO_ADDRESS.into(),
-        }
-    }
+    pub controller: Option<AccountId>,
 }
 
 pub trait Internal {
@@ -48,7 +38,7 @@ pub trait Internal {
 
     // View function
     fn _flashloan_premium_total(&self) -> u128;
-    fn _controller(&self) -> AccountId;
+    fn _controller(&self) -> Option<AccountId>;
     // events
     fn _emit_flashloan_event(
         &self,
@@ -78,9 +68,14 @@ impl<T: Storage<Data>> FlashloanGateway for T {
         let mut premiums: Vec<Balance> = Default::default();
 
         let controller = self._controller();
+        if controller.is_none() {
+            return Err(Error::ControllerIsNotSet)
+        }
+        let _controller = controller.unwrap();
+
         let flashloan_premium_total = self._flashloan_premium_total();
         for index in 0..assets.len() {
-            let market = ControllerRef::market_of_underlying(&controller, assets[index]);
+            let market = ControllerRef::market_of_underlying(&_controller, assets[index]);
             if market.is_none() {
                 return Err(Error::MarketNotListed)
             }
@@ -146,7 +141,7 @@ impl<T: Storage<Data>> FlashloanGateway for T {
         self._flashloan_premium_total()
     }
 
-    default fn controller(&self) -> AccountId {
+    default fn controller(&self) -> Option<AccountId> {
         self._controller()
     }
 }
@@ -154,14 +149,14 @@ impl<T: Storage<Data>> FlashloanGateway for T {
 impl<T: Storage<Data>> Internal for T {
     default fn _initialize(&mut self, controller: AccountId) {
         self.data::<Data>().flashloan_premium_total = 9;
-        self.data::<Data>().controller = controller;
+        self.data::<Data>().controller = Some(controller);
     }
 
     default fn _flashloan_premium_total(&self) -> u128 {
         self.data::<Data>().flashloan_premium_total
     }
 
-    default fn _controller(&self) -> AccountId {
+    default fn _controller(&self) -> Option<AccountId> {
         self.data::<Data>().controller
     }
 
