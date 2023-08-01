@@ -733,9 +733,7 @@ pub mod contract {
             let token1 = AccountId::from([0x02; 32]);
             let token2 = AccountId::from([0x03; 32]);
             assert_eq!(
-                contract
-                    .sweep_token(token1, token2)
-                    .unwrap_err(),
+                contract.sweep_token(token1, token2).unwrap_err(),
                 Error::AccessControl(AccessControlError::MissingRole)
             );
         }

@@ -205,8 +205,9 @@ pub mod contract {
         fn _pool_metadata(&self, pool: AccountId) -> PoolMetadata {
             let controller = PoolRef::controller(&pool);
             let underlying_asset_address = PoolRef::underlying(&pool);
-            let (underlying_decimals, underlying_symbol) = if underlying_asset_address.is_some() {
-                let _underlying_asset_address = underlying_asset_address.unwrap();
+            let (underlying_decimals, underlying_symbol) = if let Some(_underlying_asset_address) =
+                underlying_asset_address
+            {
                 (
                     PSP22MetadataRef::token_decimals(&_underlying_asset_address),
                     PSP22MetadataRef::token_symbol(&_underlying_asset_address).unwrap_or_default(),
@@ -221,8 +222,7 @@ pub mod contract {
                 borrow_cap,
                 mint_guardian_paused,
                 borrow_guardian_paused,
-            ) = if controller.is_some() {
-                let _controller = controller.unwrap();
+            ) = if let Some(_controller) = controller {
                 (
                     ControllerRef::is_listed(&_controller, pool),
                     ControllerRef::collateral_factor_mantissa(&_controller, pool)
@@ -259,8 +259,7 @@ pub mod contract {
 
         fn _pool_balances(&self, pool: AccountId, account: AccountId) -> PoolBalances {
             let underlying = PoolRef::underlying(&pool);
-            let (token_balance, token_allowance) = if underlying.is_some() {
-                let _underlying = underlying.unwrap();
+            let (token_balance, token_allowance) = if let Some(_underlying) = underlying {
                 (
                     PSP22Ref::balance_of(&_underlying, account),
                     PSP22Ref::allowance(&_underlying, account, pool),
@@ -306,10 +305,10 @@ pub mod contract {
 
         fn _underlying_balance(&self, pool: &AccountId, account: AccountId) -> Balance {
             let underlying = PoolRef::underlying(pool);
-            if underlying.is_some() {
-                return PSP22Ref::balance_of(&underlying.unwrap(), account)
+            if let Some(_underlying) = underlying {
+                return PSP22Ref::balance_of(&_underlying, account)
             }
-            return 0
+            0
         }
     }
 
