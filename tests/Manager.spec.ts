@@ -1,9 +1,13 @@
 import { encodeAddress } from '@polkadot/keyring'
+import { BN } from '@polkadot/util'
 import { ONE_ETHER, ROLE, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
+  deployDefaultInterestRateModel,
   deployManager,
+  deployPriceOracle,
 } from '../scripts/helper/deploy_helper'
+import { preparePoolsWithPreparedTokens } from './testContractHelper'
 import { shouldNotRevert } from './testHelpers'
 
 describe('Manager spec', () => {
@@ -23,9 +27,29 @@ describe('Manager spec', () => {
     })
 
     // initialize
-    await manager.tx.setController(controller.address)
+    await shouldNotRevert(manager, 'setController', [controller.address])
 
-    return { deployer, manager, controller }
+    const rateModelArg = new BN(100).mul(ONE_ETHER)
+    const rateModel = await deployDefaultInterestRateModel({
+      api,
+      signer: deployer,
+      args: [[rateModelArg], [rateModelArg], [rateModelArg], [rateModelArg]],
+    })
+
+    const pools = await preparePoolsWithPreparedTokens({
+      api,
+      controller,
+      rateModel,
+      manager: deployer,
+    })
+
+    const priceOracle = await deployPriceOracle({
+      api,
+      signer: deployer,
+      args: [],
+    })
+
+    return { deployer, manager, controller, pools, priceOracle }
   }
 
   it('instantiate', async () => {
@@ -55,25 +79,40 @@ describe('Manager spec', () => {
       const { value: value2 } = await controller.query.oracle()
       expect(value2.ok).toEqual(oracleAddr)
     })
-    it.skip('.support_market_with_collateral_factor_mantissa', async () => {
-      const { deployer, manager, controller } = await setup()
-      const collateralFactor = ONE_ETHER
+    it('.support_market_with_collateral_factor_mantissa', async () => {
+      const {
+        deployer,
+        manager,
+        controller,
+        pools: { usdc },
+        priceOracle,
+      } = await setup()
+      const collateralFactor = ONE_ETHER.mul(new BN(90)).div(new BN(100))
 
       await shouldNotRevert(manager, 'grantRole', [
         ROLE.CONTROLLER_ADMIN,
         deployer.address,
       ])
-      // FIXME reverted with: {"issue":"OUTPUT_IS_NULL"}
+
+      await shouldNotRevert(manager, 'setPriceOracle', [priceOracle.address])
+
+      await shouldNotRevert(priceOracle, 'setFixedPrice', [
+        usdc.token.address,
+        ONE_ETHER,
+      ])
+
       await shouldNotRevert(
         manager,
         'supportMarketWithCollateralFactorMantissa',
-        [ZERO_ADDRESS, ZERO_ADDRESS, [collateralFactor]],
+        [usdc.pool.address, usdc.token.address, [collateralFactor]],
       )
 
       const {
         value: { ok: actual },
-      } = await controller.query.collateralFactorMantissa(ZERO_ADDRESS)
-      expect(actual.rawNumber).toEqual(collateralFactor)
+      } = await controller.query.collateralFactorMantissa(usdc.pool.address)
+      expect(new BN(BigInt(actual.toString()).toString())).toEqual(
+        collateralFactor,
+      )
     })
     it('.set_borrow_cap', async () => {
       const { deployer, manager, controller } = await setup()
