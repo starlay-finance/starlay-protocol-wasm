@@ -39,7 +39,7 @@ pub trait FlashloanGateway {
 
     /// Returns Controller Address
     #[ink(message)]
-    fn controller(&self) -> AccountId;
+    fn controller(&self) -> Option<AccountId>;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -48,6 +48,7 @@ pub enum Error {
     InconsistentFlashloanParams,
     InvalidFlashloanExecutorReturn,
     MarketNotListed,
+    ControllerIsNotSet,
     PSP22(PSP22Error),
     Pool(PoolError),
 }

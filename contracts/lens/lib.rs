@@ -41,7 +41,7 @@ pub mod contract {
     pub struct PoolMetadata {
         pool: AccountId,
         pool_decimals: u8,
-        underlying_asset_address: AccountId,
+        underlying_asset_address: Option<AccountId>,
         underlying_decimals: u8,
         underlying_symbol: String,
         is_listed: bool,
@@ -90,8 +90,8 @@ pub mod contract {
     #[derive(Decode, Encode)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct Configuration {
-        manager: AccountId,
-        oracle: AccountId,
+        manager: Option<AccountId>,
+        oracle: Option<AccountId>,
         seize_guardian_paused: bool,
         transfer_guardian_paused: bool,
         liquidation_incentive_mantissa: WrappedU256,
@@ -205,14 +205,43 @@ pub mod contract {
         fn _pool_metadata(&self, pool: AccountId) -> PoolMetadata {
             let controller = PoolRef::controller(&pool);
             let underlying_asset_address = PoolRef::underlying(&pool);
+            let (underlying_decimals, underlying_symbol) = if underlying_asset_address.is_some() {
+                let _underlying_asset_address = underlying_asset_address.unwrap();
+                (
+                    PSP22MetadataRef::token_decimals(&_underlying_asset_address),
+                    PSP22MetadataRef::token_symbol(&_underlying_asset_address).unwrap_or_default(),
+                )
+            } else {
+                (0_u8, String::from(""))
+            };
+
+            let (
+                is_listed,
+                collateral_factor_mantissa,
+                borrow_cap,
+                mint_guardian_paused,
+                borrow_guardian_paused,
+            ) = if controller.is_some() {
+                let _controller = controller.unwrap();
+                (
+                    ControllerRef::is_listed(&_controller, pool),
+                    ControllerRef::collateral_factor_mantissa(&_controller, pool)
+                        .unwrap_or_default(),
+                    ControllerRef::borrow_cap(&_controller, pool),
+                    ControllerRef::mint_guardian_paused(&_controller, pool).unwrap_or_default(),
+                    ControllerRef::borrow_guardian_paused(&_controller, pool).unwrap_or_default(),
+                )
+            } else {
+                (false, Default::default(), Some(0), true, true)
+            };
+
             PoolMetadata {
                 pool,
                 pool_decimals: PSP22MetadataRef::token_decimals(&pool),
                 underlying_asset_address,
-                underlying_decimals: PSP22MetadataRef::token_decimals(&underlying_asset_address),
-                underlying_symbol: PSP22MetadataRef::token_symbol(&underlying_asset_address)
-                    .unwrap_or_default(),
-                is_listed: ControllerRef::is_listed(&controller, pool),
+                underlying_decimals,
+                underlying_symbol,
+                is_listed,
                 total_cash: PoolRef::get_cash_prior(&pool),
                 total_supply: PSP22Ref::total_supply(&pool),
                 total_borrows: PoolRef::total_borrows(&pool),
@@ -220,45 +249,67 @@ pub mod contract {
                 exchange_rate_current: PoolRef::exchange_rate_current(&pool).unwrap_or_default(),
                 supply_rate_per_msec: PoolRef::supply_rate_per_msec(&pool),
                 borrow_rate_per_msec: PoolRef::borrow_rate_per_msec(&pool),
-                collateral_factor_mantissa: ControllerRef::collateral_factor_mantissa(
-                    &controller,
-                    pool,
-                )
-                .unwrap_or_default(),
+                collateral_factor_mantissa,
                 reserve_factor_mantissa: PoolRef::reserve_factor_mantissa(&pool),
-                borrow_cap: ControllerRef::borrow_cap(&controller, pool),
-                mint_guardian_paused: ControllerRef::mint_guardian_paused(&controller, pool)
-                    .unwrap_or_default(),
-                borrow_guardian_paused: ControllerRef::borrow_guardian_paused(&controller, pool)
-                    .unwrap_or_default(),
+                borrow_cap,
+                mint_guardian_paused,
+                borrow_guardian_paused,
             }
         }
 
         fn _pool_balances(&self, pool: AccountId, account: AccountId) -> PoolBalances {
             let underlying = PoolRef::underlying(&pool);
+            let (token_balance, token_allowance) = if underlying.is_some() {
+                let _underlying = underlying.unwrap();
+                (
+                    PSP22Ref::balance_of(&_underlying, account),
+                    PSP22Ref::allowance(&_underlying, account, pool),
+                )
+            } else {
+                (0, 0)
+            };
             PoolBalances {
                 pool,
                 balance_of: PSP22Ref::balance_of(&pool, account),
                 borrow_balance_current: PoolRef::borrow_balance_current(&pool, account)
                     .unwrap_or_default(),
-                token_balance: PSP22Ref::balance_of(&underlying, account),
-                token_allowance: PSP22Ref::allowance(&underlying, account, pool),
+                token_balance,
+                token_allowance,
             }
         }
 
         fn _pool_underlying_price(&self, pool: AccountId) -> PoolUnderlyingPrice {
             let controller = PoolRef::controller(&pool);
             let underlying = PoolRef::underlying(&pool);
-            let oracle = ControllerRef::oracle(&controller);
+
+            if controller.is_none() || underlying.is_none() {
+                return PoolUnderlyingPrice {
+                    pool,
+                    underlying_price: 0,
+                }
+            }
+
+            let oracle = ControllerRef::oracle(&controller.unwrap());
+            if oracle.is_none() {
+                return PoolUnderlyingPrice {
+                    pool,
+                    underlying_price: 0,
+                }
+            }
+
             PoolUnderlyingPrice {
                 pool,
-                underlying_price: PriceOracleRef::get_price(&oracle, underlying).unwrap(),
+                underlying_price: PriceOracleRef::get_price(&oracle.unwrap(), underlying.unwrap())
+                    .unwrap(),
             }
         }
 
         fn _underlying_balance(&self, pool: &AccountId, account: AccountId) -> Balance {
             let underlying = PoolRef::underlying(pool);
-            PSP22Ref::balance_of(&underlying, account)
+            if underlying.is_some() {
+                return PSP22Ref::balance_of(&underlying.unwrap(), account)
+            }
+            return 0
         }
     }
 

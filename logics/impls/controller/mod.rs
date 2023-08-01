@@ -24,7 +24,6 @@ use openbrush::{
         Balance,
         Storage,
         String,
-        ZERO_ADDRESS,
     },
 };
 use primitive_types::U256;
@@ -60,7 +59,7 @@ pub struct Data {
     /// Whether Pool has paused `Transfer` Action
     pub transfer_guardian_paused: bool,
     /// Oracle's AccountId associated with this contract
-    pub oracle: AccountId,
+    pub oracle: Option<AccountId>,
     /// Close Factor
     pub close_factor_mantissa: WrappedU256,
     /// Liquidation Incentive
@@ -68,9 +67,9 @@ pub struct Data {
     /// Maximum that can be borrowed per Pool
     pub borrow_caps: Mapping<AccountId, Balance>,
     /// Manager's AccountId associated with this contract
-    pub manager: AccountId,
+    pub manager: Option<AccountId>,
     /// Flashloan Gateway's AccountId associated with this contract
-    pub flashloan_gateway: AccountId,
+    pub flashloan_gateway: Option<AccountId>,
 }
 
 impl Default for Data {
@@ -83,12 +82,12 @@ impl Default for Data {
             borrow_guardian_paused: Default::default(),
             seize_guardian_paused: Default::default(),
             transfer_guardian_paused: Default::default(),
-            oracle: ZERO_ADDRESS.into(),
+            oracle: None,
             close_factor_mantissa: WrappedU256::from(U256::zero()),
             liquidation_incentive_mantissa: WrappedU256::from(U256::zero()),
             borrow_caps: Default::default(),
-            manager: ZERO_ADDRESS.into(),
-            flashloan_gateway: ZERO_ADDRESS.into(),
+            manager: None,
+            flashloan_gateway: None,
         }
     }
 }
@@ -96,7 +95,7 @@ impl Default for Data {
 impl Default for PoolAttributes {
     fn default() -> Self {
         PoolAttributes {
-            underlying: ZERO_ADDRESS.into(),
+            underlying: None,
             decimals: Default::default(),
             account_balance: Default::default(),
             account_borrow_balance: Default::default(),
@@ -109,8 +108,8 @@ impl Default for PoolAttributes {
 impl Default for PoolAttributesForWithdrawValidation {
     fn default() -> Self {
         PoolAttributesForWithdrawValidation {
-            pool: ZERO_ADDRESS.into(),
-            underlying: ZERO_ADDRESS.into(),
+            pool: None,
+            underlying: None,
             liquidation_threshold: Default::default(),
             account_balance: Default::default(),
             account_borrow_balance: Default::default(),
@@ -257,25 +256,29 @@ pub trait Internal {
     // view function
     fn _markets(&self) -> Vec<AccountId>;
     fn _market_of_underlying(&self, underlying: AccountId) -> Option<AccountId>;
-    fn _flashloan_gateway(&self) -> AccountId;
+    fn _flashloan_gateway(&self) -> Option<AccountId>;
     fn _collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256>;
     fn _is_listed(&self, pool: AccountId) -> bool;
     fn _mint_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     fn _borrow_guardian_paused(&self, pool: AccountId) -> Option<bool>;
     fn _seize_guardian_paused(&self) -> bool;
     fn _transfer_guardian_paused(&self) -> bool;
-    fn _oracle(&self) -> AccountId;
+    fn _oracle(&self) -> Option<AccountId>;
     fn _close_factor_mantissa(&self) -> WrappedU256;
     fn _liquidation_incentive_mantissa(&self) -> WrappedU256;
     fn _borrow_cap(&self, pool: AccountId) -> Option<Balance>;
-    fn _manager(&self) -> AccountId;
+    fn _manager(&self) -> Option<AccountId>;
 
-    fn _account_assets(&self, account: AccountId, token_modify: AccountId) -> Vec<AccountId>;
+    fn _account_assets(
+        &self,
+        account: AccountId,
+        token_modify: Option<AccountId>,
+    ) -> Vec<AccountId>;
     fn _get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)>;
     fn _get_hypothetical_account_liquidity(
         &self,
         account: AccountId,
-        token: AccountId,
+        token: Option<AccountId>,
         redeem_tokens: Balance,
         borrow_amount: Balance,
         caller_pool: Option<(AccountId, PoolAttributes)>,
@@ -302,8 +305,8 @@ pub trait Internal {
     );
     fn _emit_pool_action_paused_event(&self, pool: AccountId, action: String, paused: bool);
     fn _emit_action_paused_event(&self, action: String, paused: bool);
-    fn _emit_new_price_oracle_event(&self, old: AccountId, new: AccountId);
-    fn _emit_new_flashloan_gateway_event(&self, _old: AccountId, _new: AccountId);
+    fn _emit_new_price_oracle_event(&self, old: Option<AccountId>, new: Option<AccountId>);
+    fn _emit_new_flashloan_gateway_event(&self, _old: Option<AccountId>, _new: Option<AccountId>);
     fn _emit_new_close_factor_event(&self, old: WrappedU256, new: WrappedU256);
     fn _emit_new_liquidation_incentive_event(&self, old: WrappedU256, new: WrappedU256);
     fn _emit_new_borrow_cap_event(&self, pool: AccountId, new: Balance);
@@ -504,7 +507,7 @@ impl<T: Storage<Data>> Controller for T {
         self._assert_manager()?;
         let old = self._oracle();
         self._set_price_oracle(new_oracle)?;
-        self._emit_new_price_oracle_event(old, new_oracle);
+        self._emit_new_price_oracle_event(old, Some(new_oracle));
         Ok(())
     }
 
@@ -519,7 +522,7 @@ impl<T: Storage<Data>> Controller for T {
         self._assert_manager()?;
         let old = self._flashloan_gateway();
         self._set_flashloan_gateway(new_flashloan_gateway)?;
-        self._emit_new_flashloan_gateway_event(old, new_flashloan_gateway);
+        self._emit_new_flashloan_gateway_event(old, Some(new_flashloan_gateway));
         Ok(())
     }
 
@@ -610,7 +613,7 @@ impl<T: Storage<Data>> Controller for T {
     default fn market_of_underlying(&self, underlying: AccountId) -> Option<AccountId> {
         self._market_of_underlying(underlying)
     }
-    default fn flashloan_gateway(&self) -> AccountId {
+    default fn flashloan_gateway(&self) -> Option<AccountId> {
         self._flashloan_gateway()
     }
     default fn collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256> {
@@ -628,7 +631,7 @@ impl<T: Storage<Data>> Controller for T {
     default fn transfer_guardian_paused(&self) -> bool {
         self._transfer_guardian_paused()
     }
-    default fn oracle(&self) -> AccountId {
+    default fn oracle(&self) -> Option<AccountId> {
         self._oracle()
     }
     default fn close_factor_mantissa(&self) -> WrappedU256 {
@@ -640,14 +643,14 @@ impl<T: Storage<Data>> Controller for T {
     default fn borrow_cap(&self, pool: AccountId) -> Option<Balance> {
         self._borrow_cap(pool)
     }
-    default fn manager(&self) -> AccountId {
+    default fn manager(&self) -> Option<AccountId> {
         self._manager()
     }
     default fn is_listed(&self, pool: AccountId) -> bool {
         self._is_listed(pool)
     }
     default fn account_assets(&self, account: AccountId) -> Vec<AccountId> {
-        self._account_assets(account, ZERO_ADDRESS.into())
+        self._account_assets(account, None)
     }
     default fn get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)> {
         self._get_account_liquidity(account)
@@ -659,7 +662,13 @@ impl<T: Storage<Data>> Controller for T {
         redeem_tokens: Balance,
         borrow_amount: Balance,
     ) -> Result<(U256, U256)> {
-        self._get_hypothetical_account_liquidity(account, token, redeem_tokens, borrow_amount, None)
+        self._get_hypothetical_account_liquidity(
+            account,
+            Some(token),
+            redeem_tokens,
+            borrow_amount,
+            None,
+        )
     }
 
     default fn calculate_user_account_data(
@@ -718,7 +727,7 @@ impl<T: Storage<Data>> Internal for T {
         };
         let (_, shortfall) = self._get_hypothetical_account_liquidity(
             redeemer,
-            pool,
+            Some(pool),
             redeem_amount,
             0,
             caller_pool,
@@ -750,16 +759,26 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::BorrowIsPaused)
         }
 
+        let oracle = self._oracle();
+        if oracle.is_none() {
+            return Err(Error::OracleIsNotSet)
+        }
+        let _oracle = oracle.unwrap();
+
         let (price, total_borrow, caller_pool) = if pool_attribute.is_none() {
             (
-                PriceOracleRef::get_underlying_price(&self._oracle(), pool),
+                PriceOracleRef::get_underlying_price(&_oracle, pool),
                 PoolRef::total_borrows(&pool),
                 None,
             )
         } else {
             let attrs = pool_attribute.unwrap();
+            if attrs.underlying.is_none() {
+                return Err(Error::UnderlyingIsNotSet)
+            }
+
             (
-                PriceOracleRef::get_price(&self._oracle(), attrs.underlying),
+                PriceOracleRef::get_price(&_oracle, attrs.underlying.unwrap()),
                 attrs.total_borrows,
                 Some((pool, attrs)),
             )
@@ -776,7 +795,7 @@ impl<T: Storage<Data>> Internal for T {
 
         let (_, shortfall) = self._get_hypothetical_account_liquidity(
             borrower,
-            pool,
+            Some(pool),
             0,
             borrow_amount,
             caller_pool,
@@ -845,13 +864,8 @@ impl<T: Storage<Data>> Internal for T {
         };
 
         // The borrower must have shortfall in order to be liquidatable
-        let (_, shortfall) = self._get_hypothetical_account_liquidity(
-            borrower,
-            ZERO_ADDRESS.into(),
-            0,
-            0,
-            caller_pool,
-        )?;
+        let (_, shortfall) =
+            self._get_hypothetical_account_liquidity(borrower, None, 0, 0, caller_pool)?;
         if shortfall.is_zero() {
             return Err(Error::InsufficientShortfall)
         }
@@ -952,15 +966,24 @@ impl<T: Storage<Data>> Internal for T {
         pool_borrowed_attributes: Option<PoolAttributesForSeizeCalculation>,
         pool_collateral_attributes: Option<PoolAttributesForSeizeCalculation>,
     ) -> Result<Balance> {
+        let oracle = self._oracle();
+        if oracle.is_none() {
+            return Err(Error::OracleIsNotSet)
+        }
+        let _oracle = oracle.unwrap();
+
         let (price_borrowed_mantissa, pool_decimals_borrowed) =
             if let Some(attrs) = pool_borrowed_attributes {
+                if attrs.underlying.is_none() {
+                    return Err(Error::UnderlyingIsNotSet)
+                }
                 (
-                    PriceOracleRef::get_price(&self._oracle(), attrs.underlying),
+                    PriceOracleRef::get_price(&_oracle, attrs.underlying.unwrap()),
                     attrs.decimals,
                 )
             } else {
                 (
-                    PriceOracleRef::get_underlying_price(&self._oracle(), pool_borrowed),
+                    PriceOracleRef::get_underlying_price(&_oracle, pool_borrowed),
                     PoolRef::token_decimals(&pool_borrowed),
                 )
             };
@@ -970,13 +993,16 @@ impl<T: Storage<Data>> Internal for T {
 
         let (price_collateral_mantissa, pool_decimals_collateral) =
             if let Some(attrs) = pool_collateral_attributes {
+                if attrs.underlying.is_none() {
+                    return Err(Error::UnderlyingIsNotSet)
+                }
                 (
-                    PriceOracleRef::get_price(&self._oracle(), attrs.underlying),
+                    PriceOracleRef::get_price(&_oracle, attrs.underlying.unwrap()),
                     attrs.decimals,
                 )
             } else {
                 (
-                    PriceOracleRef::get_underlying_price(&self._oracle(), pool_collateral),
+                    PriceOracleRef::get_underlying_price(&_oracle, pool_collateral),
                     PoolRef::token_decimals(&pool_collateral),
                 )
             };
@@ -996,17 +1022,22 @@ impl<T: Storage<Data>> Internal for T {
         Ok(result)
     }
     default fn _assert_manager(&self) -> Result<()> {
-        if Self::env().caller() != self._manager() {
+        let manager = self._manager();
+        if manager.is_none() {
+            return Err(Error::ManagerIsNotSet)
+        }
+        let _manager = manager.unwrap();
+        if Self::env().caller() != _manager {
             return Err(Error::CallerIsNotManager)
         }
         Ok(())
     }
     default fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
-        self.data().oracle = new_oracle;
+        self.data().oracle = Some(new_oracle);
         Ok(())
     }
     default fn _set_flashloan_gateway(&mut self, new_flashloan_gateway: AccountId) -> Result<()> {
-        self.data().flashloan_gateway = new_flashloan_gateway;
+        self.data().flashloan_gateway = Some(new_flashloan_gateway);
         Ok(())
     }
     default fn _support_market(
@@ -1046,7 +1077,12 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::InvalidCollateralFactor)
         }
 
-        if let None | Some(0) = PriceOracleRef::get_underlying_price(&self._oracle(), *pool) {
+        let oracle = self._oracle();
+        if oracle.is_none() {
+            return Err(Error::OracleIsNotSet)
+        }
+        let _oracle = oracle.unwrap();
+        if let None | Some(0) = PriceOracleRef::get_underlying_price(&_oracle, *pool) {
             return Err(Error::PriceError)
         }
 
@@ -1100,7 +1136,7 @@ impl<T: Storage<Data>> Internal for T {
     default fn _market_of_underlying(&self, underlying: AccountId) -> Option<AccountId> {
         self.data().markets_pair.get(&underlying)
     }
-    default fn _flashloan_gateway(&self) -> AccountId {
+    default fn _flashloan_gateway(&self) -> Option<AccountId> {
         self.data().flashloan_gateway
     }
     default fn _is_listed(&self, pool: AccountId) -> bool {
@@ -1127,7 +1163,7 @@ impl<T: Storage<Data>> Internal for T {
     default fn _transfer_guardian_paused(&self) -> bool {
         self.data().transfer_guardian_paused
     }
-    default fn _oracle(&self) -> AccountId {
+    default fn _oracle(&self) -> Option<AccountId> {
         self.data().oracle
     }
     default fn _close_factor_mantissa(&self) -> WrappedU256 {
@@ -1139,14 +1175,14 @@ impl<T: Storage<Data>> Internal for T {
     default fn _borrow_cap(&self, pool: AccountId) -> Option<Balance> {
         self.data().borrow_caps.get(&pool)
     }
-    default fn _manager(&self) -> AccountId {
+    default fn _manager(&self) -> Option<AccountId> {
         self.data().manager
     }
 
     default fn _account_assets(
         &self,
         account: AccountId,
-        token_modify: AccountId,
+        token_modify: Option<AccountId>,
     ) -> Vec<AccountId> {
         let mut account_assets = Vec::<AccountId>::new();
         let markets = self._markets();
@@ -1154,7 +1190,7 @@ impl<T: Storage<Data>> Internal for T {
             if pool == Self::env().caller() {
                 continue // NOTE: if caller is pool, need to check by the pool itself
             }
-            if pool == token_modify {
+            if token_modify.is_some() && pool == token_modify.unwrap() {
                 account_assets.push(pool); // NOTE: add unconditionally even if balance, borrowed is not already there
                 continue
             }
@@ -1169,13 +1205,13 @@ impl<T: Storage<Data>> Internal for T {
     }
 
     default fn _get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)> {
-        self._get_hypothetical_account_liquidity(account, ZERO_ADDRESS.into(), 0, 0, None)
+        self._get_hypothetical_account_liquidity(account, None, 0, 0, None)
     }
 
     default fn _get_hypothetical_account_liquidity(
         &self,
         account: AccountId,
-        token_modify: AccountId,
+        token_modify: Option<AccountId>,
         redeem_tokens: Balance,
         borrow_amount: Balance,
         caller_pool: Option<(AccountId, PoolAttributes)>,
@@ -1184,9 +1220,18 @@ impl<T: Storage<Data>> Internal for T {
         let account_assets = self._account_assets(account, token_modify);
         let mut asset_params = Vec::<HypotheticalAccountLiquidityCalculationParam>::new();
 
+        let oracle = self._oracle();
+        if oracle.is_none() {
+            return Err(Error::OracleIsNotSet)
+        }
+        let _oracle = oracle.unwrap();
+
         // if caller is a pool, get parameters for the pool without call the pool
         if let Some((caller_pool_id, attrs)) = caller_pool {
-            let oracle_price = PriceOracleRef::get_price(&self._oracle(), attrs.underlying);
+            if attrs.underlying.is_none() {
+                return Err(Error::UnderlyingIsNotSet)
+            }
+            let oracle_price = PriceOracleRef::get_price(&_oracle, attrs.underlying.unwrap());
             if let None | Some(0) = oracle_price {
                 return Err(Error::PriceError)
             }
@@ -1217,7 +1262,7 @@ impl<T: Storage<Data>> Internal for T {
             let decimals = PoolRef::token_decimals(asset);
 
             // Get the normalized price of the asset
-            let oracle_price = PriceOracleRef::get_underlying_price(&self._oracle(), *asset);
+            let oracle_price = PriceOracleRef::get_underlying_price(&_oracle, *asset);
             if let None | Some(0) = oracle_price {
                 return Err(Error::PriceError)
             }
@@ -1270,16 +1315,29 @@ impl<T: Storage<Data>> Internal for T {
         let mut total_debt_in_base_currency: U256 = U256::from(0);
 
         let oracle = self._oracle();
+        if oracle.is_none() {
+            return Err(Error::OracleIsNotSet)
+        }
+        let _oracle = oracle.unwrap();
+
+        if pool_attributes.pool.is_none() {
+            return Err(Error::PoolIsNotSet)
+        }
 
         let collateral_factor_mantissa: Option<WrappedU256> =
-            self.collateral_factor_mantissa(pool_attributes.pool);
+            self.collateral_factor_mantissa(pool_attributes.pool.unwrap());
         if collateral_factor_mantissa.is_none() {
             return Err(Error::MarketNotListed)
         }
         let ltv = U256::from(collateral_factor_mantissa.unwrap());
 
         let liquidation_threshold = pool_attributes.liquidation_threshold;
-        let unit_price_result = PriceOracleRef::get_price(&oracle, pool_attributes.underlying);
+
+        if pool_attributes.underlying.is_none() {
+            return Err(Error::UnderlyingIsNotSet)
+        }
+        let unit_price_result =
+            PriceOracleRef::get_price(&_oracle, pool_attributes.underlying.unwrap());
         if unit_price_result.is_none() {
             return Err(Error::PriceError)
         }
@@ -1314,8 +1372,13 @@ impl<T: Storage<Data>> Internal for T {
             let ltv = U256::from(collateral_factor_mantissa.unwrap());
 
             let liquidation_threshold = PoolRef::liquidation_threshold(&asset);
-            let underlying: AccountId = PoolRef::underlying(&asset);
-            let unit_price_result = PriceOracleRef::get_price(&oracle, underlying);
+
+            let underlying = PoolRef::underlying(&asset);
+            if underlying.is_none() {
+                return Err(Error::UnderlyingIsNotSet)
+            }
+
+            let unit_price_result = PriceOracleRef::get_price(&_oracle, underlying.unwrap());
             if unit_price_result.is_none() {
                 return Err(Error::PriceError)
             }
@@ -1374,6 +1437,12 @@ impl<T: Storage<Data>> Internal for T {
         account: AccountId,
         amount: Balance,
     ) -> Result<bool> {
+        let oracle = self._oracle();
+        if oracle.is_none() {
+            return Err(Error::OracleIsNotSet)
+        }
+        let _oracle = oracle.unwrap();
+
         let account_data = self._calculate_user_account_data(account, pool_attributes.clone())?;
 
         let total_debt_in_base_currency = account_data.total_debt_in_base_currency;
@@ -1382,7 +1451,11 @@ impl<T: Storage<Data>> Internal for T {
             return Ok(true)
         }
 
-        let asset_price = PriceOracleRef::get_price(&self._oracle(), pool_attributes.underlying);
+        if pool_attributes.underlying.is_none() {
+            return Err(Error::UnderlyingIsNotSet)
+        }
+
+        let asset_price = PriceOracleRef::get_price(&_oracle, pool_attributes.underlying.unwrap());
         if let None | Some(0) = asset_price {
             return Ok(false)
         }
@@ -1415,8 +1488,18 @@ impl<T: Storage<Data>> Internal for T {
     ) {
     }
     default fn _emit_action_paused_event(&self, _action: String, _paused: bool) {}
-    default fn _emit_new_price_oracle_event(&self, _old: AccountId, _new: AccountId) {}
-    default fn _emit_new_flashloan_gateway_event(&self, _old: AccountId, _new: AccountId) {}
+    default fn _emit_new_price_oracle_event(
+        &self,
+        _old: Option<AccountId>,
+        _new: Option<AccountId>,
+    ) {
+    }
+    default fn _emit_new_flashloan_gateway_event(
+        &self,
+        _old: Option<AccountId>,
+        _new: Option<AccountId>,
+    ) {
+    }
     default fn _emit_new_close_factor_event(&self, _old: WrappedU256, _new: WrappedU256) {}
     default fn _emit_new_liquidation_incentive_event(&self, _old: WrappedU256, _new: WrappedU256) {}
     default fn _emit_new_borrow_cap_event(&self, _pool: AccountId, _new: Balance) {}

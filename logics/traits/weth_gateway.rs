@@ -24,10 +24,6 @@ pub type WETHGatewayRef = dyn WETHGateway + Ownable;
 
 #[openbrush::trait_definition]
 pub trait WETHGateway: Ownable {
-    #[ink(message)]
-    #[modifiers(only_owner)]
-    fn authorize_pool(&mut self, pool: AccountId) -> Result<()>;
-
     /// Deposits WETH into the reserve, using native ETH. A corresponding amount of the overlying asset (lTokens) is minted.
     #[ink(message, payable)]
     fn deposit_eth(&mut self, pool: AccountId) -> Result<()>;
@@ -61,7 +57,7 @@ pub trait WETHGateway: Ownable {
 
     /// Get WETH address used by WETHGateway
     #[ink(message)]
-    fn get_weth_address(&self) -> AccountId;
+    fn get_weth_address(&self) -> Option<AccountId>;
 }
 
 #[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
@@ -69,6 +65,7 @@ pub trait WETHGateway: Ownable {
 pub enum Error {
     SafeETHTransferFailed,
     InsufficientPayback,
+    WethIsNotSet,
     Pool(PoolError),
     PSP22(PSP22Error),
 }

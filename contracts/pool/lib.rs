@@ -399,10 +399,10 @@ pub mod contract {
             symbol: String,
             decimals: u8,
         ) {
-            self.pool.underlying = underlying;
-            self.pool.controller = controller;
-            self.pool.manager = manager;
-            self.pool.rate_model = rate_model;
+            self.pool.underlying = Some(underlying);
+            self.pool.controller = Some(controller);
+            self.pool.manager = Some(manager);
+            self.pool.rate_model = Some(rate_model);
             self.pool.initial_exchange_rate_mantissa = initial_exchange_rate_mantissa;
             self.pool.liquidation_threshold = liquidation_threshold;
             self.pool.accrual_block_timestamp = Self::env().block_timestamp();
@@ -432,10 +432,7 @@ pub mod contract {
             },
             traits::types::WrappedU256,
         };
-        use openbrush::{
-            contracts::psp22::PSP22,
-            traits::ZERO_ADDRESS,
-        };
+        use openbrush::contracts::psp22::PSP22;
         use primitive_types::U256;
         use std::ops::{
             Add,
@@ -469,9 +466,9 @@ pub mod contract {
                 String::from("symbol"),
                 8,
             );
-            assert_eq!(contract.underlying(), underlying);
-            assert_eq!(contract.controller(), controller);
-            assert_eq!(contract.manager(), accounts.bob);
+            assert_eq!(contract.underlying(), Some(underlying));
+            assert_eq!(contract.controller(), Some(controller));
+            assert_eq!(contract.manager(), Some(accounts.bob));
             assert_eq!(
                 contract.initial_exchange_rate_mantissa(),
                 initial_exchange_rate_mantissa
@@ -482,46 +479,6 @@ pub mod contract {
             );
             assert_eq!(contract.total_borrows(), 0);
             assert_eq!(contract.liquidation_threshold(), liquidation_threshold);
-        }
-
-        #[ink::test]
-        #[should_panic(expected = "underlying is zero address")]
-        fn new_works_when_underlying_is_zero_address() {
-            let accounts = default_accounts();
-            set_caller(accounts.bob);
-
-            let controller = AccountId::from([0x02; 32]);
-            let liquidation_threshold = 10000;
-            PoolContract::new(
-                ZERO_ADDRESS.into(),
-                controller,
-                ZERO_ADDRESS.into(),
-                WrappedU256::from(U256::from(0)),
-                liquidation_threshold,
-                String::from("Token Name"),
-                String::from("symbol"),
-                8,
-            );
-        }
-
-        #[ink::test]
-        #[should_panic(expected = "controller is zero address")]
-        fn new_works_when_controller_is_zero_address() {
-            let accounts = default_accounts();
-            set_caller(accounts.bob);
-
-            let underlying = AccountId::from([0x01; 32]);
-            let liquidation_threshold = 10000;
-            PoolContract::new(
-                underlying,
-                ZERO_ADDRESS.into(),
-                ZERO_ADDRESS.into(),
-                WrappedU256::from(U256::from(0)),
-                liquidation_threshold,
-                String::from("Token Name"),
-                String::from("symbol"),
-                8,
-            );
         }
 
         #[ink::test]

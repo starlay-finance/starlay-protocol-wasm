@@ -104,8 +104,7 @@ pub mod contract {
             let mut instance = Self::default();
             let caller = Self::env().caller();
             instance._init_with_owner(caller);
-            instance.gateway.weth = weth;
-
+            instance._initialize(weth);
             instance
         }
     }

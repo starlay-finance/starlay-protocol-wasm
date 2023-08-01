@@ -111,7 +111,7 @@ pub fn collateral_factor_max_mantissa() -> U256 {
 #[derive(Debug)]
 pub struct GetHypotheticalAccountLiquidityInput {
     pub asset_params: Vec<HypotheticalAccountLiquidityCalculationParam>,
-    pub token_modify: AccountId,
+    pub token_modify: Option<AccountId>,
     pub redeem_tokens: Balance,
     pub borrow_amount: Balance,
 }
@@ -155,7 +155,7 @@ pub fn get_hypothetical_account_liquidity(
         sum_borrow_plus_effect = sum_borrow_plus_effect.add(borrow_plus_effect);
 
         // Calculate effects of interacting with cTokenModify
-        if param.asset == token_modify {
+        if token_modify.is_some() && param.asset == token_modify.unwrap() {
             let to_flatten = |volume: U256| {
                 volume
                     .mul(exp_scale())
@@ -262,7 +262,6 @@ mod tests {
         Div,
         Mul,
     };
-    use openbrush::traits::ZERO_ADDRESS;
     use primitive_types::U256;
     fn mts(val: u128) -> U256 {
         U256::from(val).mul(exp_scale())
@@ -534,7 +533,7 @@ mod tests {
             Case {
                 input: GetHypotheticalAccountLiquidityInput {
                     asset_params: asset_params_without_borrows.clone(),
-                    token_modify: ZERO_ADDRESS.into(),
+                    token_modify: None,
                     redeem_tokens: 0,
                     borrow_amount: 0,
                 },
@@ -550,7 +549,7 @@ mod tests {
             Case {
                 input: GetHypotheticalAccountLiquidityInput {
                     asset_params: asset_params_without_borrows.clone(),
-                    token_modify: AccountId::from([1; 32]),
+                    token_modify: Some(AccountId::from([1; 32])),
                     redeem_tokens: 7_500 * pow10_6,
                     borrow_amount: 0,
                 },
@@ -566,7 +565,7 @@ mod tests {
             Case {
                 input: GetHypotheticalAccountLiquidityInput {
                     asset_params: asset_params_without_borrows.clone(),
-                    token_modify: AccountId::from([2; 32]),
+                    token_modify: Some(AccountId::from([2; 32])),
                     redeem_tokens: 35_000 * pow10_6,
                     borrow_amount: 0,
                 },
@@ -582,7 +581,7 @@ mod tests {
             Case {
                 input: GetHypotheticalAccountLiquidityInput {
                     asset_params: asset_params_without_borrows.clone(),
-                    token_modify: AccountId::from([1; 32]),
+                    token_modify: Some(AccountId::from([1; 32])),
                     redeem_tokens: 0,
                     borrow_amount: 7_500 * pow10_6,
                 },
@@ -598,7 +597,7 @@ mod tests {
             Case {
                 input: GetHypotheticalAccountLiquidityInput {
                     asset_params: asset_params_without_borrows.clone(),
-                    token_modify: AccountId::from([3; 32]),
+                    token_modify: Some(AccountId::from([3; 32])),
                     redeem_tokens: 0,
                     borrow_amount: 15_000 * pow10_18,
                 },
@@ -614,7 +613,7 @@ mod tests {
             Case {
                 input: GetHypotheticalAccountLiquidityInput {
                     asset_params: asset_params_with_borrows.clone(),
-                    token_modify: ZERO_ADDRESS.into(),
+                    token_modify: None,
                     redeem_tokens: 0,
                     borrow_amount: 0,
                 },
@@ -630,7 +629,7 @@ mod tests {
             Case {
                 input: GetHypotheticalAccountLiquidityInput {
                     asset_params: asset_params_with_borrows.clone(),
-                    token_modify: AccountId::from([1; 32]),
+                    token_modify: Some(AccountId::from([1; 32])),
                     redeem_tokens: 7_500 * pow10_6,
                     borrow_amount: 0,
                 },
@@ -646,7 +645,7 @@ mod tests {
             Case {
                 input: GetHypotheticalAccountLiquidityInput {
                     asset_params: asset_params_with_borrows.clone(),
-                    token_modify: AccountId::from([3; 32]),
+                    token_modify: Some(AccountId::from([3; 32])),
                     redeem_tokens: 0,
                     borrow_amount: 7_500 * pow10_18,
                 },

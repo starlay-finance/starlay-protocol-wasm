@@ -245,7 +245,7 @@ pub trait Controller {
     fn markets(&self) -> Vec<AccountId>;
 
     #[ink(message)]
-    fn flashloan_gateway(&self) -> AccountId;
+    fn flashloan_gateway(&self) -> Option<AccountId>;
 
     /// Returns the market based on underlying
     #[ink(message)]
@@ -273,7 +273,7 @@ pub trait Controller {
 
     /// Returns the price oracle account id
     #[ink(message)]
-    fn oracle(&self) -> AccountId;
+    fn oracle(&self) -> Option<AccountId>;
 
     /// Returns the close factor
     #[ink(message)]
@@ -289,7 +289,7 @@ pub trait Controller {
 
     /// Returns the account id of the manager account
     #[ink(message)]
-    fn manager(&self) -> AccountId;
+    fn manager(&self) -> Option<AccountId>;
 
     /// Returns whether a given pool is currently listed
     #[ink(message)]
@@ -335,7 +335,7 @@ pub trait Controller {
 #[derive(Clone, Decode, Encode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributes {
-    pub underlying: AccountId,
+    pub underlying: Option<AccountId>,
     pub decimals: u8,
     pub account_balance: Balance,
     pub account_borrow_balance: Balance,
@@ -349,7 +349,7 @@ pub struct PoolAttributes {
 #[derive(Clone, Decode, Encode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributesForSeizeCalculation {
-    pub underlying: AccountId,
+    pub underlying: Option<AccountId>,
     pub decimals: u8,
 }
 
@@ -359,8 +359,8 @@ pub struct PoolAttributesForSeizeCalculation {
 #[derive(Clone, Decode, Encode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributesForWithdrawValidation {
-    pub pool: AccountId,
-    pub underlying: AccountId,
+    pub pool: Option<AccountId>,
+    pub underlying: Option<AccountId>,
     pub liquidation_threshold: u128,
     pub account_balance: Balance,
     pub account_borrow_balance: Balance,
@@ -397,6 +397,10 @@ pub enum Error {
     InsufficientShortfall,
     CallerIsNotManager,
     InvalidCollateralFactor,
+    UnderlyingIsNotSet,
+    PoolIsNotSet,
+    ManagerIsNotSet,
+    OracleIsNotSet,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;
