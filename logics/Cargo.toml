@@ -1,5 +1,5 @@
 [package]
-name = "logics"
+name = "starlay_protocol_logics"
 version = "0.0.1"
 authors = ["Starlay Finance"]
 edition = "2021"
@@ -22,7 +22,7 @@ primitive-types = { version = "0.11.1", default-features = false, features = [
 ] }
 
 [lib]
-name = "logics"
+name = "starlay_protocol_logics"
 path = "lib.rs"
 crate-type = ["rlib"]
 
