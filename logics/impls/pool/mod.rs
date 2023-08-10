@@ -232,6 +232,7 @@ pub trait Internal {
     fn _borrow_balance_stored(&self, account: AccountId) -> Balance;
     fn _balance_of_underlying(&self, account: AccountId) -> Balance;
     fn _principal_balance_of(&self, account: &AccountId) -> Balance;
+    fn _principal_total_supply(&self) -> Balance;
     fn _accrual_block_timestamp(&self) -> Timestamp;
     fn _borrow_index(&self) -> WrappedU256;
     fn _initial_exchange_rate_mantissa(&self) -> WrappedU256;
@@ -611,6 +612,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn principal_balance_of(&self, account: AccountId) -> Balance {
         self._principal_balance_of(&account)
+    }
+
+    default fn principal_total_supply(&self) -> Balance {
+        self._principal_total_supply()
     }
 
     default fn initial_exchange_rate_mantissa(&self) -> WrappedU256 {
@@ -1560,6 +1565,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn _principal_balance_of(&self, account: &AccountId) -> Balance {
         psp22::Internal::_balance_of(self, account)
+    }
+
+    default fn _principal_total_supply(&self) -> Balance {
+        psp22::Internal::_total_supply(self)
     }
 
     default fn _initial_exchange_rate_mantissa(&self) -> WrappedU256 {
