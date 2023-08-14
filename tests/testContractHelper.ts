@@ -7,6 +7,7 @@ import {
 } from '../scripts/helper/deploy_helper'
 import Controller from '../types/contracts/controller'
 import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
+import IncentivesController from '../types/contracts/incentives_controller'
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
 import WETH from '../types/contracts/weth'
@@ -72,12 +73,14 @@ export const preparePoolWithMockToken = async ({
   controller,
   rateModel,
   manager,
+  incentivesController,
 }: {
   api: ApiPromise
   metadata: Metadata
   controller: Controller
   rateModel: DefaultInterestRateModel
   manager: KeyringPair
+  incentivesController: IncentivesController
 }): Promise<PoolContracts> => {
   const token = await deployPSP22Token({
     api,
@@ -89,6 +92,7 @@ export const preparePoolWithMockToken = async ({
     api,
     signer: manager,
     args: [
+      incentivesController.address,
       token.address,
       controller.address,
       rateModel.address,
@@ -108,6 +112,7 @@ export const preparePoolWithWETH = async ({
   controller,
   rateModel,
   manager,
+  incentivesController,
   token,
 }: {
   api: ApiPromise
@@ -115,12 +120,14 @@ export const preparePoolWithWETH = async ({
   controller: Controller
   rateModel: DefaultInterestRateModel
   manager: KeyringPair
+  incentivesController: IncentivesController
   token: WETH
 }): Promise<WrappedPoolContracts> => {
   const pool = await deployPoolFromAsset({
     api,
     signer: manager,
     args: [
+      incentivesController.address,
       token.address,
       controller.address,
       rateModel.address,
@@ -138,11 +145,13 @@ export const preparePoolsWithPreparedTokens = async ({
   controller,
   rateModel,
   manager,
+  incentivesController,
   wethToken = undefined,
 }: {
   api: ApiPromise
   controller: Controller
   rateModel: DefaultInterestRateModel
+  incentivesController: IncentivesController
   manager: KeyringPair
   wethToken?: WETH
 }): Promise<Pools> => {
@@ -150,21 +159,24 @@ export const preparePoolsWithPreparedTokens = async ({
     api,
     controller,
     rateModel,
-    manager: manager,
+    manager,
+    incentivesController,
     metadata: TEST_METADATAS.dai,
   })
   const usdc = await preparePoolWithMockToken({
     api,
     controller,
     rateModel,
-    manager: manager,
+    manager,
+    incentivesController,
     metadata: TEST_METADATAS.usdc,
   })
   const usdt = await preparePoolWithMockToken({
     api,
     controller,
     rateModel,
-    manager: manager,
+    manager,
+    incentivesController,
     metadata: TEST_METADATAS.usdt,
   })
 
@@ -177,6 +189,7 @@ export const preparePoolsWithPreparedTokens = async ({
     controller,
     rateModel,
     manager,
+    incentivesController,
     token: wethToken,
   })
   return { dai, usdc, usdt, weth }

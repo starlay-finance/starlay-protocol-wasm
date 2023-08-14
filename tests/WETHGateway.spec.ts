@@ -5,13 +5,17 @@ import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
   deployDefaultInterestRateModel,
+  deployIncentivesController,
   deployPriceOracle,
   deployWETH,
   deployWETHGateway,
 } from '../scripts/helper/deploy_helper'
 import { getGasLimit } from '../scripts/helper/utils'
+
+import IncentivesController from '../types/contracts/incentives_controller'
 import WETH from '../types/contracts/weth'
 import WETHGateway from '../types/contracts/weth_gateway'
+
 import { Pools, preparePoolsWithPreparedTokens } from './testContractHelper'
 import { shouldNotRevert } from './testHelpers'
 
@@ -30,6 +34,7 @@ describe('WETHGateway spec', () => {
   let weth: WETH
   let wethGateway: WETHGateway
   let gasLimit: WeightV2
+  let incentivesController: IncentivesController
 
   const setup = async () => {
     const { api, alice: deployer, bob, charlie, django } = globalThis.setup
@@ -65,12 +70,19 @@ describe('WETHGateway spec', () => {
       args: [weth.address],
     })
 
+    const incentivesController = await deployIncentivesController({
+      api,
+      signer: deployer,
+      args: [],
+    })
+
     const pools = await preparePoolsWithPreparedTokens({
       api,
       controller,
       rateModel,
       manager: deployer,
       wethToken: weth,
+      incentivesController,
     })
 
     const users = [bob, charlie, django]
@@ -98,6 +110,7 @@ describe('WETHGateway spec', () => {
       users,
       weth,
       wethGateway,
+      incentivesController,
     }
   }
 
@@ -108,6 +121,7 @@ describe('WETHGateway spec', () => {
       api,
       deployer,
       pools,
+      incentivesController,
       // rateModel,
       // controller,
       // priceOracle,

@@ -17,3 +17,4 @@ pub mod price_oracle;
 pub mod wad_ray_math;
 pub mod weth;
 pub mod weth_gateway;
+pub mod incentives_controller;

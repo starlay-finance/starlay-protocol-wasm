@@ -162,6 +162,8 @@ pub trait Pool: PSP22 + PSP22Metadata {
     /// Set whether user's asset to use as collateral or not
     #[ink(message)]
     fn set_use_reserve_as_collateral(&mut self, use_as_collateral: bool) -> Result<()>;
+    #[ink(message)]
+    fn set_incentives_controller(&mut self, incentives_controller: AccountId) -> Result<()>;
 
     // view functions
     #[ink(message)]
@@ -170,6 +172,8 @@ pub trait Pool: PSP22 + PSP22Metadata {
     fn controller(&self) -> Option<AccountId>;
     #[ink(message)]
     fn manager(&self) -> Option<AccountId>;
+    #[ink(message)]
+    fn incentives_controller(&self) -> Option<AccountId>;
     #[ink(message)]
     fn get_cash_prior(&self) -> Balance;
     #[ink(message)]
@@ -237,6 +241,8 @@ pub enum Error {
     InterestRateModelIsNotSet,
     UnderlyingIsNotSet,
     ManagerIsNotSet,
+    IncentivesControllerIsNotSet,
+    AccrueRewardFailed,
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),

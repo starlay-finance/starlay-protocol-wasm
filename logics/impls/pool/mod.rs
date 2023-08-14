@@ -18,6 +18,7 @@ use super::{
 };
 use crate::traits::{
     controller,
+    incentives_controller::IncentivesControllerRef,
     types::WrappedU256,
 };
 pub use crate::traits::{
@@ -82,6 +83,8 @@ pub struct Data {
     pub controller: Option<AccountId>,
     /// AccountId of Manager, the administrator of this pool
     pub manager: Option<AccountId>,
+    /// AccountId of incentives conroller
+    pub incentives_controller: Option<AccountId>,
     /// AccountId of Rate Model
     pub rate_model: Option<AccountId>,
     pub borrows_scaled: Balance,
@@ -115,6 +118,7 @@ impl Default for Data {
             controller: None,
             manager: None,
             rate_model: None,
+            incentives_controller: None,
             borrows_scaled: Default::default(),
             reserves_scaled: Default::default(),
             account_borrows: Default::default(),
@@ -206,10 +210,13 @@ pub trait Internal {
         user: AccountId,
         use_as_collateral: bool,
     ) -> Result<()>;
+    fn _accrue_reward(&self, user: AccountId) -> Result<()>;
+    fn _set_incentives_controller(&mut self, incentives_controller: AccountId) -> Result<()>;
     // view functions
     fn _underlying(&self) -> Option<AccountId>;
     fn _controller(&self) -> Option<AccountId>;
     fn _manager(&self) -> Option<AccountId>;
+    fn _incentives_controller(&self) -> Option<AccountId>;
     fn _get_cash_prior(&self) -> Balance;
     fn _total_borrows(&self) -> Balance;
     fn _borrows_scaled(&self) -> Balance;
@@ -537,6 +544,14 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
 
+    default fn set_incentives_controller(
+        &mut self,
+        incentives_controller: AccountId,
+    ) -> Result<()> {
+        self._assert_manager()?;
+        self._set_incentives_controller(incentives_controller)
+    }
+
     default fn underlying(&self) -> Option<AccountId> {
         self._underlying()
     }
@@ -547,6 +562,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn manager(&self) -> Option<AccountId> {
         self._manager()
+    }
+
+    default fn incentives_controller(&self) -> Option<AccountId> {
+        self._incentives_controller()
     }
 
     default fn exchange_rate_stored(&self) -> WrappedU256 {
@@ -696,6 +715,16 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         value: Balance,
         data: Vec<u8>,
     ) -> core::result::Result<(), PSP22Error> {
+        let reward_result = self._accrue_reward(src);
+        if reward_result.is_err() {
+            return Err(PSP22Error::Custom(String::from("AccrueRewardFailed")))
+        }
+
+        let reward_result = self._accrue_reward(dst);
+        if reward_result.is_err() {
+            return Err(PSP22Error::Custom(String::from("AccrueRewardFailed")))
+        }
+
         let contract_addr = Self::env().account_id();
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(src);
@@ -761,6 +790,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()> {
+        self._accrue_reward(minter)?;
         let contract_addr = Self::env().account_id();
 
         let controller = self._controller();
@@ -801,6 +831,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _redeem(&mut self, redeemer: AccountId, redeem_amount: Balance) -> Result<()> {
+        self._accrue_reward(redeemer)?;
         if redeem_amount == 0
             || !self
                 ._using_reserve_as_collateral(redeemer)
@@ -914,6 +945,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         borrow_amount: Balance,
         release_underlying: bool,
     ) -> Result<()> {
+        self._accrue_reward(borrower)?;
         let contract_addr = Self::env().account_id();
         let caller = Self::env().caller();
         let (account_balance, account_borrow_balance, exchange_rate) =
@@ -978,6 +1010,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         borrower: AccountId,
         repay_amount: Balance,
     ) -> Result<Balance> {
+        self._accrue_reward(borrower)?;
+        self._accrue_reward(payer)?;
         let contract_addr = Self::env().account_id();
         let controller = self._controller();
         if controller.is_none() {
@@ -1030,6 +1064,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         repay_amount: Balance,
         collateral: AccountId,
     ) -> Result<()> {
+        self._accrue_reward(liquidator)?;
+        self._accrue_reward(borrower)?;
         let contract_addr = Self::env().account_id();
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(borrower);
@@ -1134,6 +1170,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         borrower: AccountId,
         seize_tokens: Balance,
     ) -> Result<()> {
+        self._accrue_reward(borrower)?;
+        self._accrue_reward(liquidator)?;
         let contract_addr = Self::env().account_id();
         let controller = self._controller();
         if controller.is_none() {
@@ -1375,6 +1413,25 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
 
+    default fn _accrue_reward(&self, user: AccountId) -> Result<()> {
+        if let Some(incentives_controller) = self._incentives_controller() {
+            let handle_result = IncentivesControllerRef::handle_action(
+                &incentives_controller,
+                user,
+                self._principal_total_supply(),
+                self._total_borrows(),
+                self._principal_balance_of(&user),
+                self._borrow_balance_stored(user),
+            );
+
+            if handle_result.is_ok() {
+                return Ok(())
+            }
+            return Err(Error::AccrueRewardFailed)
+        }
+        Ok(())
+    }
+
     // utilities
     default fn _transfer_underlying_from(
         &self,
@@ -1416,6 +1473,14 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
 
+    default fn _set_incentives_controller(
+        &mut self,
+        incentives_controller: AccountId,
+    ) -> Result<()> {
+        self.data::<Data>().incentives_controller = Some(incentives_controller);
+        Ok(())
+    }
+
     // view functions
     default fn _underlying(&self) -> Option<AccountId> {
         self.data::<Data>().underlying
@@ -1427,6 +1492,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn _manager(&self) -> Option<AccountId> {
         self.data::<Data>().manager
+    }
+
+    default fn _incentives_controller(&self) -> Option<AccountId> {
+        self.data::<Data>().incentives_controller
     }
 
     default fn _get_cash_prior(&self) -> Balance {

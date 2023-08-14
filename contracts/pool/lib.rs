@@ -319,6 +319,7 @@ pub mod contract {
         /// Generate this contract
         #[ink(constructor)]
         pub fn new(
+            incentives_controller: AccountId,
             underlying: AccountId,
             controller: AccountId,
             rate_model: AccountId,
@@ -336,6 +337,7 @@ pub mod contract {
             }
             let mut instance = Self::default();
             instance._initialize(
+                incentives_controller,
                 underlying,
                 controller,
                 Self::env().caller(),
@@ -352,6 +354,7 @@ pub mod contract {
         /// Generate this contract
         #[ink(constructor)]
         pub fn new_from_asset(
+            incentives_controller: AccountId,
             underlying: AccountId,
             controller: AccountId,
             rate_model: AccountId,
@@ -373,6 +376,7 @@ pub mod contract {
 
             let mut instance = Self::default();
             instance._initialize(
+                incentives_controller,
                 underlying,
                 controller,
                 Self::env().caller(),
@@ -389,6 +393,7 @@ pub mod contract {
         #[allow(clippy::too_many_arguments)]
         fn _initialize(
             &mut self,
+            incentives_controller: AccountId,
             underlying: AccountId,
             controller: AccountId,
             manager: AccountId,
@@ -399,6 +404,7 @@ pub mod contract {
             symbol: String,
             decimals: u8,
         ) {
+            self.pool.incentives_controller = Some(incentives_controller);
             self.pool.underlying = Some(underlying);
             self.pool.controller = Some(controller);
             self.pool.manager = Some(manager);
@@ -454,9 +460,11 @@ pub mod contract {
             let underlying = AccountId::from([0x01; 32]);
             let controller = AccountId::from([0x02; 32]);
             let rate_model = AccountId::from([0x03; 32]);
+            let incentives_controller = AccountId::from([0x04; 32]);
             let initial_exchange_rate_mantissa = WrappedU256::from(exp_scale());
             let liquidation_threshold = 10000;
             let contract = PoolContract::new(
+                incentives_controller,
                 underlying,
                 controller,
                 rate_model,
@@ -469,6 +477,10 @@ pub mod contract {
             assert_eq!(contract.underlying(), Some(underlying));
             assert_eq!(contract.controller(), Some(controller));
             assert_eq!(contract.manager(), Some(accounts.bob));
+            assert_eq!(
+                contract.incentives_controller(),
+                Some(incentives_controller)
+            );
             assert_eq!(
                 contract.initial_exchange_rate_mantissa(),
                 initial_exchange_rate_mantissa
@@ -492,6 +504,7 @@ pub mod contract {
             let dummy_id = AccountId::from([0x01; 32]);
             let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
+                dummy_id,
                 dummy_id,
                 dummy_id,
                 dummy_id,
@@ -519,6 +532,7 @@ pub mod contract {
                 dummy_id,
                 dummy_id,
                 dummy_id,
+                dummy_id,
                 WrappedU256::from(U256::from(0)),
                 liquidation_threshold,
                 String::from("Token Name"),
@@ -539,6 +553,7 @@ pub mod contract {
             let dummy_id = AccountId::from([0x01; 32]);
             let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
+                dummy_id,
                 dummy_id,
                 dummy_id,
                 dummy_id,
@@ -566,6 +581,7 @@ pub mod contract {
                 dummy_id,
                 dummy_id,
                 dummy_id,
+                dummy_id,
                 WrappedU256::from(U256::from(0)),
                 liquidation_threshold,
                 String::from("Token Name"),
@@ -584,6 +600,7 @@ pub mod contract {
             let dummy_id = AccountId::from([0x01; 32]);
             let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
+                dummy_id,
                 dummy_id,
                 dummy_id,
                 dummy_id,
@@ -607,6 +624,7 @@ pub mod contract {
             let dummy_id = AccountId::from([0x01; 32]);
             let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
+                dummy_id,
                 dummy_id,
                 dummy_id,
                 dummy_id,
@@ -645,6 +663,7 @@ pub mod contract {
                 dummy_id,
                 dummy_id,
                 dummy_id,
+                dummy_id,
                 WrappedU256::from(U256::from(0)),
                 liquidation_threshold,
                 String::from("Token Name"),
@@ -671,6 +690,7 @@ pub mod contract {
             let dummy_id = AccountId::from([0x01; 32]);
             let mut liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
+                dummy_id,
                 dummy_id,
                 dummy_id,
                 dummy_id,

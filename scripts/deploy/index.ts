@@ -14,6 +14,8 @@ const main = async () => {
   const env = setEnv(process.argv[2])
   console.log(`Start deploying to: ${env}`)
 
+  const incentivesController = setEnv(process.argv[3])
+
   const { api, signer } = await providerAndSigner(env)
   const config = CONFIG
   const option = defaultOption(api)
@@ -24,6 +26,7 @@ const main = async () => {
     config,
     tokenConfigs: DUMMY_TOKENS,
     option,
+    incentivesController,
   })
 
   if (env === ENV.local) await mintNativeToken(api, signer, config)

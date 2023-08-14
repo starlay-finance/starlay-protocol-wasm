@@ -8,6 +8,7 @@ import DefaultInterestRateModel_factory from '../../types/constructors/default_i
 import Faucet_factory from '../../types/constructors/faucet'
 import FlashloanGateway_factory from '../../types/constructors/flashloan_gateway'
 import FlashloanReceiver_factory from '../../types/constructors/flashloan_receiver'
+import IncentivesController_factory from '../../types/constructors/incentives_controller'
 import Lens_factory from '../../types/constructors/lens'
 import Manager_factory from '../../types/constructors/manager'
 import Pool_factory from '../../types/constructors/pool'
@@ -21,6 +22,7 @@ import DefaultInterestRateModel from '../../types/contracts/default_interest_rat
 import Faucet from '../../types/contracts/faucet'
 import FlashloanGateway from '../../types/contracts/flashloan_gateway'
 import FlashloanReceiver from '../../types/contracts/flashloan_receiver'
+import IncentivesController from '../../types/contracts/incentives_controller'
 import Lens from '../../types/contracts/lens'
 import Manager from '../../types/contracts/manager'
 import Pool from '../../types/contracts/pool'
@@ -245,7 +247,6 @@ export const deployFlashLoanGateway = async ({
   return result
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
 export const deployFlashLoanReceiver = async ({
   api,
   signer,
@@ -258,6 +259,22 @@ export const deployFlashLoanReceiver = async ({
   const contract = await factory.new(...args, option)
 
   const result = new FlashloanReceiver(contract.address, signer, api)
+  await afterDeployment(result.name, contract)
+  return result
+}
+
+export const deployIncentivesController = async ({
+  api,
+  signer,
+  args,
+  option = defaultOption(api),
+}: FactoryArgs<
+  IncentivesController_factory['new']
+>): Promise<IncentivesController> => {
+  const factory = new IncentivesController_factory(api, signer)
+  const contract = await factory.new(...args, option)
+
+  const result = new IncentivesController(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
 }
