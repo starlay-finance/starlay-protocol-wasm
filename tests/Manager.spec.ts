@@ -4,6 +4,7 @@ import { ONE_ETHER, ROLE, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
   deployDefaultInterestRateModel,
+  deployIncentivesController,
   deployManager,
   deployPriceOracle,
 } from '../scripts/helper/deploy_helper'
@@ -26,6 +27,12 @@ describe('Manager spec', () => {
       args: [manager.address],
     })
 
+    const incentivesController = await deployIncentivesController({
+      api,
+      signer: deployer,
+      args: [],
+    })
+
     // initialize
     await shouldNotRevert(manager, 'setController', [controller.address])
 
@@ -41,6 +48,7 @@ describe('Manager spec', () => {
       controller,
       rateModel,
       manager: deployer,
+      incentivesController,
     })
 
     const priceOracle = await deployPriceOracle({

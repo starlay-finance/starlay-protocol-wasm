@@ -7,6 +7,7 @@ import {
   deployController,
   deployDefaultInterestRateModel,
   deployFaucet,
+  deployIncentivesController,
   deployLens,
   deployPSP22Token,
   deployPoolFromAsset,
@@ -66,10 +67,17 @@ const setup = async (
     args: [[ONE_ETHER], [ONE_ETHER], [ONE_ETHER], [ONE_ETHER]],
   })
 
+  const incentivesController = await deployIncentivesController({
+    api,
+    signer: deployer,
+    args: [],
+  })
+
   const pool1 = await deployPoolFromAsset({
     api,
     signer: deployer,
     args: [
+      incentivesController.address,
       token1.address,
       controller.address,
       interestRateModel.address,
@@ -83,6 +91,7 @@ const setup = async (
     api,
     signer: deployer,
     args: [
+      incentivesController.address,
       token2.address,
       controller.address,
       interestRateModel.address,

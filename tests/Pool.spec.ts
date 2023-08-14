@@ -7,6 +7,7 @@ import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
   deployDefaultInterestRateModel,
+  deployIncentivesController,
   deployPSP22Token,
   deployPoolFromAsset,
   deployPriceOracle,
@@ -37,7 +38,7 @@ import {
   toDec6,
 } from './testHelpers'
 
-const MAX_CALL_WEIGHT = new BN(100_000_000_000).isub(BN_ONE).mul(BN_TEN)
+const MAX_CALL_WEIGHT = new BN(125_000_000_000).isub(BN_ONE).mul(BN_TEN)
 const PROOFSIZE = new BN(2_000_000)
 describe('Pool spec', () => {
   const setup = async (model?: Contract) => {
@@ -63,11 +64,18 @@ describe('Pool spec', () => {
           args: [[0], [0], [0], [0]],
         })
 
+    const incentivesController = await deployIncentivesController({
+      api,
+      signer: deployer,
+      args: [],
+    })
+
     const pools = await preparePoolsWithPreparedTokens({
       api,
       controller,
       rateModel,
       manager: deployer,
+      incentivesController,
     })
 
     const users = [bob, charlie, django]
@@ -93,6 +101,7 @@ describe('Pool spec', () => {
       controller,
       priceOracle,
       users,
+      incentivesController,
       gasLimit,
     }
   }
@@ -123,7 +132,15 @@ describe('Pool spec', () => {
       let rateModel
       let controller
       let priceOracle
-      ;({ api, deployer, rateModel, controller, priceOracle } = await setup())
+      let incentivesController
+      ;({
+        api,
+        deployer,
+        rateModel,
+        controller,
+        priceOracle,
+        incentivesController,
+      } = await setup())
 
       token = await deployPSP22Token({
         api,
@@ -135,6 +152,7 @@ describe('Pool spec', () => {
         api,
         signer: deployer,
         args: [
+          incentivesController.address,
           token.address,
           controller.address,
           rateModel.address,
@@ -883,13 +901,21 @@ describe('Pool spec', () => {
   })
 
   it('.seize (cannot call by users)', async () => {
-    const { api, deployer, controller, rateModel, priceOracle, users } =
-      await setup()
+    const {
+      api,
+      deployer,
+      controller,
+      rateModel,
+      priceOracle,
+      users,
+      incentivesController,
+    } = await setup()
     const { dai, usdc } = await preparePoolsWithPreparedTokens({
       api,
       controller,
       rateModel,
       manager: deployer,
+      incentivesController,
     })
     const toParam = (m: BN) => [m.toString()]
     for (const sym of [dai, usdc]) {
@@ -933,13 +959,22 @@ describe('Pool spec', () => {
     }
 
     it('success', async () => {
-      const { api, deployer, controller, rateModel, priceOracle, users } =
-        await setup()
+      const {
+        api,
+        deployer,
+        controller,
+        rateModel,
+        priceOracle,
+        users,
+        gasLimit,
+        incentivesController,
+      } = await setup()
       const { dai, usdc } = await preparePoolsWithPreparedTokens({
         api,
         controller,
         rateModel,
         manager: deployer,
+        incentivesController,
       })
       const [userA, userB] = users
 
@@ -983,7 +1018,7 @@ describe('Pool spec', () => {
         const { events } = await shouldNotRevert(
           dai.pool.withSigner(userA),
           'transfer',
-          [userB.address, toDec18(100_000), []],
+          [userB.address, toDec18(100_000), [], { gasLimit }],
         )
         // assertions
         expect(
@@ -1082,12 +1117,14 @@ describe('Pool spec', () => {
         priceOracle,
         users,
         gasLimit,
+        incentivesController,
       } = await setup()
       const { dai, usdc } = await preparePoolsWithPreparedTokens({
         api,
         controller,
         rateModel,
         manager: deployer,
+        incentivesController,
       })
       const [userA, userB] = users
 
@@ -1107,12 +1144,12 @@ describe('Pool spec', () => {
         {
           user: userA,
           sym: dai,
-          amount: toDec18(500_000),
+          amount: toDec18(0.05),
         },
         {
           user: userB,
           sym: usdc,
-          amount: toDec6(500_000),
+          amount: toDec6(0.05),
         },
       ]) {
         const { pool, token } = sym
@@ -1131,15 +1168,16 @@ describe('Pool spec', () => {
       // case: shortfall of account_liquidity
 
       {
-        await usdc.pool
-          .withSigner(userA)
-          .tx.borrow(toDec6(450_000), { gasLimit })
+        await shouldNotRevert(usdc.pool.withSigner(userA), 'borrow', [
+          toDec6(0.02),
+          { gasLimit },
+        ])
         const res = await dai.pool
           .withSigner(userA)
           .query.transfer(userB.address, new BN(2), []) // temp: truncated if less than 1 by collateral_factor?
         expect(res.value.ok.err.custom).toBe('InsufficientLiquidity')
       }
-      // case: paused
+      // // case: paused
       await controller.tx.setTransferGuardianPaused(true)
       {
         const res = await dai.pool
@@ -1152,13 +1190,21 @@ describe('Pool spec', () => {
 
   describe('.transfer_from', () => {
     it('success', async () => {
-      const { api, deployer, controller, rateModel, priceOracle, users } =
-        await setup()
+      const {
+        api,
+        deployer,
+        controller,
+        rateModel,
+        priceOracle,
+        users,
+        incentivesController,
+      } = await setup()
       const { dai, usdc } = await preparePoolsWithPreparedTokens({
         api,
         controller,
         rateModel,
         manager: deployer,
+        incentivesController,
       })
       const [userA, userB] = users
       const spender = deployer
@@ -1262,13 +1308,21 @@ describe('Pool spec', () => {
       }
     })
     it('failure', async () => {
-      const { api, deployer, controller, rateModel, priceOracle, users } =
-        await setup()
+      const {
+        api,
+        deployer,
+        controller,
+        rateModel,
+        priceOracle,
+        users,
+        incentivesController,
+      } = await setup()
       const { dai, usdc } = await preparePoolsWithPreparedTokens({
         api,
         controller,
         rateModel,
         manager: deployer,
+        incentivesController,
       })
       const [userA, userB] = users
       const spender = deployer
@@ -1358,7 +1412,8 @@ describe('Pool spec', () => {
   describe('.exchange_rate_stored', () => {
     describe('success', () => {
       it('return initial_exchange_rate_stored if no total_supply', async () => {
-        const { api, deployer, controller, rateModel } = await setup()
+        const { api, deployer, controller, rateModel, incentivesController } =
+          await setup()
 
         const newToken = await deployPSP22Token({
           api: api,
@@ -1370,6 +1425,7 @@ describe('Pool spec', () => {
           api: api,
           signer: deployer,
           args: [
+            incentivesController.address,
             newToken.address,
             controller.address,
             rateModel.address,
@@ -1398,8 +1454,16 @@ describe('Pool spec', () => {
 
   describe('.interest_rate_model', () => {
     const setupExtended = async () => {
-      const { api, deployer, controller, users, priceOracle, pools, gasLimit } =
-        await setup()
+      const {
+        api,
+        deployer,
+        controller,
+        users,
+        priceOracle,
+        pools,
+        gasLimit,
+        incentivesController,
+      } = await setup()
 
       const token = await deployPSP22Token({
         api: api,
@@ -1423,6 +1487,7 @@ describe('Pool spec', () => {
         api,
         signer: deployer,
         args: [
+          incentivesController.address,
           token.address,
           controller.address,
           rateModel.address,

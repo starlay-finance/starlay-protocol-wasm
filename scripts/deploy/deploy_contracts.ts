@@ -19,6 +19,7 @@ type DeployContractArgs = {
   config: Config
   tokenConfigs: DummyToken[]
   option: ReturnType<typeof defaultOption>
+  incentivesController: string
 }
 
 export const deployContracts = async ({
@@ -27,6 +28,7 @@ export const deployContracts = async ({
   config,
   tokenConfigs,
   option,
+  incentivesController,
 }: DeployContractArgs) => {
   const lens = await deployLens({ api, signer, args: [] })
   const faucet = await deployFaucet({ api, signer, args: [] })
@@ -48,6 +50,7 @@ export const deployContracts = async ({
     priceOracle,
     config,
     option,
+    incentivesController
   })
 
   const wethGateway = await deployWETHGateway({

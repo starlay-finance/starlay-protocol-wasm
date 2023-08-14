@@ -63,6 +63,7 @@ type SetupPoolArgs = {
   priceOracle: PriceOracle
   config: Config
   option: ReturnType<typeof defaultOption>
+  incentivesController: string
 }
 const deployAndSetupPool = async (
   api: ApiPromise,
@@ -73,6 +74,7 @@ const deployAndSetupPool = async (
     priceOracle,
     config: { collateralNamePrefix, collateralSymbolPrefix },
     option,
+    incentivesController
   }: SetupPoolArgs,
 ) => {
   console.log(
@@ -92,6 +94,7 @@ const deployAndSetupPool = async (
     api,
     signer,
     args: [
+      incentivesController,
       token.address,
       controller.address,
       interestRateModel.address,
