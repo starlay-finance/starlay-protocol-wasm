@@ -18,6 +18,7 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug, Default)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
+    /// For mock only: return if handle_action result is oks
     pub is_ok: bool,
 }
 

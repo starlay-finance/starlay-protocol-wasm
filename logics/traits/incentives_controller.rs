@@ -22,6 +22,7 @@ pub type IncentivesControllerRef = dyn IncentivesController;
 
 #[openbrush::trait_definition]
 pub trait IncentivesController {
+    /// Called by pools to accrue rewards.
     #[ink(message)]
     fn handle_action(
         &mut self,

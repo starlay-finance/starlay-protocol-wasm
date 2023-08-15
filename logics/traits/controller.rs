@@ -307,6 +307,7 @@ pub trait Controller {
         pool_attributes: PoolAttributesForWithdrawValidation,
     ) -> Result<AccountData>;
 
+    /// Check if withdraw is valid.
     #[ink(message)]
     fn balance_decrease_allowed(
         &self,

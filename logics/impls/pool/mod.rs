@@ -87,11 +87,15 @@ pub struct Data {
     pub incentives_controller: Option<AccountId>,
     /// AccountId of Rate Model
     pub rate_model: Option<AccountId>,
+    /// Total borrows
     pub borrows_scaled: Balance,
+    /// Total reserves
     pub reserves_scaled: Balance,
+    /// Borrow balance for accounts
     pub account_borrows: Mapping<AccountId, Balance>,
     /// Last block stamp of interest calculation process execution
     pub accrual_block_timestamp: Timestamp,
+    /// Borrow index for interests
     pub borrow_index: WrappedU256,
     /// Initial exchange_rate, Used if never called
     pub initial_exchange_rate_mantissa: WrappedU256,
