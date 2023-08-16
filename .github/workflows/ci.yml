@@ -155,8 +155,7 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: '16.x'
-      - uses: actions/checkout@v3
-      - name: Yarn install dependencies
+      - name: Install dependencies
         run: |
           yarn
           yarn add ts-node
