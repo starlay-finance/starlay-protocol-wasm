@@ -168,3 +168,36 @@ jobs:
           path: |
             **/target
           key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      - name: Restore cached Primes
+        id: cache-substrate-node-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            substrate-contracts-node
+          key: substrate-contracts-node-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            substrate-contracts-node-${{ runner.os }}-${{ runner.arch }}-
+      - name: Check if substrate node exists
+        id: check-substrate-node
+        continue-on-error: true
+        run: substrate-contracts-node/target/release/substrate-contracts-node --version
+      - name: Install protoc
+        uses: arduino/setup-protoc@v2
+      - name: Clone Substrate node
+        if: ${{ steps.check-substrate-node.outcome == 'failure' }}
+        uses: actions/checkout@v3
+        with:
+          repository: https://github.com/paritytech/substrate-contracts-node.git
+          ref: v0.26.0
+      - name: Compile Substrate node
+        if: ${{ steps.check-substrate-node.outcome == 'failure' }}
+        run: |
+          cd substrate-contracts-node
+          cargo build --release
+      - name: Save Substrate node
+        id: cache-substrate-node-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            substrate-contracts-node
+          key: substrate-contracts-node-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
