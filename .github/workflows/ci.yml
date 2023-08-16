@@ -153,7 +153,7 @@ jobs:
       - name: Install protoc
         uses: arduino/setup-protoc@v2
       - name: Install Substrate node
-        run: cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git
+        run: cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --tag v0.26.0
       - uses: actions/setup-node@v1
         with:
           node-version: '16.x'
