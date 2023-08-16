@@ -150,6 +150,12 @@ jobs:
         if: ${{ steps.check-cargo-contract.outcome == 'failure' }}
         run: |
           cargo install cargo-contract --version 3.0.1 --force
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 512
+          swap-size-mb: 1024
+          remove-dotnet: 'true'
       - name: Setup Node
         uses: actions/setup-node@v1
         with:
