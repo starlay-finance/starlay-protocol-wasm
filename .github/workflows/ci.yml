@@ -150,8 +150,10 @@ jobs:
         if: ${{ steps.check-cargo-contract.outcome == 'failure' }}
         run: |
           cargo install cargo-contract --version 3.0.1 --force
+      - name: Install protoc
+        run: apt install -y protobuf-compiler
       - name: Install Substrate node
-        run: apt install -y protobuf-compiler | cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git
+        run: cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git
       - uses: actions/setup-node@v1
         with:
           node-version: '16.x'
