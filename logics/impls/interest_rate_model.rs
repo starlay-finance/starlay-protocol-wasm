@@ -28,8 +28,11 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
+    /// The multiplier of utilization rate that gives the slope of the interest rate
     multiplier_per_milli_second_slope_1: WrappedU256,
+    /// The multiplier of utilization rate that gives the slope of the interest rate
     multiplier_per_milli_second_slope_2: WrappedU256,
+    /// Borrow interest per milli seconds
     base_rate_per_milli_second: WrappedU256,
     kink: WrappedU256,
 }

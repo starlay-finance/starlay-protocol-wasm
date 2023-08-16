@@ -162,48 +162,69 @@ pub trait Pool: PSP22 + PSP22Metadata {
     /// Set whether user's asset to use as collateral or not
     #[ink(message)]
     fn set_use_reserve_as_collateral(&mut self, use_as_collateral: bool) -> Result<()>;
+    /// Set incentives Controller AccountId for reward
     #[ink(message)]
     fn set_incentives_controller(&mut self, incentives_controller: AccountId) -> Result<()>;
 
     // view functions
+    /// AccountId of underlying token
     #[ink(message)]
     fn underlying(&self) -> Option<AccountId>;
+    /// Accountid of controller
     #[ink(message)]
     fn controller(&self) -> Option<AccountId>;
     #[ink(message)]
+    /// AccountId of manager
     fn manager(&self) -> Option<AccountId>;
     #[ink(message)]
+    /// AccountId of incentives controller
     fn incentives_controller(&self) -> Option<AccountId>;
+    /// Get Pool's underlying Balance
     #[ink(message)]
     fn get_cash_prior(&self) -> Balance;
+    /// Total borrows in pool
     #[ink(message)]
     fn total_borrows(&self) -> Balance;
+    /// Total reserves in pool
     #[ink(message)]
     fn total_reserves(&self) -> Balance;
+    /// Get collateral detail of an account
     #[ink(message)]
     fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256);
+    /// Get user's borrow without interest
     #[ink(message)]
     fn borrow_balance_stored(&self, account: AccountId) -> Balance;
+    /// Get user's borrow with interest
     #[ink(message)]
     fn borrow_balance_current(&mut self, account: AccountId) -> Result<Balance>;
+    /// Get last block stamp of interest calculation process execution
     #[ink(message)]
     fn get_accrual_block_timestamp(&self) -> Timestamp;
+    /// Calculates the current borrow interest rate per milliseconds
     #[ink(message)]
     fn borrow_rate_per_msec(&self) -> WrappedU256;
+    /// Calculates the current supply interest rate per milliseconds
     #[ink(message)]
     fn supply_rate_per_msec(&self) -> WrappedU256;
+    /// Return the saved exchange rate
     #[ink(message)]
     fn exchange_rate_stored(&self) -> WrappedU256;
+    /// Calculate the current exchange rate
     #[ink(message)]
     fn exchange_rate_current(&mut self) -> Result<WrappedU256>;
+    /// PSP22::balance_of
     #[ink(message)]
     fn principal_balance_of(&self, account: AccountId) -> Balance;
+    /// PSP22::total_supply
     #[ink(message)]
     fn principal_total_supply(&self) -> Balance;
+    /// Get Initial Exchange rate.
     #[ink(message)]
     fn initial_exchange_rate_mantissa(&self) -> WrappedU256;
+    /// Maximum fraction of interest that can be set aside for reserves
     #[ink(message)]
     fn reserve_factor_mantissa(&self) -> WrappedU256;
+    /// Get Liquidation Threshold for
     #[ink(message)]
     fn liquidation_threshold(&self) -> u128;
     /// Returns the delegation allowance of the user

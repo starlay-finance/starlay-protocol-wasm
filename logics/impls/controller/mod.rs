@@ -47,6 +47,7 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 pub struct Data {
     /// AccountId of managed Pools
     pub markets: Vec<AccountId>,
+    /// Pair of pool and underlying
     pub markets_pair: Mapping<AccountId, AccountId>,
     /// Mapping of Pool and Collateral Factors
     pub collateral_factor_mantissa: Mapping<AccountId, WrappedU256>,
