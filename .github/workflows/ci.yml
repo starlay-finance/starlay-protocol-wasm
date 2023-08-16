@@ -150,7 +150,8 @@ jobs:
         if: ${{ steps.check-cargo-contract.outcome == 'failure' }}
         run: |
           cargo install cargo-contract --version 3.0.1 --force
-      - uses: actions/setup-node@v1
+      - name: Setup Node
+        uses: actions/setup-node@v1
         with:
           node-version: '16.x'
       - name: Install dependencies
@@ -160,7 +161,11 @@ jobs:
       - name: Compile contracts
         uses: borales/actions-yarn@v4
         with:
-          cmd: compile
+          cmd: compile:nogenerate
+      - name: Generate typechains
+        uses: borales/actions-yarn@v4
+        with:
+          cmd: generate
       - name: Save Primes
         id: cache-primes-save
         uses: actions/cache/save@v3
@@ -168,7 +173,7 @@ jobs:
           path: |
             **/target
           key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
-      - name: Restore cached Primes
+      - name: Restore cached Substrate node
         id: cache-substrate-node-restore
         uses: actions/cache/restore@v3
         with:

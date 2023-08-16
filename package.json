@@ -21,6 +21,7 @@
     "ts-node": "^10.9.1"
   },
   "scripts": {
+    "compile:nogenerate": "typechain-compiler --toolchain nightly-2023-03-03 --nt",
     "compile": "typechain-compiler --toolchain nightly-2023-03-03 --nt && yarn generate",
     "compile:release": "typechain-compiler --release --toolchain nightly-2023-03-03 --nt && yarn generate",
     "test:typechain": "jest --testPathPattern \".spec.ts$\" --runInBand",
