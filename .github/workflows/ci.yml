@@ -150,15 +150,6 @@ jobs:
         if: ${{ steps.check-cargo-contract.outcome == 'failure' }}
         run: |
           cargo install cargo-contract --version 3.0.1 --force
-      - name: Install protoc
-        uses: arduino/setup-protoc@v2
-      - name: Check if substrate node exists
-        id: check-substrate-node
-        continue-on-error: true
-        run: contracts-node --version
-      - name: Install Substrate node
-        if: ${{ steps.check-substrate-node.outcome == 'failure' }}
-        run: cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --tag v0.26.0
       - uses: actions/setup-node@v1
         with:
           node-version: '16.x'
@@ -170,3 +161,10 @@ jobs:
         uses: borales/actions-yarn@v4
         with:
           cmd: compile
+      - name: Save Primes
+        id: cache-primes-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            **/target
+          key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
