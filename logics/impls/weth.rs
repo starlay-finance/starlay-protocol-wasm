@@ -23,10 +23,8 @@ where
     default fn deposit(&mut self) -> Result<(), PSP22Error> {
         let caller = Self::env().caller();
         let transferred_value = Self::env().transferred_value();
-        let mint_result = self._mint_to(caller, transferred_value);
-        if mint_result.is_err() {
-            return mint_result
-        }
+        self._mint_to(caller, transferred_value)?;
+
         self._emit_deposit_event(caller, transferred_value);
         Ok(())
     }
@@ -36,10 +34,7 @@ where
         if self.balance_of(caller) < value {
             return Err(PSP22Error::InsufficientBalance)
         }
-        let burn_result = self._burn_from(caller, value);
-        if burn_result.is_err() {
-            return burn_result
-        }
+        self._burn_from(caller, value)?;
         let transfer_result = Self::env().transfer(caller, value);
         if transfer_result.is_err() {
             return Err(PSP22Error::Custom("Cannot send ASTR.".into()))

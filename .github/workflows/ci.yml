@@ -177,15 +177,15 @@ jobs:
           path: |
             **/target
           key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
-      - name: Restore cached Substrate node
-        id: cache-substrate-node-restore
-        uses: actions/cache/restore@v3
-        with:
-          path: |
-            substrate-contracts-node
-          key: substrate-contracts-node-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
-          restore-keys: |
-            substrate-contracts-node-${{ runner.os }}-${{ runner.arch }}-
+      # - name: Restore cached Substrate node
+      #   id: cache-substrate-node-restore
+      #   uses: actions/cache/restore@v3
+      #   with:
+      #     path: |
+      #       /usr/local/bin/substrate-contracts-node
+      #     key: substrate-contracts-node-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      #     restore-keys: |
+      #       substrate-contracts-node-${{ runner.os }}-${{ runner.arch }}
       - name: Check if substrate node exists
         id: check-substrate-node
         continue-on-error: true
@@ -194,21 +194,13 @@ jobs:
         uses: arduino/setup-protoc@v2
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Clone Substrate node
+      - name: Install Substrate node
         if: ${{ steps.check-substrate-node.outcome == 'failure' }}
-        uses: actions/checkout@v3
-        with:
-          repository: paritytech/substrate-contracts-node
-          ref: v0.26.0
-      - name: Compile Substrate node
-        if: ${{ steps.check-substrate-node.outcome == 'failure' }}
-        run: |
-          cd substrate-contracts-node
-          cargo build --release
-      - name: Save Substrate node
-        id: cache-substrate-node-save
-        uses: actions/cache/save@v3
-        with:
-          path: |
-            substrate-contracts-node
-          key: substrate-contracts-node-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+        run: cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --tag v0.26.0
+      # - name: Save Substrate node
+      #   id: cache-substrate-node-save
+      #   uses: actions/cache/save@v3
+      #   with:
+      #     path: |
+      #       /usr/local/bin/substrate-contracts-node
+      #     key: substrate-contracts-node-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
