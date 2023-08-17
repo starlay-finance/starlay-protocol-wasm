@@ -209,6 +209,6 @@ jobs:
           for test in $(find tests -type f -regex ".*\.spec.ts"); do
             substrate-contracts-node --tmp --dev & P1=$!;
             set +e;
-            yarn test:mocha-single ./$test
+            yarn test:single ./$test
             kill $P1;
           done
