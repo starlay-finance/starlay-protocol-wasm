@@ -206,6 +206,9 @@ jobs:
         run: cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --tag v0.26.0
       - name: Run e2e tests
         run: | 
-          substrate-contracts-node --tmp --dev & P1=$!;
-          yarn test:typechain
-          kill $P1;
+          for test in $(find tests -type f -regex ".*\.spec.ts"); do
+            substrate-contracts-node --tmp --dev & P1=$!;
+            set +e;
+            yarn test:mocha-single ./$test
+            kill $P1;
+          done
