@@ -196,7 +196,7 @@ jobs:
       - name: Check if substrate node exists
         id: check-substrate-node
         continue-on-error: true
-        run: substrate-contracts-node/target/release/substrate-contracts-node --version
+        run: substrate-contracts-node --version
       - name: Install protoc
         uses: arduino/setup-protoc@v2
         with:
