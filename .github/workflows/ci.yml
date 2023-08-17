@@ -203,4 +203,4 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install Substrate node
         if: ${{ steps.check-substrate-node.outcome == 'failure' }}
-        run: cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --branch v0.26.0
+        run: cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --tag v0.26.0
