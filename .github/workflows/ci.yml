@@ -204,3 +204,8 @@ jobs:
       - name: Install Substrate node
         if: ${{ steps.check-substrate-node.outcome == 'failure' }}
         run: cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --tag v0.26.0
+      - name: Run e2e tests
+        run: | 
+          substrate-contracts-node --tmp --dev & P1=$!;
+          yarn test:typechain
+          kill $P1;
