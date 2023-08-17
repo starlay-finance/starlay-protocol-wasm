@@ -11,7 +11,7 @@ RUN rustup component add rustfmt
 RUN rustup component add rust-analysis
 RUN rustup component add rust-src
 RUN rustup component add rls
-RUN rustup install nightly-2023-03-03-x86_64-unknown-linux-gnu
+RUN rustup install nightly-2023-03-05-x86_64-unknown-linux-gnu
 RUN rustup target add wasm32-unknown-unknown
 
 # utility for Cargo.toml
