@@ -198,7 +198,7 @@ jobs:
         if: ${{ steps.check-substrate-node.outcome == 'failure' }}
         uses: actions/checkout@v3
         with:
-          repository: https://github.com/paritytech/substrate-contracts-node.git
+          repository: paritytech/substrate-contracts-node
           ref: v0.26.0
       - name: Compile Substrate node
         if: ${{ steps.check-substrate-node.outcome == 'failure' }}
