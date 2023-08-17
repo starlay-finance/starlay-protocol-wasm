@@ -143,6 +143,15 @@ jobs:
         with:
           path: |
             **/target
+          key: primes-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            primes-${{ runner.os }}-${{ runner.arch }}-
+      - name: Restore cached Artifacts
+        id: cache-artifacts-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            **/artifacts
           key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
           restore-keys: |
             artifacts-${{ runner.os }}-${{ runner.arch }}-
@@ -176,6 +185,13 @@ jobs:
         with:
           path: |
             **/target
+          key: primes-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      - name: Save Artifacts
+        id: cache-artifacts-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            **/artifacts
           key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
       - name: Restore cached Substrate node
         id: cache-substrate-node-restore
@@ -185,7 +201,7 @@ jobs:
             substrate-contracts-node
           key: substrate-contracts-node-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
           restore-keys: |
-            substrate-contracts-node-${{ runner.os }}-${{ runner.arch }}
+            substrate-contracts-node-${{ runner.os }}-${{ runner.arch }}-
       - name: Check if substrate node exists
         id: check-substrate-node
         continue-on-error: true
