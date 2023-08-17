@@ -192,6 +192,8 @@ jobs:
         run: substrate-contracts-node/target/release/substrate-contracts-node --version
       - name: Install protoc
         uses: arduino/setup-protoc@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Clone Substrate node
         if: ${{ steps.check-substrate-node.outcome == 'failure' }}
         uses: actions/checkout@v3
