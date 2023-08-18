@@ -3,7 +3,13 @@ import { ApiPromise, Keyring, WsProvider } from '@polkadot/api'
 const wsProvider = new WsProvider('ws://127.0.0.1:9944')
 // Create a keyring instance
 const keyring = new Keyring({ type: 'sr25519' })
+
+const delay = (time: number) => {
+  return new Promise((resolve) => setTimeout(resolve, time))
+}
+
 export default async function setupApi(): Promise<void> {
+  await delay(1000)
   const api = await ApiPromise.create({
     provider: wsProvider,
     throwOnConnect: true,

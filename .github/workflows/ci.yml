@@ -112,3 +112,102 @@ jobs:
           key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
       - name: test
         run: cargo test
+
+  e2e-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove unnecessary files
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+      - name: Checkout the source code
+        uses: actions/checkout@v3
+      - id: cache-rustup
+        name: Cache Save restore toolchain
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo
+            ~/.rustup
+          key: ${{ runner.os }}-rust-${{ hashFiles('rust-toolchain.toml') }}
+      - if: ${{ steps.cache-rustup.outputs.cache-hit != 'true' }}
+        name: Install & display rust toolchain
+        run: |
+          rustup show
+          rustup component add rust-src
+      - name: Check targets are installed correctly
+        run: rustup target list --installed
+      - name: Restore cached Primes
+        id: cache-primes-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            **/target
+          key: primes-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            primes-${{ runner.os }}-${{ runner.arch }}-
+      - name: Restore cached Artifacts
+        id: cache-artifacts-restore
+        uses: actions/cache/restore@v3
+        with:
+          path: |
+            **/artifacts
+          key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          restore-keys: |
+            artifacts-${{ runner.os }}-${{ runner.arch }}-
+      - name: Check if cargo-contract exists
+        id: check-cargo-contract
+        continue-on-error: true
+        run: cargo contract --version
+      - name: Install cargo contract
+        if: ${{ steps.check-cargo-contract.outcome == 'failure' }}
+        run: |
+          cargo install cargo-contract --version 3.0.1 --force
+      - name: Setup Node
+        uses: actions/setup-node@v1
+        with:
+          node-version: '16.x'
+      - name: Install dependencies
+        uses: borales/actions-yarn@v4
+        with:
+          cmd: install
+      - name: Compile contracts
+        uses: borales/actions-yarn@v4
+        with:
+          cmd: compile:nogenerate
+      - name: Generate typechains
+        uses: borales/actions-yarn@v4
+        with:
+          cmd: generate
+      - name: Save Primes
+        id: cache-primes-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            **/target
+          key: primes-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      - name: Save Artifacts
+        id: cache-artifacts-save
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            **/artifacts
+          key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      - name: Check if substrate node exists
+        id: check-substrate-node
+        continue-on-error: true
+        run: substrate-contracts-node --version
+      - name: Install protoc
+        uses: arduino/setup-protoc@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Substrate node
+        if: ${{ steps.check-substrate-node.outcome == 'failure' }}
+        run: cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --tag v0.26.0
+      - name: Run e2e tests
+        run: | 
+          for test in $(find tests -type f -regex ".*\.spec.ts"); do
+            substrate-contracts-node --tmp --dev & P1=$!;
+            yarn test:single ./$test
+            kill $P1;
+          done
