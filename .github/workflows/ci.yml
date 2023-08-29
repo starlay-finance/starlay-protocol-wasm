@@ -92,7 +92,7 @@ jobs:
       - name: Install cargo contract
         if: ${{ steps.check-cargo-contract.outcome == 'failure' }}
         run: |
-          cargo install cargo-contract --version 3.0.1 --force
+          cargo install cargo-contract --version 3.0.1 --locked --force
       - name: Compile checks
         env:
           CARGO_INCREMENTAL: 1
@@ -162,7 +162,7 @@ jobs:
       - name: Install cargo contract
         if: ${{ steps.check-cargo-contract.outcome == 'failure' }}
         run: |
-          cargo install cargo-contract --version 3.0.1 --force
+          cargo install cargo-contract --version 3.0.1 --locked --force
       - name: Setup Node
         uses: actions/setup-node@v1
         with:
@@ -203,7 +203,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install Substrate node
         if: ${{ steps.check-substrate-node.outcome == 'failure' }}
-        run: cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --tag v0.26.0
+        run: cargo install contracts-node --git https://github.com/paritytech/substrate-contracts-node.git --tag v0.26.0 --locked
       - name: Run e2e tests
         run: | 
           for test in $(find tests -type f -regex ".*\.spec.ts"); do

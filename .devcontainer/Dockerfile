@@ -18,7 +18,7 @@ RUN rustup target add wasm32-unknown-unknown
 RUN cargo install cargo-edit
 
 # for ink!
-RUN cargo install cargo-contract --version 3.0.1 --force
+RUN cargo install cargo-contract --version 3.0.1 --locked --force
 RUN rustc --version
 
 # nodejs
