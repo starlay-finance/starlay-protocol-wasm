@@ -319,7 +319,7 @@ pub mod contract {
         /// Generate this contract
         #[ink(constructor)]
         pub fn new(
-            incentives_controller: AccountId,
+            incentives_controller: Option<AccountId>,
             underlying: AccountId,
             controller: AccountId,
             rate_model: AccountId,
@@ -354,7 +354,7 @@ pub mod contract {
         /// Generate this contract
         #[ink(constructor)]
         pub fn new_from_asset(
-            incentives_controller: AccountId,
+            incentives_controller: Option<AccountId>,
             underlying: AccountId,
             controller: AccountId,
             rate_model: AccountId,
@@ -393,7 +393,7 @@ pub mod contract {
         #[allow(clippy::too_many_arguments)]
         fn _initialize(
             &mut self,
-            incentives_controller: AccountId,
+            incentives_controller: Option<AccountId>,
             underlying: AccountId,
             controller: AccountId,
             manager: AccountId,
@@ -404,7 +404,7 @@ pub mod contract {
             symbol: String,
             decimals: u8,
         ) {
-            self.pool.incentives_controller = Some(incentives_controller);
+            self.pool.incentives_controller = incentives_controller;
             self.pool.underlying = Some(underlying);
             self.pool.controller = Some(controller);
             self.pool.manager = Some(manager);
