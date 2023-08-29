@@ -92,7 +92,7 @@ jobs:
       - name: Install cargo contract
         if: ${{ steps.check-cargo-contract.outcome == 'failure' }}
         run: |
-          cargo install cargo-contract --version 3.0.1 --force
+          cargo install cargo-contract --version 3.0.1 --locked --force
       - name: Compile checks
         env:
           CARGO_INCREMENTAL: 1
@@ -162,7 +162,7 @@ jobs:
       - name: Install cargo contract
         if: ${{ steps.check-cargo-contract.outcome == 'failure' }}
         run: |
-          cargo install cargo-contract --version 3.0.1 --force
+          cargo install cargo-contract --version 3.0.1 --locked --force
       - name: Setup Node
         uses: actions/setup-node@v1
         with:
