@@ -464,7 +464,7 @@ pub mod contract {
             let initial_exchange_rate_mantissa = WrappedU256::from(exp_scale());
             let liquidation_threshold = 10000;
             let contract = PoolContract::new(
-                incentives_controller,
+                Some(incentives_controller),
                 underlying,
                 controller,
                 rate_model,
@@ -504,7 +504,7 @@ pub mod contract {
             let dummy_id = AccountId::from([0x01; 32]);
             let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
-                dummy_id,
+                Some(dummy_id),
                 dummy_id,
                 dummy_id,
                 dummy_id,
@@ -529,7 +529,7 @@ pub mod contract {
             let dummy_id = AccountId::from([0x01; 32]);
             let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
-                dummy_id,
+                Some(dummy_id),
                 dummy_id,
                 dummy_id,
                 dummy_id,
@@ -553,7 +553,7 @@ pub mod contract {
             let dummy_id = AccountId::from([0x01; 32]);
             let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
-                dummy_id,
+                Some(dummy_id),
                 dummy_id,
                 dummy_id,
                 dummy_id,
@@ -578,7 +578,7 @@ pub mod contract {
             let dummy_id = AccountId::from([0x01; 32]);
             let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
-                dummy_id,
+                Some(dummy_id),
                 dummy_id,
                 dummy_id,
                 dummy_id,
@@ -600,7 +600,7 @@ pub mod contract {
             let dummy_id = AccountId::from([0x01; 32]);
             let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
-                dummy_id,
+                Some(dummy_id),
                 dummy_id,
                 dummy_id,
                 dummy_id,
@@ -624,7 +624,7 @@ pub mod contract {
             let dummy_id = AccountId::from([0x01; 32]);
             let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
-                dummy_id,
+                Some(dummy_id),
                 dummy_id,
                 dummy_id,
                 dummy_id,
@@ -660,7 +660,7 @@ pub mod contract {
             let dummy_id = AccountId::from([0x01; 32]);
             let liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
-                dummy_id,
+                Some(dummy_id),
                 dummy_id,
                 dummy_id,
                 dummy_id,
@@ -690,7 +690,7 @@ pub mod contract {
             let dummy_id = AccountId::from([0x01; 32]);
             let mut liquidation_threshold = 10000;
             let mut contract = PoolContract::new(
-                dummy_id,
+                Some(dummy_id),
                 dummy_id,
                 dummy_id,
                 dummy_id,
