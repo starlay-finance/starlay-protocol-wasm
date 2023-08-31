@@ -14,7 +14,7 @@ const main = async () => {
   const env = setEnv(process.argv[2])
   console.log(`Start deploying to: ${env}`)
 
-  const incentivesController = setEnv(process.argv[3])
+  const incentivesController = null
 
   const { api, signer } = await providerAndSigner(env)
   const config = CONFIG

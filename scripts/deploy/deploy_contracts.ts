@@ -19,7 +19,7 @@ type DeployContractArgs = {
   config: Config
   tokenConfigs: DummyToken[]
   option: ReturnType<typeof defaultOption>
-  incentivesController: string
+  incentivesController: string | null
 }
 
 export const deployContracts = async ({
