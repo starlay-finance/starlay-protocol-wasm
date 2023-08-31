@@ -63,7 +63,7 @@ type SetupPoolArgs = {
   priceOracle: PriceOracle
   config: Config
   option: ReturnType<typeof defaultOption>
-  incentivesController: string
+  incentivesController: string | null
 }
 const deployAndSetupPool = async (
   api: ApiPromise,
