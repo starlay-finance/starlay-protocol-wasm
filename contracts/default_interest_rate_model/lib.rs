@@ -8,6 +8,9 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 #![feature(min_specialization)]
 
+#[cfg(test)]
+mod tests;
+
 /// Definition of Interest Rate Model Contract
 #[openbrush::contract]
 pub mod contract {
@@ -44,39 +47,6 @@ pub mod contract {
                     kink,
                 ),
             }
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-        use ink::env::{
-            test::{
-                self,
-                DefaultAccounts,
-            },
-            DefaultEnvironment,
-        };
-        use logics::traits::types::WrappedU256;
-
-        fn default_accounts() -> DefaultAccounts<DefaultEnvironment> {
-            test::default_accounts::<DefaultEnvironment>()
-        }
-        fn set_caller(id: AccountId) {
-            test::set_caller::<DefaultEnvironment>(id);
-        }
-
-        #[ink::test]
-        fn new_works() {
-            let accounts = default_accounts();
-            set_caller(accounts.bob);
-
-            let _contract = DefaultInterestRateModelContract::new(
-                WrappedU256::from(0),
-                WrappedU256::from(0),
-                WrappedU256::from(0),
-                WrappedU256::from(0),
-            );
         }
     }
 }

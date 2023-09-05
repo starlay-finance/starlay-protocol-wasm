@@ -8,6 +8,9 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 #![feature(min_specialization)]
 
+#[cfg(test)]
+mod tests;
+
 /// Definition of Lens Contract
 ///
 /// This is a contract to make it easier to get protocol status and data for the frontend
@@ -309,33 +312,6 @@ pub mod contract {
                 return PSP22Ref::balance_of(&_underlying, account)
             }
             0
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-        use ink::env::{
-            test::{
-                self,
-                DefaultAccounts,
-            },
-            DefaultEnvironment,
-        };
-
-        fn default_accounts() -> DefaultAccounts<DefaultEnvironment> {
-            test::default_accounts::<DefaultEnvironment>()
-        }
-        fn set_caller(id: AccountId) {
-            test::set_caller::<DefaultEnvironment>(id);
-        }
-
-        #[ink::test]
-        fn new_works() {
-            let accounts = default_accounts();
-            set_caller(accounts.bob);
-
-            let _contract = LensContract::new();
         }
     }
 }
