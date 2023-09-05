@@ -11,7 +11,12 @@ use core::ops::{
     Mul,
     Sub,
 };
-#[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
+use scale::{
+    Decode,
+    Encode,
+};
+
+#[derive(Debug, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {
     MathMultiplicationOverflow,

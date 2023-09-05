@@ -74,6 +74,7 @@ pub mod contract {
             traits::types::WrappedU256,
         };
         use primitive_types::U256;
+        use scale::Decode;
 
         type Event = <ControllerContract as ink::reflect::ContractEventBase>::Type;
 
@@ -87,9 +88,7 @@ pub mod contract {
             recorded_events().collect::<Vec<_>>()
         }
         fn decode_market_listed_event(event: EmittedEvent) -> MarketListed {
-            if let Ok(Event::MarketListed(x)) =
-                <Event as scale::Decode>::decode(&mut &event.data[..])
-            {
+            if let Ok(Event::MarketListed(x)) = <Event as Decode>::decode(&mut &event.data[..]) {
                 return x
             }
             panic!("unexpected event kind: expected MarketListed event")

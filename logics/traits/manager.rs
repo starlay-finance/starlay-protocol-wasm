@@ -16,6 +16,10 @@ use openbrush::{
         Balance,
     },
 };
+use scale::{
+    Decode,
+    Encode,
+};
 
 use super::types::WrappedU256;
 
@@ -103,7 +107,7 @@ pub trait Manager {
 }
 
 /// Custom error definitions for Manager
-#[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
+#[derive(Debug, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {
     AccessControl(AccessControlError),
