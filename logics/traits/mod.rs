@@ -10,6 +10,7 @@ pub mod flashloan_gateway;
 pub mod flashloan_receiver;
 pub mod incentives_controller;
 pub mod interest_rate_model;
+pub mod leverager;
 pub mod manager;
 pub mod pool;
 pub mod price_oracle;
