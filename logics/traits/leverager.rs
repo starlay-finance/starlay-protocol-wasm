@@ -95,10 +95,9 @@ pub trait Leverager {
 #[derive(Clone, Decode, Encode, Default)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct AvailableBorrows {
-    pub total_collateral: Balance,
-    pub available_borrows: Balance,
+    pub total_collateral_in_base_currency: U256,
+    pub available_borrow_in_base_currency: U256,
     pub price_eth: Balance,
-    pub available: Balance,
     pub health_factor: U256,
     pub ltv: U256,
 }

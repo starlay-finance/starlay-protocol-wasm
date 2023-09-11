@@ -14,11 +14,13 @@
 
 use super::{
     controller::{
+        calculate_available_borrow_in_base_currency,
         AccountData,
         ControllerRef,
         PoolAttributesForWithdrawValidation,
     },
     pool::PoolRef,
+    price_oracle::PriceOracleRef,
     weth::WETHRef,
 };
 pub use crate::traits::{
@@ -234,7 +236,41 @@ impl<T: Storage<Data>> Internal for T {
         self.data().manager
     }
 
-    default fn _get_available_borrows(&self, _account: AccountId) -> AvailableBorrows {
+    default fn _get_available_borrows(&self, account: AccountId) -> AvailableBorrows {
+        if let Some(controller) = self._controller() {
+            let account_data_result =
+                ControllerRef::calculate_user_account_data(&controller, account, None);
+
+            if account_data_result.is_err() {
+                return Default::default()
+            }
+
+            let account_data: AccountData = account_data_result.unwrap();
+            let available_borrow_in_base_currency = calculate_available_borrow_in_base_currency(
+                account_data.total_collateral_in_base_currency,
+                account_data.total_debt_in_base_currency,
+                account_data.avg_ltv,
+            );
+
+            let price_eth: u128 = if let Some(price_oracle) = self._price_oracle() {
+                if let Some(weth) = self._weth_address() {
+                    let price = PriceOracleRef::get_price(&price_oracle, weth);
+                    price.unwrap_or(0)
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+
+            return AvailableBorrows {
+                total_collateral_in_base_currency: account_data.total_collateral_in_base_currency,
+                available_borrow_in_base_currency,
+                health_factor: account_data.health_factor,
+                ltv: account_data.avg_ltv,
+                price_eth,
+            }
+        }
         Default::default()
     }
 
@@ -266,7 +302,7 @@ impl<T: Storage<Data>> Internal for T {
                 let account_data_result = ControllerRef::calculate_user_account_data(
                     &controller,
                     account,
-                    pool_attributes,
+                    Some(pool_attributes),
                 );
 
                 if account_data_result.is_err() {

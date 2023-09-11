@@ -304,7 +304,7 @@ pub trait Controller {
     fn calculate_user_account_data(
         &self,
         account: AccountId,
-        pool_attributes: PoolAttributesForWithdrawValidation,
+        pool_attributes: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<AccountData>;
 
     /// Check if withdraw is valid.
