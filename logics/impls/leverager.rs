@@ -5,22 +5,25 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-// use core::ops::{
-//     Add,
-//     Div,
-//     Mul,
-//     Sub,
-// };
+use core::ops::{
+    // Add,
+    Div,
+    Mul,
+    Sub,
+};
 
 use super::{
     controller::{
         calculate_available_borrow_in_base_currency,
+        calculate_health_factor_from_balances,
         AccountData,
         ControllerRef,
-        PoolAttributesForWithdrawValidation,
     },
     pool::PoolRef,
-    price_oracle::PriceOracleRef,
+    price_oracle::{
+        PriceOracleRef,
+        PRICE_PRECISION,
+    },
     weth::WETHRef,
 };
 pub use crate::traits::{
@@ -281,37 +284,55 @@ impl<T: Storage<Data>> Internal for T {
         withdraw_amount: Balance,
     ) -> U256 {
         if let Some(controller) = self._controller() {
-            if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
-                let liquidation_threshold = PoolRef::liquidation_threshold(&pool);
-                let (account_balance, account_borrow_balance, _) =
-                    PoolRef::get_account_snapshot(&pool, account);
+            let liquidation_threshold = self._liquidation_threshold(asset);
 
-                let account_balance_after = if account_balance > withdraw_amount {
-                    account_balance - withdraw_amount
-                } else {
-                    0
-                };
+            let account_data_result =
+                ControllerRef::calculate_user_account_data(&controller, account, None);
 
-                let pool_attributes = PoolAttributesForWithdrawValidation {
-                    pool: Some(pool),
-                    underlying: Some(asset),
-                    liquidation_threshold,
-                    account_balance: account_balance_after,
-                    account_borrow_balance,
-                };
-                let account_data_result = ControllerRef::calculate_user_account_data(
-                    &controller,
-                    account,
-                    Some(pool_attributes),
-                );
-
-                if account_data_result.is_err() {
-                    return U256::from(0)
-                }
-
-                let account_data: AccountData = account_data_result.unwrap();
-                return account_data.health_factor
+            if account_data_result.is_err() {
+                return U256::from(0)
             }
+
+            let account_data: AccountData = account_data_result.unwrap();
+
+            if let Some(price_oracle) = self._price_oracle() {
+                if let Some(price_asset) = PriceOracleRef::get_price(&price_oracle, asset) {
+                    let withdraw_amount_in_base_currency = U256::from(price_asset)
+                        .mul(U256::from(withdraw_amount))
+                        .div(U256::from(PRICE_PRECISION));
+
+                    let total_collateral_after = if account_data.total_collateral_in_base_currency
+                        > withdraw_amount_in_base_currency
+                    {
+                        account_data
+                            .total_collateral_in_base_currency
+                            .sub(withdraw_amount_in_base_currency)
+                    } else {
+                        U256::from(0)
+                    };
+
+                    let factor = account_data
+                        .avg_liquidation_threshold
+                        .mul(account_data.total_collateral_in_base_currency)
+                        .sub(
+                            U256::from(liquidation_threshold).mul(withdraw_amount_in_base_currency),
+                        );
+
+                    let liquidation_threshold_after =
+                        if !total_collateral_after.is_zero() || factor >= U256::from(0) {
+                            factor.div(total_collateral_after)
+                        } else {
+                            U256::from(0)
+                        };
+
+                    return calculate_health_factor_from_balances(
+                        total_collateral_after,
+                        account_data.total_debt_in_base_currency,
+                        liquidation_threshold_after,
+                    )
+                }
+            }
+
             return U256::from(0)
         }
         U256::from(0)
