@@ -13,7 +13,12 @@
 // };
 
 use super::{
-    controller::ControllerRef,
+    controller::{
+        AccountData,
+        ControllerRef,
+        PoolAttributesForWithdrawValidation,
+    },
+    pool::PoolRef,
     weth::WETHRef,
 };
 pub use crate::traits::{
@@ -235,10 +240,44 @@ impl<T: Storage<Data>> Internal for T {
 
     default fn _get_health_factor(
         &self,
-        _account: AccountId,
-        _asset: AccountId,
-        _withdraw_amount: Balance,
+        account: AccountId,
+        asset: AccountId,
+        withdraw_amount: Balance,
     ) -> U256 {
+        if let Some(controller) = self._controller() {
+            if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
+                let liquidation_threshold = PoolRef::liquidation_threshold(&pool);
+                let (account_balance, account_borrow_balance, _) =
+                    PoolRef::get_account_snapshot(&pool, account);
+
+                let account_balance_after = if account_balance > withdraw_amount {
+                    account_balance - withdraw_amount
+                } else {
+                    0
+                };
+
+                let pool_attributes = PoolAttributesForWithdrawValidation {
+                    pool: Some(pool),
+                    underlying: Some(asset),
+                    liquidation_threshold,
+                    account_balance: account_balance_after,
+                    account_borrow_balance,
+                };
+                let account_data_result = ControllerRef::calculate_user_account_data(
+                    &controller,
+                    account,
+                    pool_attributes,
+                );
+
+                if account_data_result.is_err() {
+                    return U256::from(0)
+                }
+
+                let account_data: AccountData = account_data_result.unwrap();
+                return account_data.health_factor
+            }
+            return U256::from(0)
+        }
         U256::from(0)
     }
 
