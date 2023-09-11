@@ -60,7 +60,7 @@ pub trait Leverager {
     fn loan_to_value(&self, asset: AccountId) -> U256;
 
     #[ink(message)]
-    fn liquidation_threshold(&self, asset: AccountId) -> U256;
+    fn liquidation_threshold(&self, asset: AccountId) -> u128;
 
     #[ink(message)]
     fn initialize(

@@ -62,7 +62,7 @@ pub trait Internal {
 
     fn _loan_to_value(&self, asset: AccountId) -> U256;
 
-    fn _liquidation_threshold(&self, asset: AccountId) -> U256;
+    fn _liquidation_threshold(&self, asset: AccountId) -> u128;
 
     fn _get_health_factor(
         &self,
@@ -146,7 +146,7 @@ impl<T: Storage<Data>> Leverager for T {
         self._loan_to_value(asset)
     }
 
-    default fn liquidation_threshold(&self, asset: AccountId) -> U256 {
+    default fn liquidation_threshold(&self, asset: AccountId) -> u128 {
         self._liquidation_threshold(asset)
     }
 
@@ -293,8 +293,15 @@ impl<T: Storage<Data>> Internal for T {
         U256::from(0)
     }
 
-    default fn _liquidation_threshold(&self, _asset: AccountId) -> U256 {
-        U256::from(0)
+    default fn _liquidation_threshold(&self, asset: AccountId) -> u128 {
+        if let Some(controller) = self._controller() {
+            if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
+                let liquidation_threshold = PoolRef::liquidation_threshold(&pool);
+                return liquidation_threshold
+            }
+            return 0
+        }
+        0
     }
 
     default fn _loop_asset(
