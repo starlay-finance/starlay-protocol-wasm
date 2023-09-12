@@ -105,12 +105,13 @@ pub struct AvailableBorrows {
 #[derive(Clone, Decode, Encode, Default)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct Withdrawable {
-    pub total_collateral: Balance,
-    pub total_debt: Balance,
-    pub current_liquidation_threshold: Balance,
-    pub afford: Balance,
-    pub withdrawable_collateral: Balance,
-    pub withdraw_amount: Balance,
+    pub total_collateral_in_base_currency: U256,
+    pub total_debt_in_base_currency: U256,
+    pub current_liquidation_threshold: U256,
+    pub afford_in_base_currency: U256,
+    pub withdrawable_collateral_in_base_currency: U256,
+    pub withdrawable_collateral: U256,
+    pub withdraw_amount: U256,
 }
 
 /// Custom error definitions for Controller

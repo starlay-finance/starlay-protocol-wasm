@@ -338,7 +338,63 @@ impl<T: Storage<Data>> Internal for T {
         U256::from(0)
     }
 
-    default fn _withdrawable(&self, _account: AccountId, _asset: AccountId) -> Withdrawable {
+    default fn _withdrawable(&self, account: AccountId, asset: AccountId) -> Withdrawable {
+        if let Some(controller) = self._controller() {
+            let liquidation_threshold = self._liquidation_threshold(asset);
+
+            let account_data_result =
+                ControllerRef::calculate_user_account_data(&controller, account, None);
+
+            if account_data_result.is_err() {
+                return Default::default()
+            }
+
+            let account_data: AccountData = account_data_result.unwrap();
+
+            let afford_in_base_currency = account_data
+                .total_collateral_in_base_currency
+                .mul(account_data.avg_liquidation_threshold)
+                .sub(
+                    account_data
+                        .total_debt_in_base_currency
+                        .mul(U256::from(10000)),
+                );
+
+            let withdrawable_collateral_in_base_currency =
+                afford_in_base_currency.div(U256::from(liquidation_threshold));
+
+            if let Some(price_oracle) = self._price_oracle() {
+                if let Some(price_asset) = PriceOracleRef::get_price(&price_oracle, asset) {
+                    let withdrawable_collateral = withdrawable_collateral_in_base_currency
+                        .mul(U256::from(PRICE_PRECISION))
+                        .div(U256::from(price_asset));
+                    let mut withdraw_amount = withdrawable_collateral;
+
+                    let mut health_factor =
+                        self._get_health_factor(account, asset, withdraw_amount.as_u128());
+
+                    // 1.01
+                    let health_factor_limit = U256::from(101 * (10_u128.pow(18)) / 100);
+                    while health_factor <= health_factor_limit {
+                        // Decrease withdraw amount
+                        withdraw_amount = withdraw_amount.mul(U256::from(95)).div(U256::from(100));
+                        health_factor =
+                            self._get_health_factor(account, asset, withdraw_amount.as_u128());
+                    }
+
+                    return Withdrawable {
+                        total_collateral_in_base_currency: account_data
+                            .total_collateral_in_base_currency,
+                        total_debt_in_base_currency: account_data.total_debt_in_base_currency,
+                        current_liquidation_threshold: account_data.avg_liquidation_threshold,
+                        afford_in_base_currency,
+                        withdrawable_collateral_in_base_currency,
+                        withdrawable_collateral,
+                        withdraw_amount,
+                    }
+                }
+            }
+        }
         Default::default()
     }
 
