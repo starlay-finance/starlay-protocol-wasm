@@ -78,7 +78,7 @@ pub trait Internal {
 
     fn _withdrawable(&self, account: AccountId, asset: AccountId) -> Withdrawable;
 
-    fn _withdrawable_amount(&self, account: AccountId, asset: AccountId) -> Balance;
+    fn _withdrawable_amount(&self, account: AccountId, asset: AccountId) -> U256;
 
     fn _assert_manager(&mut self) -> Result<()>;
 
@@ -159,7 +159,7 @@ impl<T: Storage<Data>> Leverager for T {
         self._withdrawable(account, asset)
     }
 
-    default fn withdrawable_amount(&self, account: AccountId, asset: AccountId) -> Balance {
+    default fn withdrawable_amount(&self, account: AccountId, asset: AccountId) -> U256 {
         self.withdrawable_amount(account, asset)
     }
 
@@ -398,8 +398,9 @@ impl<T: Storage<Data>> Internal for T {
         Default::default()
     }
 
-    default fn _withdrawable_amount(&self, _account: AccountId, _asset: AccountId) -> Balance {
-        0
+    default fn _withdrawable_amount(&self, account: AccountId, asset: AccountId) -> U256 {
+        let withdrwable = self._withdrawable(account, asset);
+        withdrwable.withdraw_amount
     }
 
     default fn _loan_to_value(&self, _asset: AccountId) -> U256 {

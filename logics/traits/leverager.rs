@@ -54,7 +54,7 @@ pub trait Leverager {
     fn withdrawable(&self, account: AccountId, asset: AccountId) -> Withdrawable;
 
     #[ink(message)]
-    fn withdrawable_amount(&self, account: AccountId, asset: AccountId) -> Balance;
+    fn withdrawable_amount(&self, account: AccountId, asset: AccountId) -> U256;
 
     #[ink(message)]
     fn loan_to_value(&self, asset: AccountId) -> U256;
