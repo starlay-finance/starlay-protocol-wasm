@@ -65,7 +65,7 @@ pub trait Internal {
 
     fn _get_available_borrows(&self, account: AccountId) -> AvailableBorrows;
 
-    fn _loan_to_value(&self, asset: AccountId) -> U256;
+    fn _loan_to_value(&self, asset: AccountId) -> u128;
 
     fn _liquidation_threshold(&self, asset: AccountId) -> u128;
 
@@ -93,24 +93,17 @@ pub trait Internal {
         &mut self,
         asset: AccountId,
         amount: Balance,
-        interest_rate_mode: U256,
-        borrow_ratio: U256,
+        borrow_ratio: u128,
         loop_count: u128,
     ) -> Result<()>;
 
-    fn _loop_eth(
-        &mut self,
-        interest_rate_mode: U256,
-        borrow_ratio: U256,
-        loop_count: u128,
-    ) -> Result<()>;
+    fn _loop_eth(&mut self, borrow_ratio: u128, loop_count: u128) -> Result<()>;
 
     fn _loop(
         &mut self,
         asset: AccountId,
         amount: Balance,
-        interest_rate_mode: U256,
-        borrow_ratio: U256,
+        borrow_ratio: u128,
         loop_count: u128,
     ) -> Result<()>;
 
@@ -147,7 +140,7 @@ impl<T: Storage<Data>> Leverager for T {
         self._get_health_factor(account, asset, withdraw_amount)
     }
 
-    default fn loan_to_value(&self, asset: AccountId) -> U256 {
+    default fn loan_to_value(&self, asset: AccountId) -> u128 {
         self._loan_to_value(asset)
     }
 
@@ -181,20 +174,14 @@ impl<T: Storage<Data>> Leverager for T {
         &mut self,
         asset: AccountId,
         amount: Balance,
-        interest_rate_mode: U256,
-        borrow_ratio: U256,
+        borrow_ratio: u128,
         loop_count: u128,
     ) -> Result<()> {
-        self._loop_asset(asset, amount, interest_rate_mode, borrow_ratio, loop_count)
+        self._loop_asset(asset, amount, borrow_ratio, loop_count)
     }
 
-    default fn loop_eth(
-        &mut self,
-        interest_rate_mode: U256,
-        borrow_ratio: U256,
-        loop_count: u128,
-    ) -> Result<()> {
-        self._loop_eth(interest_rate_mode, borrow_ratio, loop_count)
+    default fn loop_eth(&mut self, borrow_ratio: u128, loop_count: u128) -> Result<()> {
+        self._loop_eth(borrow_ratio, loop_count)
     }
 }
 
@@ -403,8 +390,8 @@ impl<T: Storage<Data>> Internal for T {
         withdrwable.withdraw_amount
     }
 
-    default fn _loan_to_value(&self, _asset: AccountId) -> U256 {
-        U256::from(0)
+    default fn _loan_to_value(&self, _asset: AccountId) -> u128 {
+        0
     }
 
     default fn _liquidation_threshold(&self, asset: AccountId) -> u128 {
@@ -422,12 +409,11 @@ impl<T: Storage<Data>> Internal for T {
         &mut self,
         asset: AccountId,
         amount: Balance,
-        interest_rate_mode: U256,
-        borrow_ratio: U256,
+        borrow_ratio: u128,
         loop_count: u128,
     ) -> Result<()> {
         let _ltv = self._loan_to_value(asset);
-        if borrow_ratio <= U256::from(0) || borrow_ratio > _ltv {
+        if borrow_ratio <= 0 || borrow_ratio > _ltv {
             return Err(Error::InappropriateBorrowRate)
         }
         if loop_count < 2 || loop_count > 40 {
@@ -441,23 +427,18 @@ impl<T: Storage<Data>> Internal for T {
         if let Some(controller) = self._controller() {
             if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
                 PSP22Ref::approve(&asset, pool, u128::MAX)?;
-                return self._loop(asset, amount, interest_rate_mode, borrow_ratio, loop_count)
+                return self._loop(asset, amount, borrow_ratio, loop_count)
             }
             return Err(Error::MarketNotListed)
         }
         return Err(Error::ControllerIsNotSet)
     }
 
-    default fn _loop_eth(
-        &mut self,
-        interest_rate_mode: U256,
-        borrow_ratio: U256,
-        loop_count: u128,
-    ) -> Result<()> {
+    default fn _loop_eth(&mut self, borrow_ratio: u128, loop_count: u128) -> Result<()> {
         if let Some(weth) = self._weth_address() {
             let _ltv = self._loan_to_value(weth);
 
-            if borrow_ratio <= U256::from(0) || borrow_ratio > _ltv {
+            if borrow_ratio <= 0 || borrow_ratio > _ltv {
                 return Err(Error::InappropriateBorrowRate)
             }
             if loop_count < 2 || loop_count > 40 {
@@ -468,17 +449,11 @@ impl<T: Storage<Data>> Internal for T {
 
             if let Some(controller) = self._controller() {
                 if let Some(pool) = ControllerRef::market_of_underlying(&controller, weth) {
-                    WETHRef::approve(&weth, pool, u128::MAX)?;
                     WETHRef::deposit_builder(&weth)
                         .transferred_value(deposit_value)
                         .invoke()?;
-                    return self._loop(
-                        weth,
-                        deposit_value,
-                        interest_rate_mode,
-                        borrow_ratio,
-                        loop_count,
-                    )
+                    WETHRef::approve(&weth, pool, u128::MAX)?;
+                    return self._loop(weth, deposit_value, borrow_ratio, loop_count)
                 }
                 return Err(Error::MarketNotListed)
             }
@@ -488,13 +463,36 @@ impl<T: Storage<Data>> Internal for T {
 
     default fn _loop(
         &mut self,
-        _asset: AccountId,
-        _amount: Balance,
-        _interest_rate_mode: U256,
-        _borrow_ratio: U256,
-        _loop_count: u128,
+        asset: AccountId,
+        amount: Balance,
+        borrow_ratio: u128,
+        loop_count: u128,
     ) -> Result<()> {
-        Ok(())
+        let caller = Self::env().caller();
+        if let Some(controller) = self._controller() {
+            if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
+                let mut next_deposit_amount = amount;
+                for _i in 0..loop_count - 1 {
+                    PoolRef::mint_to(&pool, caller, next_deposit_amount)?;
+
+                    next_deposit_amount = (next_deposit_amount * borrow_ratio) / 10000;
+
+                    if next_deposit_amount == 0 {
+                        break
+                    }
+
+                    PoolRef::borrow_for(&pool, caller, next_deposit_amount)?;
+                }
+
+                if next_deposit_amount != 0 {
+                    PoolRef::mint_to(&pool, caller, next_deposit_amount)?;
+                }
+                return Ok(())
+            }
+            return Err(Error::MarketNotListed)
+        }
+
+        Err(Error::ControllerIsNotSet)
     }
 
     default fn _close(&mut self, _asset: AccountId) -> Result<()> {

@@ -19,7 +19,10 @@ use scale::{
     Encode,
 };
 
-use super::controller::Error as ControllerError;
+use super::{
+    controller::Error as ControllerError,
+    pool::Error as PoolError,
+};
 
 #[openbrush::wrapper]
 pub type LeveragerRef = dyn Leverager;
@@ -57,7 +60,7 @@ pub trait Leverager {
     fn withdrawable_amount(&self, account: AccountId, asset: AccountId) -> U256;
 
     #[ink(message)]
-    fn loan_to_value(&self, asset: AccountId) -> U256;
+    fn loan_to_value(&self, asset: AccountId) -> u128;
 
     #[ink(message)]
     fn liquidation_threshold(&self, asset: AccountId) -> u128;
@@ -75,18 +78,12 @@ pub trait Leverager {
         &mut self,
         asset: AccountId,
         amount: Balance,
-        interest_rate_mode: U256,
-        borrow_ratio: U256,
+        borrow_ratio: u128,
         loop_count: u128,
     ) -> Result<()>;
 
     #[ink(message, payable)]
-    fn loop_eth(
-        &mut self,
-        interest_rate_mode: U256,
-        borrow_ratio: U256,
-        loop_count: u128,
-    ) -> Result<()>;
+    fn loop_eth(&mut self, borrow_ratio: u128, loop_count: u128) -> Result<()>;
 
     #[ink(message)]
     fn close(&mut self, asset: AccountId) -> Result<()>;
@@ -126,6 +123,7 @@ pub enum Error {
     MarketNotListed,
     WETHIsNotSet,
     Controller(ControllerError),
+    Pool(PoolError),
     PSP22(PSP22Error),
 }
 
@@ -134,6 +132,13 @@ impl From<ControllerError> for Error {
         Error::Controller(error)
     }
 }
+
+impl From<PoolError> for Error {
+    fn from(error: PoolError) -> Self {
+        Error::Pool(error)
+    }
+}
+
 impl From<PSP22Error> for Error {
     fn from(error: PSP22Error) -> Self {
         Error::PSP22(error)
