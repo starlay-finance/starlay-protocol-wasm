@@ -40,7 +40,6 @@ use openbrush::{
 };
 use primitive_types::U256;
 
-pub const LEVERAGE_CODE: u128 = 10;
 pub const CLOSE_MAX_LOOPS: u128 = 40;
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
@@ -48,9 +47,13 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug, Default)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
+    /// AccountId of Controller
     pub controller: Option<AccountId>,
+    /// AccountId of Weth
     pub weth: Option<AccountId>,
+    /// AccountId of Price Oracle
     pub price_oracle: Option<AccountId>,
+    /// AccountId of Manager
     pub manager: Option<AccountId>,
 }
 
@@ -496,6 +499,47 @@ impl<T: Storage<Data>> Internal for T {
     }
 
     default fn _close(&mut self, _asset: AccountId) -> Result<()> {
-        Ok(())
+        let caller = Self::env().caller();
+        let contract_addr = Self::env().account_id();
+        if let Some(controller) = self._controller() {
+            if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
+                PSP22Ref::approve(&asset, pool, u128::MAX)?;
+
+                let mut withdraw_amount = self.withdrawable_amount(caller, asset);
+                let mut repay_amount = PoolRef::borrow_balance_current(&pool, caller);
+                let mut loop_remains = CLOSE_MAX_LOOPS;
+
+                while loop_remains > 0 || withdraw_amount > 0 {
+                    if withdraw_amount > repay_amount {
+                        withdraw_amount = repay_amount;
+
+                        PoolRef::transfer_from(&pool, caller, contract_addr, withdraw_amount);
+                        Pool
+                    Ref::withdraw(
+                            &pool, 
+                            withdraw_amount,
+                        );
+                        PoolRef::repay_borrow_behalf(&pool, caller,withdraw_amount);
+                        break;
+                    } else {
+                        PoolRef::transfer_from(caller, contract_addr, withdraw_amount);
+                        PoolRef::withdraw(
+                            &pool, 
+                            withdraw_amount,
+                        );
+                        PoolRef::repay_borrow_behalf(&pool, caller,withdraw_amount);
+
+                        withdraw_amount = self.withdrawable_amount(caller, asset);
+                        repay_amount = PoolRef::borrow_balance_current(&pool,caller);
+				loop_remains--;
+                    }
+                }
+
+                return Ok(())
+            }
+            return Err(Error::MarketNotListed)
+        }
+
+        Err(Error::ControllerIsNotSet)
     }
 }

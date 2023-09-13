@@ -5,7 +5,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-// use ink::prelude::vec::Vec;
 use openbrush::{
     contracts::psp22::PSP22Error,
     traits::{
@@ -30,21 +29,27 @@ pub type LeveragerRef = dyn Leverager;
 /// Trait defines the interface for the Leverager
 #[openbrush::trait_definition]
 pub trait Leverager {
+    /// Get Controller AccountId
     #[ink(message)]
     fn controller(&self) -> Option<AccountId>;
 
+    /// Get Price Oracle AccountId
     #[ink(message)]
     fn price_oracle(&self) -> Option<AccountId>;
 
+    /// Get Weth AccountId
     #[ink(message)]
     fn weth_address(&self) -> Option<AccountId>;
 
+    /// Get Manager AccountId
     #[ink(message)]
     fn manager(&self) -> Option<AccountId>;
 
+    /// Get Borrowable information of an account
     #[ink(message)]
     fn get_available_borrows(&self, account: AccountId) -> AvailableBorrows;
 
+    /// Get account health factor after withdraw
     #[ink(message)]
     fn get_health_factor(
         &self,
@@ -53,15 +58,19 @@ pub trait Leverager {
         withdraw_amount: Balance,
     ) -> U256;
 
+    /// Get withdrawable information for an account
     #[ink(message)]
     fn withdrawable(&self, account: AccountId, asset: AccountId) -> Withdrawable;
 
+    /// Get withdrawable amount for an account asset
     #[ink(message)]
     fn withdrawable_amount(&self, account: AccountId, asset: AccountId) -> U256;
 
+    /// Get Loan to value of the asset.
     #[ink(message)]
     fn loan_to_value(&self, asset: AccountId) -> u128;
 
+    /// Get Liquidation threshold of the asset.
     #[ink(message)]
     fn liquidation_threshold(&self, asset: AccountId) -> u128;
 
@@ -73,6 +82,7 @@ pub trait Leverager {
         weth: Option<AccountId>,
     ) -> Result<()>;
 
+    /// Loop the depositing and borrowing assets
     #[ink(message)]
     fn loop_asset(
         &mut self,
@@ -82,9 +92,11 @@ pub trait Leverager {
         loop_count: u128,
     ) -> Result<()>;
 
+    /// Loop the depositing and borrowing eth
     #[ink(message, payable)]
     fn loop_eth(&mut self, borrow_ratio: u128, loop_count: u128) -> Result<()>;
 
+    /// Loop the withdrawing and repaying asset
     #[ink(message)]
     fn close(&mut self, asset: AccountId) -> Result<()>;
 }
