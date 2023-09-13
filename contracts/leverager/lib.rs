@@ -14,10 +14,7 @@ mod tests;
 /// Definition of Leverager Contract
 #[openbrush::contract]
 pub mod contract {
-    use logics::{
-        impls::leverager::*,
-        traits::leverager::Result,
-    };
+    use logics::impls::leverager::*;
     use openbrush::traits::Storage;
 
     /// Contract's Storage

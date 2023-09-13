@@ -498,40 +498,45 @@ impl<T: Storage<Data>> Internal for T {
         Err(Error::ControllerIsNotSet)
     }
 
-    default fn _close(&mut self, _asset: AccountId) -> Result<()> {
+    default fn _close(&mut self, asset: AccountId) -> Result<()> {
         let caller = Self::env().caller();
         let contract_addr = Self::env().account_id();
         if let Some(controller) = self._controller() {
             if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
                 PSP22Ref::approve(&asset, pool, u128::MAX)?;
 
-                let mut withdraw_amount = self.withdrawable_amount(caller, asset);
-                let mut repay_amount = PoolRef::borrow_balance_current(&pool, caller);
+                let mut withdraw_amount = self.withdrawable_amount(caller, asset).as_u128();
+                let mut repay_amount = PoolRef::borrow_balance_current(&pool, caller)?;
                 let mut loop_remains = CLOSE_MAX_LOOPS;
 
                 while loop_remains > 0 || withdraw_amount > 0 {
                     if withdraw_amount > repay_amount {
                         withdraw_amount = repay_amount;
 
-                        PoolRef::transfer_from(&pool, caller, contract_addr, withdraw_amount);
-                        Pool
-                    Ref::withdraw(
-                            &pool, 
+                        PoolRef::transfer_from(
+                            &pool,
+                            caller,
+                            contract_addr,
                             withdraw_amount,
-                        );
-                        PoolRef::repay_borrow_behalf(&pool, caller,withdraw_amount);
-                        break;
+                            Default::default(),
+                        )?;
+                        PoolRef::redeem(&pool, withdraw_amount)?;
+                        PoolRef::repay_borrow_behalf(&pool, caller, withdraw_amount)?;
+                        break
                     } else {
-                        PoolRef::transfer_from(caller, contract_addr, withdraw_amount);
-                        PoolRef::withdraw(
-                            &pool, 
+                        PoolRef::transfer_from(
+                            &pool,
+                            caller,
+                            contract_addr,
                             withdraw_amount,
-                        );
-                        PoolRef::repay_borrow_behalf(&pool, caller,withdraw_amount);
+                            Default::default(),
+                        )?;
+                        PoolRef::redeem(&pool, withdraw_amount)?;
+                        PoolRef::repay_borrow_behalf(&pool, caller, withdraw_amount)?;
 
-                        withdraw_amount = self.withdrawable_amount(caller, asset);
-                        repay_amount = PoolRef::borrow_balance_current(&pool,caller);
-				loop_remains--;
+                        withdraw_amount = self.withdrawable_amount(caller, asset).as_u128();
+                        repay_amount = PoolRef::borrow_balance_current(&pool, caller)?;
+                        loop_remains = loop_remains - 1;
                     }
                 }
 
