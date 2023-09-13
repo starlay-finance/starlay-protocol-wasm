@@ -6,10 +6,7 @@ use ink::env::{
     },
     DefaultEnvironment,
 };
-use logics::{
-    impls::leverager::Leverager,
-    traits::leverager::Error,
-};
+use logics::impls::leverager::*;
 use openbrush::traits::AccountId;
 
 fn default_accounts() -> DefaultAccounts<DefaultEnvironment> {
