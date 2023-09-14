@@ -47,7 +47,7 @@ pub trait Leverager {
 
     /// Get Borrowable information of an account
     #[ink(message)]
-    fn get_available_borrows(&self, account: AccountId) -> AvailableBorrows;
+    fn get_available_borrows(&self, account: AccountId) -> Option<AvailableBorrows>;
 
     /// Get account health factor after withdraw
     #[ink(message)]
@@ -60,7 +60,7 @@ pub trait Leverager {
 
     /// Get withdrawable information for an account
     #[ink(message)]
-    fn withdrawable(&self, account: AccountId, asset: AccountId) -> Withdrawable;
+    fn withdrawable(&self, account: AccountId, asset: AccountId) -> Option<Withdrawable>;
 
     /// Get withdrawable amount for an account asset
     #[ink(message)]

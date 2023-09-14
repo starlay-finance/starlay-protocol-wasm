@@ -66,7 +66,7 @@ pub trait Internal {
 
     fn _manager(&self) -> Option<AccountId>;
 
-    fn _get_available_borrows(&self, account: AccountId) -> AvailableBorrows;
+    fn _get_available_borrows(&self, account: AccountId) -> Option<AvailableBorrows>;
 
     fn _loan_to_value(&self, asset: AccountId) -> u128;
 
@@ -79,7 +79,7 @@ pub trait Internal {
         withdraw_amount: Balance,
     ) -> U256;
 
-    fn _withdrawable(&self, account: AccountId, asset: AccountId) -> Withdrawable;
+    fn _withdrawable(&self, account: AccountId, asset: AccountId) -> Option<Withdrawable>;
 
     fn _withdrawable_amount(&self, account: AccountId, asset: AccountId) -> U256;
 
@@ -130,7 +130,7 @@ impl<T: Storage<Data>> Leverager for T {
         self._manager()
     }
 
-    default fn get_available_borrows(&self, account: AccountId) -> AvailableBorrows {
+    default fn get_available_borrows(&self, account: AccountId) -> Option<AvailableBorrows> {
         self._get_available_borrows(account)
     }
 
@@ -151,7 +151,7 @@ impl<T: Storage<Data>> Leverager for T {
         self._liquidation_threshold(asset)
     }
 
-    default fn withdrawable(&self, account: AccountId, asset: AccountId) -> Withdrawable {
+    default fn withdrawable(&self, account: AccountId, asset: AccountId) -> Option<Withdrawable> {
         self._withdrawable(account, asset)
     }
 
@@ -229,13 +229,13 @@ impl<T: Storage<Data>> Internal for T {
         self.data().manager
     }
 
-    default fn _get_available_borrows(&self, account: AccountId) -> AvailableBorrows {
+    default fn _get_available_borrows(&self, account: AccountId) -> Option<AvailableBorrows> {
         if let Some(controller) = self._controller() {
             let account_data_result =
                 ControllerRef::calculate_user_account_data(&controller, account, None);
 
             if account_data_result.is_err() {
-                return Default::default()
+                return None
             }
 
             let account_data: AccountData = account_data_result.unwrap();
@@ -256,15 +256,15 @@ impl<T: Storage<Data>> Internal for T {
                 0
             };
 
-            return AvailableBorrows {
+            return Some(AvailableBorrows {
                 total_collateral_in_base_currency: account_data.total_collateral_in_base_currency,
                 available_borrow_in_base_currency,
                 health_factor: account_data.health_factor,
                 ltv: account_data.avg_ltv,
                 price_eth,
-            }
+            })
         }
-        Default::default()
+        None
     }
 
     default fn _get_health_factor(
@@ -328,7 +328,7 @@ impl<T: Storage<Data>> Internal for T {
         U256::from(0)
     }
 
-    default fn _withdrawable(&self, account: AccountId, asset: AccountId) -> Withdrawable {
+    default fn _withdrawable(&self, account: AccountId, asset: AccountId) -> Option<Withdrawable> {
         if let Some(controller) = self._controller() {
             let liquidation_threshold = self._liquidation_threshold(asset);
 
@@ -336,7 +336,7 @@ impl<T: Storage<Data>> Internal for T {
                 ControllerRef::calculate_user_account_data(&controller, account, None);
 
             if account_data_result.is_err() {
-                return Default::default()
+                return None
             }
 
             let account_data: AccountData = account_data_result.unwrap();
@@ -372,7 +372,7 @@ impl<T: Storage<Data>> Internal for T {
                             self._get_health_factor(account, asset, withdraw_amount.as_u128());
                     }
 
-                    return Withdrawable {
+                    return Some(Withdrawable {
                         total_collateral_in_base_currency: account_data
                             .total_collateral_in_base_currency,
                         total_debt_in_base_currency: account_data.total_debt_in_base_currency,
@@ -381,16 +381,18 @@ impl<T: Storage<Data>> Internal for T {
                         withdrawable_collateral_in_base_currency,
                         withdrawable_collateral,
                         withdraw_amount,
-                    }
+                    })
                 }
             }
         }
-        Default::default()
+        None
     }
 
     default fn _withdrawable_amount(&self, account: AccountId, asset: AccountId) -> U256 {
-        let withdrwable = self._withdrawable(account, asset);
-        withdrwable.withdraw_amount
+        if let Some(withdrwable) = self._withdrawable(account, asset) {
+            return withdrwable.withdraw_amount
+        }
+        return U256::from(0)
     }
 
     default fn _loan_to_value(&self, asset: AccountId) -> u128 {
