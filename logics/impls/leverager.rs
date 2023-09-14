@@ -156,7 +156,7 @@ impl<T: Storage<Data>> Leverager for T {
     }
 
     default fn withdrawable_amount(&self, account: AccountId, asset: AccountId) -> U256 {
-        self.withdrawable_amount(account, asset)
+        self._withdrawable_amount(account, asset)
     }
 
     default fn close(&mut self, asset: AccountId) -> Result<()> {
@@ -392,7 +392,7 @@ impl<T: Storage<Data>> Internal for T {
         if let Some(withdrwable) = self._withdrawable(account, asset) {
             return withdrwable.withdraw_amount
         }
-        return U256::from(0)
+        U256::from(0)
     }
 
     default fn _loan_to_value(&self, asset: AccountId) -> u128 {
@@ -522,7 +522,7 @@ impl<T: Storage<Data>> Internal for T {
             if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
                 PSP22Ref::approve(&asset, pool, u128::MAX)?;
 
-                let mut withdraw_amount = self.withdrawable_amount(caller, asset).as_u128();
+                let mut withdraw_amount = self._withdrawable_amount(caller, asset).as_u128();
                 let mut repay_amount = PoolRef::borrow_balance_current(&pool, caller)?;
                 let mut loop_remains = CLOSE_MAX_LOOPS;
 
@@ -551,7 +551,7 @@ impl<T: Storage<Data>> Internal for T {
                         PoolRef::redeem(&pool, withdraw_amount)?;
                         PoolRef::repay_borrow_behalf(&pool, caller, withdraw_amount)?;
 
-                        withdraw_amount = self.withdrawable_amount(caller, asset).as_u128();
+                        withdraw_amount = self._withdrawable_amount(caller, asset).as_u128();
                         repay_amount = PoolRef::borrow_balance_current(&pool, caller)?;
                         loop_remains = loop_remains - 1;
                     }
