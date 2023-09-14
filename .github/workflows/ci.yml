@@ -114,6 +114,7 @@ jobs:
         run: cargo test
 
   e2e-test:
+    needs: unit-test
     runs-on: ubuntu-latest
     steps:
       - name: Remove unnecessary files

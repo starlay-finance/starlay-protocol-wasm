@@ -10,6 +10,7 @@ import FlashloanGateway_factory from '../../types/constructors/flashloan_gateway
 import FlashloanReceiver_factory from '../../types/constructors/flashloan_receiver'
 import IncentivesController_factory from '../../types/constructors/incentives_controller'
 import Lens_factory from '../../types/constructors/lens'
+import Leverager_factory from '../../types/constructors/leverager'
 import Manager_factory from '../../types/constructors/manager'
 import Pool_factory from '../../types/constructors/pool'
 import PriceOracle_factory from '../../types/constructors/price_oracle'
@@ -24,6 +25,7 @@ import FlashloanGateway from '../../types/contracts/flashloan_gateway'
 import FlashloanReceiver from '../../types/contracts/flashloan_receiver'
 import IncentivesController from '../../types/contracts/incentives_controller'
 import Lens from '../../types/contracts/lens'
+import Leverager from '../../types/contracts/leverager'
 import Manager from '../../types/contracts/manager'
 import Pool from '../../types/contracts/pool'
 import PriceOracle from '../../types/contracts/price_oracle'
@@ -232,7 +234,6 @@ export const deployWETHPool = async ({
   return result
 }
 
-// eslint-disable-next-line @typescript-eslint/naming-convention
 export const deployFlashLoanGateway = async ({
   api,
   signer,
@@ -275,6 +276,20 @@ export const deployIncentivesController = async ({
   const contract = await factory.new(...args, option)
 
   const result = new IncentivesController(contract.address, signer, api)
+  await afterDeployment(result.name, contract)
+  return result
+}
+
+export const deployLeverager = async ({
+  api,
+  signer,
+  args,
+  option = defaultOption(api),
+}: FactoryArgs<Leverager_factory['new']>): Promise<Leverager> => {
+  const factory = new Leverager_factory(api, signer)
+  const contract = await factory.new(...args, option)
+
+  const result = new Leverager(contract.address, signer, api)
   await afterDeployment(result.name, contract)
   return result
 }

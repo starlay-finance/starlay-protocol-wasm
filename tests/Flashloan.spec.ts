@@ -13,7 +13,6 @@ import Controller from '../types/contracts/controller'
 import Contract from '../types/contracts/default_interest_rate_model'
 import FlashloanGateway from '../types/contracts/flashloan_gateway'
 import FlashloanReceiver from '../types/contracts/flashloan_receiver'
-import IncentivesController from '../types/contracts/incentives_controller'
 import { FlashLoan } from '../types/event-types/flashloan_gateway'
 import {
   PoolContracts,
@@ -32,7 +31,6 @@ describe('Controller spec', () => {
   let usdt: PoolContracts
   let usdc: PoolContracts
   let dai: PoolContracts
-  let incentivesController: IncentivesController
 
   const setup = async (model?: Contract) => {
     const { api, alice: deployer, bob, charlie, django } = globalThis.setup

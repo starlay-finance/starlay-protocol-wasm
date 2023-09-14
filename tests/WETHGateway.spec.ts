@@ -1,3 +1,4 @@
+import { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { WeightV2 } from '@polkadot/types/interfaces'
 import { BN, BN_ONE, BN_TEN } from '@polkadot/util'
@@ -12,7 +13,6 @@ import {
 } from '../scripts/helper/deploy_helper'
 import { getGasLimit } from '../scripts/helper/utils'
 
-import IncentivesController from '../types/contracts/incentives_controller'
 import WETH from '../types/contracts/weth'
 import WETHGateway from '../types/contracts/weth_gateway'
 
@@ -24,7 +24,7 @@ const PROOFSIZE = new BN(2_000_000)
 describe('WETHGateway spec', () => {
   const rateModelArg = new BN(100).mul(ONE_ETHER)
 
-  let api
+  let api: ApiPromise
   let deployer: KeyringPair
   let pools: Pools
   // let rateModel: DefaultInterestRateModel
@@ -34,7 +34,6 @@ describe('WETHGateway spec', () => {
   let weth: WETH
   let wethGateway: WETHGateway
   let gasLimit: WeightV2
-  let incentivesController: IncentivesController
 
   const setup = async () => {
     const { api, alice: deployer, bob, charlie, django } = globalThis.setup
@@ -121,7 +120,6 @@ describe('WETHGateway spec', () => {
       api,
       deployer,
       pools,
-      incentivesController,
       // rateModel,
       // controller,
       // priceOracle,
