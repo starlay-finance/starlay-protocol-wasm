@@ -28,7 +28,7 @@ use super::{
 };
 pub use crate::traits::{
     leverager::*,
-    types,
+    types::WrappedU256,
 };
 use openbrush::{
     contracts::psp22::PSP22Ref,
@@ -393,7 +393,22 @@ impl<T: Storage<Data>> Internal for T {
         withdrwable.withdraw_amount
     }
 
-    default fn _loan_to_value(&self, _asset: AccountId) -> u128 {
+    default fn _loan_to_value(&self, asset: AccountId) -> u128 {
+        if let Some(controller) = self._controller() {
+            if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
+                let collateral_factor_result: Option<WrappedU256> =
+                    ControllerRef::collateral_factor_mantissa(&controller, pool);
+                if let Some(collateral_factor) = collateral_factor_result {
+                    // Convert collateral factor into percent
+                    return U256::from(collateral_factor)
+                        .mul(U256::from(10000))
+                        .div(PRICE_PRECISION)
+                        .as_u128()
+                }
+                return 0
+            }
+            return 0
+        }
         0
     }
 
