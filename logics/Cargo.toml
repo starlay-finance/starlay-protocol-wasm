@@ -6,6 +6,7 @@ edition = "2021"
 
 [dependencies]
 ink = { version = "4.3", default-features = false }
+ink_env = { version = "4.3", default-features = false }
 
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
     "derive",

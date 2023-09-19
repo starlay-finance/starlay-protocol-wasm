@@ -492,7 +492,7 @@ impl<T: Storage<Data>> Internal for T {
         if let Some(controller) = self._controller() {
             if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
                 let mut next_deposit_amount = amount;
-                for _i in 0..loop_count - 1 {
+                for _i in 0..loop_count {
                     PoolRef::mint_to(&pool, caller, next_deposit_amount)?;
 
                     next_deposit_amount = (next_deposit_amount * borrow_ratio) / 10000;
@@ -502,6 +502,7 @@ impl<T: Storage<Data>> Internal for T {
                     }
 
                     PoolRef::borrow_for(&pool, caller, next_deposit_amount)?;
+                    ink_env::debug_println!("loop value: {:#?}", _i);
                 }
 
                 if next_deposit_amount != 0 {

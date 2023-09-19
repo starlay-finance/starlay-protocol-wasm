@@ -7,27 +7,36 @@ import { ONE_ETHER } from '../scripts/helper/constants'
 import {
   deployController,
   deployDefaultInterestRateModel,
-  deployIncentivesController,
+  deployLeverager,
   deployPriceOracle,
+  deployWETH,
 } from '../scripts/helper/deploy_helper'
 import { getGasLimit } from '../scripts/helper/utils'
-import Contract from '../types/contracts/default_interest_rate_model'
-import { Pools, preparePoolsWithPreparedTokens } from './testContractHelper'
 
-const MAX_CALL_WEIGHT = new BN(125_000_000_000).isub(BN_ONE).mul(BN_TEN)
+import Controller from '../types/contracts/controller'
+import Leverager from '../types/contracts/leverager'
+import WETH from '../types/contracts/weth'
+
+import {
+  PoolContracts,
+  Pools,
+  preparePoolsWithPreparedTokens,
+} from './testContractHelper'
+import { shouldNotRevert } from './testHelpers'
+
+const MAX_CALL_WEIGHT = new BN(128_000_000_000).isub(BN_ONE).mul(BN_TEN)
 const PROOFSIZE = new BN(2_000_000)
-describe('Pool spec 1', () => {
+describe('Leverager spec', () => {
   let api: ApiPromise
   let deployer: KeyringPair
   let users: KeyringPair[]
   let controller: Controller
   let pools: Pools
-  let usdt: PoolContracts
-  let usdc: PoolContracts
   let dai: PoolContracts
-  let incentivesController: IncentivesController
   let gasLimit: WeightV2
-  const setup = async (model?: Contract) => {
+  let leverager: Leverager
+  let weth: WETH
+  const setup = async () => {
     const { api, alice: deployer, bob, charlie, django } = globalThis.setup
 
     const gasLimit = getGasLimit(api, MAX_CALL_WEIGHT, PROOFSIZE)
@@ -42,15 +51,13 @@ describe('Pool spec 1', () => {
       args: [],
     })
 
-    const rateModel = model
-      ? model
-      : await deployDefaultInterestRateModel({
-          api,
-          signer: deployer,
-          args: [[0], [0], [0], [0]],
-        })
+    const rateModel = await deployDefaultInterestRateModel({
+      api,
+      signer: deployer,
+      args: [[0], [0], [0], [0]],
+    })
 
-    const incentivesController = await deployIncentivesController({
+    const weth = await deployWETH({
       api,
       signer: deployer,
       args: [],
@@ -61,7 +68,7 @@ describe('Pool spec 1', () => {
       controller,
       rateModel,
       manager: deployer,
-      incentivesController,
+      wethToken: weth,
     })
 
     const users = [bob, charlie, django]
@@ -70,7 +77,7 @@ describe('Pool spec 1', () => {
     await controller.tx.setPriceOracle(priceOracle.address)
     await controller.tx.setCloseFactorMantissa([ONE_ETHER])
     //// for pool
-    for (const sym of [pools.dai, pools.usdc, pools.usdt]) {
+    for (const sym of [pools.dai, pools.weth]) {
       await priceOracle.tx.setFixedPrice(sym.token.address, ONE_ETHER)
       await controller.tx.supportMarketWithCollateralFactorMantissa(
         sym.pool.address,
@@ -78,6 +85,18 @@ describe('Pool spec 1', () => {
         [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
       )
     }
+
+    const leverager = await deployLeverager({
+      api,
+      signer: deployer,
+      args: [deployer.address],
+    })
+
+    await leverager.tx.initialize(
+      controller.address,
+      priceOracle.address,
+      weth.address,
+    )
 
     return {
       api,
@@ -87,21 +106,36 @@ describe('Pool spec 1', () => {
       controller,
       priceOracle,
       users,
-      incentivesController,
       gasLimit,
+      leverager,
     }
   }
 
   beforeAll(async () => {
-    ;({
-      api,
-      deployer,
-      gasLimit,
-      users,
-      controller,
-      pools,
-      incentivesController,
-    } = await setup())
-    ;({ usdt, usdc, dai } = pools)
+    ;({ api, deployer, gasLimit, users, controller, pools, leverager } =
+      await setup())
+    ;({ dai } = pools)
+  })
+
+  it('.loop', async () => {
+    const depositAmount = 2_000
+    await shouldNotRevert(dai.token, 'mint', [
+      deployer.address,
+      depositAmount,
+      { gasLimit },
+    ])
+    await shouldNotRevert(dai.token, 'approve', [leverager.address, ONE_ETHER])
+    await shouldNotRevert(dai.pool, 'approveDelegate', [
+      leverager.address,
+      ONE_ETHER,
+    ])
+
+    await shouldNotRevert(leverager, 'loopAsset', [
+      dai.token.address,
+      depositAmount,
+      5000,
+      2,
+      { gasLimit },
+    ])
   })
 })
