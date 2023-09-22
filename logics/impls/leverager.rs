@@ -451,7 +451,7 @@ impl<T: Storage<Data>> Internal for T {
             }
             return Err(Error::MarketNotListed)
         }
-        return Err(Error::ControllerIsNotSet)
+        Err(Error::ControllerIsNotSet)
     }
 
     default fn _loop_eth(&mut self, borrow_ratio: u128, loop_count: u128) -> Result<()> {
@@ -478,7 +478,7 @@ impl<T: Storage<Data>> Internal for T {
                 return Err(Error::MarketNotListed)
             }
         }
-        return Err(Error::WETHIsNotSet)
+        Err(Error::WETHIsNotSet)
     }
 
     default fn _loop(
@@ -492,21 +492,37 @@ impl<T: Storage<Data>> Internal for T {
         if let Some(controller) = self._controller() {
             if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
                 let mut next_deposit_amount = amount;
-                for _i in 0..loop_count {
-                    PoolRef::mint_to(&pool, caller, next_deposit_amount)?;
+                // for _i in 0..loop_count {
+                ink_env::debug_println!("Leverager: mint 1.");
+                PoolRef::mint_to_builder(&pool, caller, next_deposit_amount)
+                    .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
+                    .try_invoke()
+                    .unwrap()
+                    .unwrap()?;
 
-                    next_deposit_amount = (next_deposit_amount * borrow_ratio) / 10000;
+                next_deposit_amount = (next_deposit_amount * borrow_ratio) / 10000;
 
-                    if next_deposit_amount == 0 {
-                        break
-                    }
+                // if next_deposit_amount == 0 {
+                //     break
+                // }
 
-                    PoolRef::borrow_for(&pool, caller, next_deposit_amount)?;
-                    ink_env::debug_println!("loop value: {:#?}", _i);
-                }
+                ink_env::debug_println!("Leverager: borrow 1.");
+                PoolRef::borrow_for_builder(&pool, caller, next_deposit_amount)
+                    .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
+                    .try_invoke()
+                    .unwrap()
+                    .unwrap()?;
 
+                // ink_env::debug_println!("loop value: {:#?}", _i);
+                // }
+
+                ink_env::debug_println!("Leverager: mint 2.");
                 if next_deposit_amount != 0 {
-                    PoolRef::mint_to(&pool, caller, next_deposit_amount)?;
+                    PoolRef::mint_to_builder(&pool, caller, next_deposit_amount)
+                        .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
+                        .try_invoke()
+                        .unwrap()
+                        .unwrap()?;
                 }
                 return Ok(())
             }

@@ -697,10 +697,12 @@ impl<T: Storage<Data>> Internal for T {
         _minter: AccountId,
         _mint_amount: Balance,
     ) -> Result<()> {
+        ink_env::debug_println!("Controller: before mint guardian.");
         if let Some(true) | None = self._mint_guardian_paused(pool) {
+            ink_env::debug_println!("Controller: mint guardian paused.");
             return Err(Error::MintIsPaused)
         }
-
+        ink_env::debug_println!("Controller: after mint guardian.");
         // FEATURE: update governance token supply index & distribute
 
         Ok(())

@@ -137,5 +137,34 @@ describe('Leverager spec', () => {
       2,
       { gasLimit },
     ])
+
+    const allowance = (
+      await dai.token.query.allowance(deployer.address, leverager.address)
+    ).value.ok
+    console.log('allowance', allowance.toString())
+
+    const borrowBalance = (
+      await dai.pool.query.borrowBalanceStored(deployer.address)
+    ).value.ok
+    console.log('borrowBalance', borrowBalance.toString())
+
+    const balanceUser = (await dai.token.query.balanceOf(deployer.address))
+      .value.ok
+    console.log('balanceUser', balanceUser.toNumber())
+
+    const balanceContract = (await dai.token.query.balanceOf(leverager.address))
+      .value.ok
+    console.log('balanceContract', balanceContract.toNumber())
+
+    const contractAllowance = (
+      await dai.token.query.allowance(leverager.address, dai.pool.address)
+    ).value.ok
+    console.log('contractAllowance', contractAllowance.toString())
+
+    // await shouldNotRevert(leverager, 'loopAssetAgain', [
+    //   dai.token.address,
+    //   balanceUser.toNumber(),
+    //   { gasLimit },
+    // ])
   })
 })

@@ -803,7 +803,9 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         }
         let _controller = controller.unwrap();
 
+        ink_env::debug_println!("Pool: Before mint allowed.");
         ControllerRef::mint_allowed(&_controller, contract_addr, minter, mint_amount)?;
+        ink_env::debug_println!("Pool: After mint allowed.");
 
         let current_timestamp = Self::env().block_timestamp();
         if self._accrual_block_timestamp() != current_timestamp {
@@ -812,7 +814,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         let exchange_rate = self._exchange_rate_stored(); // NOTE: need exchange_rate calculation before transfer underlying
         let caller = Self::env().caller();
+
+        ink_env::debug_println!("Pool: Before transfer underlying.");
         self._transfer_underlying_from(caller, contract_addr, mint_amount)?;
+        ink_env::debug_println!("Pool: After transfer underlying.");
         let minted_tokens = U256::from(mint_amount)
             .mul(exp_scale())
             .div(exchange_rate)
@@ -824,8 +829,9 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             self._set_use_reserve_as_collateral(minter, true);
         }
 
+        ink_env::debug_println!("Pool: Before mint to.");
         self._mint_to(minter, minted_tokens)?;
-
+        ink_env::debug_println!("Pool: After mint to.");
         self._emit_mint_event(minter, mint_amount, minted_tokens);
 
         // skip post-process because nothing is done
