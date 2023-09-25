@@ -17,6 +17,7 @@ use openbrush::{
     traits::{
         AccountId,
         Balance,
+        String,
         Timestamp,
     },
 };
@@ -271,6 +272,7 @@ pub enum Error {
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),
+    MintRejected(String),
 }
 
 impl From<ControllerError> for Error {

@@ -804,7 +804,31 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let _controller = controller.unwrap();
 
         ink_env::debug_println!("Pool: Before mint allowed.");
-        ControllerRef::mint_allowed(&_controller, contract_addr, minter, mint_amount)?;
+        let builder =
+            ControllerRef::mint_allowed_builder(&_controller, contract_addr, minter, mint_amount)
+                .call_flags(ink_env::CallFlags::default().set_allow_reentry(true));
+
+        let result = match builder.try_invoke() {
+            Ok(Ok(Ok(_))) => Ok(()),
+            // Means unknown method
+            Ok(Err(ink::LangError::CouldNotReadInput)) => {
+                Err(Error::MintRejected(String::from("Error CouldNotReadInput")))
+            }
+            // `NotCallable` means that the receiver is not a contract.
+            Err(ink::env::Error::NotCallable) => {
+                Err(Error::MintRejected(String::from("Error NotCallable")))
+            }
+            _ => {
+                Err(Error::MintRejected(String::from(
+                    "Error while performing the `on-mint`",
+                )))
+            }
+        };
+
+        if result.is_err() {
+            return Err(result.err().unwrap())
+        }
+
         ink_env::debug_println!("Pool: After mint allowed.");
 
         let current_timestamp = Self::env().block_timestamp();

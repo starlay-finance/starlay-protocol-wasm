@@ -10,6 +10,7 @@ use openbrush::{
     traits::{
         AccountId,
         Balance,
+        String,
     },
 };
 use primitive_types::U256;
@@ -137,6 +138,7 @@ pub enum Error {
     Controller(ControllerError),
     Pool(PoolError),
     PSP22(PSP22Error),
+    MintRejected(String),
 }
 
 impl From<ControllerError> for Error {

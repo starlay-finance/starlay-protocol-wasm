@@ -36,6 +36,7 @@ use openbrush::{
         AccountId,
         Balance,
         Storage,
+        String,
     },
 };
 use primitive_types::U256;
@@ -518,11 +519,26 @@ impl<T: Storage<Data>> Internal for T {
 
                 ink_env::debug_println!("Leverager: mint 2.");
                 if next_deposit_amount != 0 {
-                    PoolRef::mint_to_builder(&pool, caller, next_deposit_amount)
-                        .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
-                        .try_invoke()
-                        .unwrap()
-                        .unwrap()?;
+                    let builder = PoolRef::mint_to_builder(&pool, caller, next_deposit_amount)
+                        .call_flags(ink_env::CallFlags::default().set_allow_reentry(true));
+
+                    let result = match builder.try_invoke() {
+                        Ok(Ok(Ok(_))) => Ok(()),
+                        // Means unknown method
+                        Ok(Err(ink::LangError::CouldNotReadInput)) => {
+                            Err(Error::MintRejected(String::from("Error CouldNotReadInput")))
+                        }
+                        // `NotCallable` means that the receiver is not a contract.
+                        Err(ink::env::Error::NotCallable) => {
+                            Err(Error::MintRejected(String::from("Error NotCallable")))
+                        }
+                        _ => {
+                            Err(Error::MintRejected(String::from(
+                                "Error while performing the `on-mint`",
+                            )))
+                        }
+                    };
+                    return result
                 }
                 return Ok(())
             }
