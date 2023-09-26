@@ -1,4 +1,3 @@
-import { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { WeightV2 } from '@polkadot/types/interfaces'
 import { BN, BN_ONE, BN_TEN } from '@polkadot/util'
@@ -24,7 +23,7 @@ const PROOFSIZE = new BN(2_000_000)
 describe('WETHGateway spec', () => {
   const rateModelArg = new BN(100).mul(ONE_ETHER)
 
-  let api: ApiPromise
+  let api
   let deployer: KeyringPair
   let pools: Pools
   // let rateModel: DefaultInterestRateModel
