@@ -805,6 +805,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Err(Error::ControllerIsNotSet)
         }
         let _controller = controller.unwrap();
+        ink_env::debug_println!("Pool: controller: {:#?}", _controller);
 
         ink_env::debug_println!("Pool: Before mint allowed.");
         let builder =
