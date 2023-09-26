@@ -272,7 +272,7 @@ pub enum Error {
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),
-    MintRejected(String),
+    InkEnv(String),
 }
 
 impl From<ControllerError> for Error {

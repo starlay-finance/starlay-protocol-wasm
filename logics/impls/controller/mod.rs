@@ -320,6 +320,7 @@ impl<T: Storage<Data>> Controller for T {
         minter: AccountId,
         mint_amount: Balance,
     ) -> Result<()> {
+        ink_env::debug_println!("Controller: Before mint allowed 1.");
         self._mint_allowed(pool, minter, mint_amount)
     }
 
