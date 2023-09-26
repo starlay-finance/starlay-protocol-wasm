@@ -22,7 +22,7 @@ import {
   Pools,
   preparePoolsWithPreparedTokens,
 } from './testContractHelper'
-import { shouldNotRevert } from './testHelpers'
+import { shouldNotRevert, shouldNotRevertWithNetworkGas } from './testHelpers'
 
 const MAX_CALL_WEIGHT = new BN(128_000_000_000).isub(BN_ONE).mul(BN_TEN)
 const PROOFSIZE = new BN(2_000_000)
@@ -124,47 +124,30 @@ describe('Leverager spec', () => {
       depositAmount,
       { gasLimit },
     ])
-    await shouldNotRevert(dai.token, 'approve', [leverager.address, ONE_ETHER])
+    await shouldNotRevert(dai.token, 'approve', [
+      leverager.address,
+      depositAmount,
+    ])
     await shouldNotRevert(dai.pool, 'approveDelegate', [
       leverager.address,
       ONE_ETHER,
     ])
 
-    await shouldNotRevert(leverager, 'loopAsset', [
+    await shouldNotRevertWithNetworkGas(api, leverager, 'loopAsset', [
       dai.token.address,
       depositAmount,
       5000,
       2,
-      { gasLimit },
     ])
 
-    const allowance = (
-      await dai.token.query.allowance(deployer.address, leverager.address)
-    ).value.ok
-    console.log('allowance', allowance.toString())
-
+    const borrowTotal = 1500
     const borrowBalance = (
       await dai.pool.query.borrowBalanceStored(deployer.address)
     ).value.ok
-    console.log('borrowBalance', borrowBalance.toString())
+    expect(borrowBalance.toNumber()).toEqual(borrowTotal)
 
-    const balanceUser = (await dai.token.query.balanceOf(deployer.address))
+    const depositedUser = (await dai.pool.query.balanceOf(deployer.address))
       .value.ok
-    console.log('balanceUser', balanceUser.toNumber())
-
-    const balanceContract = (await dai.token.query.balanceOf(leverager.address))
-      .value.ok
-    console.log('balanceContract', balanceContract.toNumber())
-
-    const contractAllowance = (
-      await dai.token.query.allowance(leverager.address, dai.pool.address)
-    ).value.ok
-    console.log('contractAllowance', contractAllowance.toString())
-
-    // await shouldNotRevert(leverager, 'loopAssetAgain', [
-    //   dai.token.address,
-    //   balanceUser.toNumber(),
-    //   { gasLimit },
-    // ])
+    expect(depositedUser.toNumber()).toEqual(borrowTotal + depositAmount)
   })
 })

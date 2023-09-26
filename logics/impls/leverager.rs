@@ -30,14 +30,12 @@ pub use crate::traits::{
     leverager::*,
     types::WrappedU256,
 };
-use ink::LangError;
 use openbrush::{
     contracts::psp22::PSP22Ref,
     traits::{
         AccountId,
         Balance,
         Storage,
-        String,
     },
 };
 use primitive_types::U256;
@@ -494,91 +492,31 @@ impl<T: Storage<Data>> Internal for T {
         if let Some(controller) = self._controller() {
             if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
                 let mut next_deposit_amount = amount;
-                // for _i in 0..loop_count {
-                ink_env::debug_println!("Leverager: mint 1.");
-                PoolRef::mint_to_builder(&pool, caller, next_deposit_amount)
-                    .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
-                    .try_invoke()
-                    .unwrap()
-                    .unwrap()?;
-
-                next_deposit_amount = (next_deposit_amount * borrow_ratio) / 10000;
-
-                // if next_deposit_amount == 0 {
-                //     break
-                // }
-
-                ink_env::debug_println!("Leverager: borrow 1.");
-                PoolRef::borrow_for_builder(&pool, caller, next_deposit_amount)
-                    .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
-                    .try_invoke()
-                    .unwrap()
-                    .unwrap()?;
-
-                // ink_env::debug_println!("loop value: {:#?}", _i);
-                // }
-
-                ink_env::debug_println!("Leverager: mint 2.");
-                if next_deposit_amount != 0 {
-                    let builder = PoolRef::mint_to_builder(&pool, caller, next_deposit_amount)
+                for _i in 0..loop_count {
+                    PoolRef::mint_to_builder(&pool, caller, next_deposit_amount)
                         .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
-                        .try_invoke();
+                        .try_invoke()
+                        .unwrap()
+                        .unwrap()?;
 
-                    if builder.is_err() {
-                        let err: ink_env::Error = builder.err().unwrap();
+                    next_deposit_amount = (next_deposit_amount * borrow_ratio) / 10000;
 
-                        let error_type = match err {
-                            ink_env::Error::CalleeTrapped => {
-                                Error::InkEnv(String::from("CalleeTrapped"))
-                            }
-                            ink_env::Error::CalleeReverted => {
-                                Error::InkEnv(String::from("CalleeReverted"))
-                            }
-                            ink_env::Error::KeyNotFound => {
-                                Error::InkEnv(String::from("KeyNotFound"))
-                            }
-                            ink_env::Error::_BelowSubsistenceThreshold => {
-                                Error::InkEnv(String::from("_BelowSubsistenceThreshold"))
-                            }
-                            ink_env::Error::TransferFailed => {
-                                Error::InkEnv(String::from("TransferFailed"))
-                            }
-                            ink_env::Error::_EndowmentTooLow => {
-                                Error::InkEnv(String::from("_EndowmentTooLow"))
-                            }
-                            ink_env::Error::CodeNotFound => {
-                                Error::InkEnv(String::from("CodeNotFound"))
-                            }
-                            ink_env::Error::NotCallable => {
-                                Error::InkEnv(String::from("NotCallable"))
-                            }
-                            ink_env::Error::Unknown => Error::InkEnv(String::from("Unknown")),
-                            ink_env::Error::LoggingDisabled => {
-                                Error::InkEnv(String::from("LoggingDisabled"))
-                            }
-                            ink_env::Error::CallRuntimeFailed => {
-                                Error::InkEnv(String::from("CallRuntimeFailed"))
-                            }
-                            ink_env::Error::EcdsaRecoveryFailed => {
-                                Error::InkEnv(String::from("EcdsaRecoveryFailed"))
-                            }
-                            _ => Error::InkEnv(String::from("Others")),
-                        };
-                        return Err(error_type)
+                    if next_deposit_amount == 0 {
+                        break
                     }
 
-                    let result1 = builder.unwrap();
-                    if result1.is_err() {
-                        let err: LangError = result1.err().unwrap();
-                        return Err(Error::Lang(err))
-                    }
-
-                    let result2 = result1.unwrap();
-                    if result2.is_err() {
-                        let err = result2.err().unwrap();
-
-                        return Err(Error::Pool(err))
-                    }
+                    PoolRef::borrow_for_builder(&pool, caller, next_deposit_amount)
+                        .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
+                        .try_invoke()
+                        .unwrap()
+                        .unwrap()?;
+                }
+                if next_deposit_amount != 0 {
+                    PoolRef::mint_to_builder(&pool, caller, next_deposit_amount)
+                        .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
+                        .try_invoke()
+                        .unwrap()
+                        .unwrap()?;
                 }
                 return Ok(())
             }

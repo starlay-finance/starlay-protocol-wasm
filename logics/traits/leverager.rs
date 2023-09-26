@@ -10,7 +10,6 @@ use openbrush::{
     traits::{
         AccountId,
         Balance,
-        String,
     },
 };
 use primitive_types::U256;
@@ -23,7 +22,6 @@ use super::{
     controller::Error as ControllerError,
     pool::Error as PoolError,
 };
-use ink::LangError;
 
 #[openbrush::wrapper]
 pub type LeveragerRef = dyn Leverager;
@@ -139,8 +137,6 @@ pub enum Error {
     Controller(ControllerError),
     Pool(PoolError),
     PSP22(PSP22Error),
-    InkEnv(String),
-    Lang(LangError),
 }
 
 impl From<ControllerError> for Error {
@@ -158,12 +154,6 @@ impl From<PoolError> for Error {
 impl From<PSP22Error> for Error {
     fn from(error: PSP22Error) -> Self {
         Error::PSP22(error)
-    }
-}
-
-impl From<LangError> for Error {
-    fn from(error: LangError) -> Self {
-        Error::Lang(error)
     }
 }
 
