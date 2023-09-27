@@ -16,6 +16,10 @@ use openbrush::{
         Balance,
     },
 };
+use scale::{
+    Decode,
+    Encode,
+};
 
 pub use super::pool::Error as PoolError;
 
@@ -60,7 +64,7 @@ pub trait WETHGateway: Ownable {
     fn get_weth_address(&self) -> Option<AccountId>;
 }
 
-#[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
+#[derive(Debug, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {
     SafeETHTransferFailed,

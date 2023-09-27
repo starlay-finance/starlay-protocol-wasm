@@ -6,6 +6,8 @@ edition = "2021"
 
 [dependencies]
 ink = { version = "4.3", default-features = false }
+ink_env = { version = "4.3", default-features = false }
+ink_primitives = { version = "4.3", default-features = false }
 
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = [
     "derive",
@@ -14,7 +16,7 @@ scale-info = { version = "2.6", default-features = false, features = [
     "derive",
 ], optional = true }
 
-openbrush = { tag = "3.1.1", git = "https://github.com/Brushfam/openbrush-contracts", default-features = false, features = [
+openbrush = { tag = "3.2.0", git = "https://github.com/Brushfam/openbrush-contracts", default-features = false, features = [
     "psp22", "ownable"
 ] }
 primitive-types = { version = "0.11.1", default-features = false, features = [

@@ -80,7 +80,7 @@ export const preparePoolWithMockToken = async ({
   controller: Controller
   rateModel: DefaultInterestRateModel
   manager: KeyringPair
-  incentivesController: IncentivesController
+  incentivesController?: IncentivesController
 }): Promise<PoolContracts> => {
   const token = await deployPSP22Token({
     api,
@@ -92,7 +92,7 @@ export const preparePoolWithMockToken = async ({
     api,
     signer: manager,
     args: [
-      incentivesController.address,
+      incentivesController ? incentivesController.address : null,
       token.address,
       controller.address,
       rateModel.address,
@@ -120,14 +120,14 @@ export const preparePoolWithWETH = async ({
   controller: Controller
   rateModel: DefaultInterestRateModel
   manager: KeyringPair
-  incentivesController: IncentivesController
+  incentivesController?: IncentivesController
   token: WETH
 }): Promise<WrappedPoolContracts> => {
   const pool = await deployPoolFromAsset({
     api,
     signer: manager,
     args: [
-      incentivesController.address,
+      incentivesController ? incentivesController.address : null,
       token.address,
       controller.address,
       rateModel.address,
@@ -151,7 +151,7 @@ export const preparePoolsWithPreparedTokens = async ({
   api: ApiPromise
   controller: Controller
   rateModel: DefaultInterestRateModel
-  incentivesController: IncentivesController
+  incentivesController?: IncentivesController
   manager: KeyringPair
   wethToken?: WETH
 }): Promise<Pools> => {

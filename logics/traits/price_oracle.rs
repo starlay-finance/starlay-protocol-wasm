@@ -6,6 +6,10 @@
 // except according to those terms.
 
 use openbrush::traits::AccountId;
+use scale::{
+    Decode,
+    Encode,
+};
 
 #[openbrush::wrapper]
 pub type PriceOracleRef = dyn PriceOracle;
@@ -28,7 +32,7 @@ pub trait PriceOracle {
 }
 
 /// Custom error definitions for PriceOracle
-#[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
+#[derive(Debug, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {}
 

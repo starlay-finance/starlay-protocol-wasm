@@ -1,5 +1,6 @@
 import { ReturnNumber } from '@727-ventures/typechain-types'
-import { BN, BN_TEN } from '@polkadot/util'
+import { WeightV2 } from '@polkadot/types/interfaces'
+import { BN, BN_TEN, BN_TWO } from '@polkadot/util'
 import { ReplacedType } from '../scripts/helper/utilityTypes'
 import { waitForTx } from '../scripts/helper/utils'
 
@@ -46,6 +47,49 @@ export const shouldNotRevert = async <
   }
 
   const res = await contract.tx[fn](...args)
+  await waitForTx(res)
+  return res
+}
+
+export const shouldNotRevertWithNetworkGas = async <
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  C extends { tx: any; query: any; name: string },
+  F extends keyof C['tx'],
+  R extends ReturnType<C['tx'][F]>,
+>(
+  api,
+  contract: C,
+  fn: F,
+  args: Parameters<C['tx'][F]>,
+): Promise<R> => {
+  let estimatedGas: WeightV2
+  try {
+    const gasLimit = api.registry.createType(
+      'WeightV2',
+      api.consts.system.blockWeights.maxBlock,
+    )
+    const { value, gasRequired } = await contract.query[fn](...args, {
+      gasLimit: gasLimit,
+      storageDepositLimit: null,
+    })
+    expect(value.ok.err).toBeUndefined()
+
+    estimatedGas = api.registry.createType('WeightV2', {
+      refTime: gasRequired.refTime.toBn().mul(BN_TWO),
+      proofSize: gasRequired.proofSize.toBn().mul(BN_TWO),
+    }) as WeightV2
+  } catch (e) {
+    throw new Error(
+      `failed to preview ${contract.name}.${fn as string}(${JSON.stringify(
+        args,
+      )}): ${JSON.stringify(e)}`,
+    )
+  }
+
+  const res = await contract.tx[fn](...args, {
+    gasLimit: estimatedGas,
+    storageDepositLimit: null,
+  })
   await waitForTx(res)
   return res
 }

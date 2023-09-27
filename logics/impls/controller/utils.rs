@@ -254,6 +254,26 @@ pub fn calculate_health_factor_from_balances(
     U256::from(wad_div_result.unwrap().mantissa)
 }
 
+pub fn calculate_available_borrow_in_base_currency(
+    total_collateral_in_base_currency: U256,
+    total_debt_in_base_currency: U256,
+    ltv: U256,
+) -> U256 {
+    let percent_mul_result =
+        (Percent { percentage: ltv }).percent_mul(total_collateral_in_base_currency);
+
+    if percent_mul_result.is_err() {
+        return U256::from(0)
+    }
+
+    let available_borrows_in_base_currency = percent_mul_result.unwrap();
+    if available_borrows_in_base_currency < total_debt_in_base_currency {
+        return U256::from(0)
+    }
+
+    return available_borrows_in_base_currency.sub(total_debt_in_base_currency)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -12,7 +12,6 @@ import {
 } from '../scripts/helper/deploy_helper'
 import { getGasLimit } from '../scripts/helper/utils'
 
-import IncentivesController from '../types/contracts/incentives_controller'
 import WETH from '../types/contracts/weth'
 import WETHGateway from '../types/contracts/weth_gateway'
 
@@ -34,7 +33,6 @@ describe('WETHGateway spec', () => {
   let weth: WETH
   let wethGateway: WETHGateway
   let gasLimit: WeightV2
-  let incentivesController: IncentivesController
 
   const setup = async () => {
     const { api, alice: deployer, bob, charlie, django } = globalThis.setup
@@ -121,7 +119,6 @@ describe('WETHGateway spec', () => {
       api,
       deployer,
       pools,
-      incentivesController,
       // rateModel,
       // controller,
       // priceOracle,

@@ -50,7 +50,7 @@ export const deployContracts = async ({
     priceOracle,
     config,
     option,
-    incentivesController
+    incentivesController,
   })
 
   const wethGateway = await deployWETHGateway({

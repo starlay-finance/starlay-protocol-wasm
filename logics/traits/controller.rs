@@ -304,7 +304,7 @@ pub trait Controller {
     fn calculate_user_account_data(
         &self,
         account: AccountId,
-        pool_attributes: PoolAttributesForWithdrawValidation,
+        pool_attributes: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<AccountData>;
 
     /// Check if withdraw is valid.
@@ -381,7 +381,7 @@ pub struct AccountData {
 }
 
 /// Custom error definitions for Controller
-#[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
+#[derive(Debug, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {
     MintIsPaused,

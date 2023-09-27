@@ -14,6 +14,10 @@ use openbrush::{
         Balance,
     },
 };
+use scale::{
+    Decode,
+    Encode,
+};
 
 #[openbrush::wrapper]
 pub type FlashloanGatewayRef = dyn FlashloanGateway;
@@ -42,7 +46,7 @@ pub trait FlashloanGateway {
     fn controller(&self) -> Option<AccountId>;
 }
 
-#[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
+#[derive(Debug, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {
     InconsistentFlashloanParams,
@@ -53,7 +57,8 @@ pub enum Error {
     Pool(PoolError),
 }
 
-#[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
+#[derive(Debug, PartialEq, Eq, Encode, Decode)]
+#[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 #[repr(u8)]
 pub enum FlashLoanType {
     None = 0,

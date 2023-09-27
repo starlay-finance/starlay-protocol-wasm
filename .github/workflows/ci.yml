@@ -164,7 +164,7 @@ jobs:
         run: |
           cargo install cargo-contract --version 3.0.1 --locked --force
       - name: Setup Node
-        uses: actions/setup-node@v1
+        uses: actions/setup-node@v3
         with:
           node-version: '16.x'
       - name: Install dependencies

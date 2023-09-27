@@ -21,6 +21,10 @@ use openbrush::{
     },
 };
 use primitive_types::U256;
+use scale::{
+    Decode,
+    Encode,
+};
 
 use super::{
     controller::Error as ControllerError,
@@ -236,7 +240,7 @@ pub trait Pool: PSP22 + PSP22Metadata {
 }
 
 /// Custom error definitions for Pool
-#[derive(Debug, PartialEq, Eq, scale::Encode, scale::Decode)]
+#[derive(Debug, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {
     NotImplemented,

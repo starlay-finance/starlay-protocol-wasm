@@ -334,16 +334,18 @@ where
     F: FnOnce(&mut T) -> Result<R>,
 {
     let caller = T::env().caller();
-    let controller = instance._controller();
-    if controller.is_none() {
-        return Err(Error::ControllerIsNotSet)
-    }
-    let _controller = controller.unwrap();
-    let flashloan_gateway = ControllerRef::flashloan_gateway(&_controller);
-    if flashloan_gateway.is_none() || caller != flashloan_gateway.unwrap() {
+    if let Some(controller) = instance._controller() {
+        if let Some(flashloan_gateway) = ControllerRef::flashloan_gateway(&controller) {
+            if caller != flashloan_gateway {
+                return Err(Error::CallerIsNotFlashloanGateway)
+            }
+
+            return body(instance)
+        }
         return Err(Error::CallerIsNotFlashloanGateway)
     }
-    body(instance)
+
+    Err(Error::ControllerIsNotSet)
 }
 
 impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metadata::Data>> Pool
@@ -692,23 +694,21 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let reserves = self._total_reserves();
         let idx = self._borrow_index();
 
-        let rate_model = self._rate_model();
-        if rate_model.is_none() {
-            return Err(Error::InterestRateModelIsNotSet)
+        if let Some(rate_model) = self._rate_model() {
+            let borrow_rate =
+                InterestRateModelRef::get_borrow_rate(&rate_model, cash, borrows, reserves);
+            return calculate_interest(&CalculateInterestInput {
+                total_borrows: borrows,
+                total_reserves: reserves,
+                borrow_index: idx.into(),
+                borrow_rate: borrow_rate.into(),
+                old_block_timestamp: self._accrual_block_timestamp(),
+                new_block_timestamp: at,
+                reserve_factor_mantissa: self._reserve_factor_mantissa().into(),
+            })
         }
-        let _rate_model = rate_model.unwrap();
 
-        let borrow_rate =
-            InterestRateModelRef::get_borrow_rate(&_rate_model, cash, borrows, reserves);
-        calculate_interest(&CalculateInterestInput {
-            total_borrows: borrows,
-            total_reserves: reserves,
-            borrow_index: idx.into(),
-            borrow_rate: borrow_rate.into(),
-            old_block_timestamp: self._accrual_block_timestamp(),
-            new_block_timestamp: at,
-            reserve_factor_mantissa: self._reserve_factor_mantissa().into(),
-        })
+        Err(Error::InterestRateModelIsNotSet)
     }
 
     default fn _transfer_tokens(
@@ -741,97 +741,96 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             total_borrows: self._total_borrows(),
         };
 
-        let controller = self._controller();
-        if controller.is_none() {
-            return Err(PSP22Error::Custom(String::from("ControllerIsNotSet")))
-        }
-        let _controller = controller.unwrap();
+        if let Some(controller) = self._controller() {
+            ControllerRef::transfer_allowed(
+                &controller,
+                contract_addr,
+                src,
+                dst,
+                value,
+                Some(pool_attribute),
+            )?;
 
-        ControllerRef::transfer_allowed(
-            &_controller,
-            contract_addr,
-            src,
-            dst,
-            value,
-            Some(pool_attribute),
-        )?;
+            if src == dst {
+                return Err(PSP22Error::Custom(String::from("TransferNotAllowed")))
+            }
+            let exchange_rate = self._exchange_rate_stored();
+            let psp22_transfer_amount = from_scaled_amount(
+                value,
+                Exp {
+                    mantissa: exchange_rate.into(),
+                },
+            );
 
-        if src == dst {
-            return Err(PSP22Error::Custom(String::from("TransferNotAllowed")))
-        }
-        let exchange_rate = self._exchange_rate_stored();
-        let psp22_transfer_amount = from_scaled_amount(
-            value,
-            Exp {
-                mantissa: exchange_rate.into(),
-            },
-        );
+            if spender == src {
+                // copied from PSP22#transfer
+                // ref: https://github.com/Brushfam/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L75-L79
+                self._transfer_from_to(src, dst, psp22_transfer_amount, data)?;
+            } else {
+                // copied from PSP22#transfer_from
+                // ref: https://github.com/Brushfam/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L81-L98
+                let allowance = self._allowance(&src, &spender);
 
-        if spender == src {
-            // copied from PSP22#transfer
-            // ref: https://github.com/Brushfam/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L75-L79
-            self._transfer_from_to(src, dst, psp22_transfer_amount, data)?;
-        } else {
-            // copied from PSP22#transfer_from
-            // ref: https://github.com/Brushfam/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L81-L98
-            let allowance = self._allowance(&src, &spender);
+                if allowance < psp22_transfer_amount {
+                    return Err(PSP22Error::InsufficientAllowance)
+                }
 
-            if allowance < psp22_transfer_amount {
-                return Err(PSP22Error::InsufficientAllowance)
+                self._approve_from_to(src, spender, allowance - psp22_transfer_amount)?;
+                self._transfer_from_to(src, dst, psp22_transfer_amount, data)?;
             }
 
-            self._approve_from_to(src, spender, allowance - psp22_transfer_amount)?;
-            self._transfer_from_to(src, dst, psp22_transfer_amount, data)?;
+            let lp_balance = self._principal_balance_of(&src);
+            if lp_balance == 0 {
+                self._set_use_reserve_as_collateral(src, false);
+            }
+            self._set_use_reserve_as_collateral(dst, true);
+
+            return Ok(())
         }
 
-        let lp_balance = self._principal_balance_of(&src);
-        if lp_balance == 0 {
-            self._set_use_reserve_as_collateral(src, false);
-        }
-        self._set_use_reserve_as_collateral(dst, true);
-
-        Ok(())
+        Err(PSP22Error::Custom(String::from("ControllerIsNotSet")))
     }
 
     default fn _mint(&mut self, minter: AccountId, mint_amount: Balance) -> Result<()> {
         self._accrue_reward(minter)?;
         let contract_addr = Self::env().account_id();
 
-        let controller = self._controller();
-        if controller.is_none() {
-            return Err(Error::ControllerIsNotSet)
+        if let Some(controller) = self._controller() {
+            ControllerRef::mint_allowed_builder(&controller, contract_addr, minter, mint_amount)
+                .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
+                .try_invoke()
+                .unwrap()
+                .unwrap()?;
+
+            let current_timestamp = Self::env().block_timestamp();
+            if self._accrual_block_timestamp() != current_timestamp {
+                return Err(Error::AccrualBlockNumberIsNotFresh)
+            };
+
+            let exchange_rate = self._exchange_rate_stored(); // NOTE: need exchange_rate calculation before transfer underlying
+            let caller = Self::env().caller();
+
+            self._transfer_underlying_from(caller, contract_addr, mint_amount)?;
+            let minted_tokens = U256::from(mint_amount)
+                .mul(exp_scale())
+                .div(exchange_rate)
+                .as_u128();
+
+            // Check if it is first deposit.
+            let lp_balance = self._principal_balance_of(&caller);
+            if lp_balance == 0 {
+                self._set_use_reserve_as_collateral(minter, true);
+            }
+
+            self._mint_to(minter, minted_tokens)?;
+            self._emit_mint_event(minter, mint_amount, minted_tokens);
+
+            // skip post-process because nothing is done
+            // ControllerRef::mint_verify(&self._controller(), contract_addr, minter, minted_amount, mint_amount)?;
+
+            return Ok(())
         }
-        let _controller = controller.unwrap();
-
-        ControllerRef::mint_allowed(&_controller, contract_addr, minter, mint_amount)?;
-
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
-            return Err(Error::AccrualBlockNumberIsNotFresh)
-        };
-
-        let exchange_rate = self._exchange_rate_stored(); // NOTE: need exchange_rate calculation before transfer underlying
-        let caller = Self::env().caller();
-        self._transfer_underlying_from(caller, contract_addr, mint_amount)?;
-        let minted_tokens = U256::from(mint_amount)
-            .mul(exp_scale())
-            .div(exchange_rate)
-            .as_u128();
-
-        // Check if it is first deposit.
-        let lp_balance = self._principal_balance_of(&caller);
-        if lp_balance == 0 {
-            self._set_use_reserve_as_collateral(minter, true);
-        }
-
-        self._mint_to(minter, minted_tokens)?;
-
-        self._emit_mint_event(minter, mint_amount, minted_tokens);
-
-        // skip post-process because nothing is done
-        // ControllerRef::mint_verify(&self._controller(), contract_addr, minter, minted_amount, mint_amount)?;
-
-        Ok(())
+        Err(Error::ControllerIsNotSet)
     }
 
     default fn _redeem(&mut self, redeemer: AccountId, redeem_amount: Balance) -> Result<()> {
@@ -844,78 +843,76 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Ok(())
         }
 
-        let controller = self._controller();
-        if controller.is_none() {
-            return Err(Error::ControllerIsNotSet)
-        }
-        let _controller = controller.unwrap();
-
-        let (_, account_borrow_balance, exchange_rate) = self.get_account_snapshot(redeemer);
-        let account_balance = Internal::_balance_of(self, &redeemer);
-        let contract_addr = Self::env().account_id();
-        let pool_attributes = PoolAttributesForWithdrawValidation {
-            pool: Some(contract_addr),
-            underlying: self._underlying(),
-            liquidation_threshold: self._liquidation_threshold(),
-            account_balance,
-            account_borrow_balance,
-        };
-        let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
-            &_controller,
-            pool_attributes,
-            redeemer,
-            redeem_amount,
-        )?;
-        if !balance_decrease_allowed {
-            return Err(Error::RedeemTransferOutNotPossible)
-        }
-
-        let pool_attribute = PoolAttributes {
-            underlying: self._underlying(),
-            decimals: self.token_decimals(),
-            account_balance,
-            account_borrow_balance,
-            exchange_rate,
-            total_borrows: self._total_borrows(),
-        };
-        ControllerRef::redeem_allowed(
-            &_controller,
-            contract_addr,
-            redeemer,
-            redeem_amount,
-            Some(pool_attribute),
-        )?;
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
-            return Err(Error::AccrualBlockNumberIsNotFresh)
-        }
-
-        if self._get_cash_prior() < redeem_amount {
-            return Err(Error::RedeemTransferOutNotPossible)
-        }
-
-        let lp_balance = Internal::_balance_of(self, &redeemer);
-        if lp_balance == redeem_amount {
-            self._set_use_reserve_as_collateral(redeemer, false);
-        }
-
-        self._burn_from(
-            redeemer,
-            scaled_amount_of(
+        if let Some(controller) = self._controller() {
+            let (_, account_borrow_balance, exchange_rate) = self.get_account_snapshot(redeemer);
+            let account_balance = Internal::_balance_of(self, &redeemer);
+            let contract_addr = Self::env().account_id();
+            let pool_attributes = PoolAttributesForWithdrawValidation {
+                pool: Some(contract_addr),
+                underlying: self._underlying(),
+                liquidation_threshold: self._liquidation_threshold(),
+                account_balance,
+                account_borrow_balance,
+            };
+            let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
+                &controller,
+                pool_attributes,
+                redeemer,
                 redeem_amount,
-                Exp {
-                    mantissa: exchange_rate.into(),
-                },
-            ),
-        )?;
-        self._transfer_underlying(redeemer, redeem_amount)?;
+            )?;
+            if !balance_decrease_allowed {
+                return Err(Error::RedeemTransferOutNotPossible)
+            }
 
-        self._emit_redeem_event(redeemer, redeem_amount);
+            let pool_attribute = PoolAttributes {
+                underlying: self._underlying(),
+                decimals: self.token_decimals(),
+                account_balance,
+                account_borrow_balance,
+                exchange_rate,
+                total_borrows: self._total_borrows(),
+            };
+            ControllerRef::redeem_allowed(
+                &controller,
+                contract_addr,
+                redeemer,
+                redeem_amount,
+                Some(pool_attribute),
+            )?;
+            let current_timestamp = Self::env().block_timestamp();
+            if self._accrual_block_timestamp() != current_timestamp {
+                return Err(Error::AccrualBlockNumberIsNotFresh)
+            }
 
-        // skip post-process because nothing is done
-        // ControllerRef::redeem_verify(&self._controller(), contract_addr, redeemer, redeem_tokens, redeem_amount)?;
+            if self._get_cash_prior() < redeem_amount {
+                return Err(Error::RedeemTransferOutNotPossible)
+            }
 
-        Ok(())
+            let lp_balance = Internal::_balance_of(self, &redeemer);
+            if lp_balance == redeem_amount {
+                self._set_use_reserve_as_collateral(redeemer, false);
+            }
+
+            self._burn_from(
+                redeemer,
+                scaled_amount_of(
+                    redeem_amount,
+                    Exp {
+                        mantissa: exchange_rate.into(),
+                    },
+                ),
+            )?;
+            self._transfer_underlying(redeemer, redeem_amount)?;
+
+            self._emit_redeem_event(redeemer, redeem_amount);
+
+            // skip post-process because nothing is done
+            // ControllerRef::redeem_verify(&self._controller(), contract_addr, redeemer, redeem_tokens, redeem_amount)?;
+
+            return Ok(())
+        }
+
+        Err(Error::ControllerIsNotSet)
     }
 
     default fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool) {
@@ -950,62 +947,60 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         release_underlying: bool,
     ) -> Result<()> {
         self._accrue_reward(borrower)?;
-        let contract_addr = Self::env().account_id();
-        let caller = Self::env().caller();
-        let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(borrower);
 
-        let pool_attribute = PoolAttributes {
-            underlying: self._underlying(),
-            decimals: self.token_decimals(),
-            account_balance,
-            account_borrow_balance,
-            exchange_rate,
-            total_borrows: self._total_borrows(),
-        };
+        if let Some(controller) = self._controller() {
+            let contract_addr = Self::env().account_id();
+            let caller: ink_primitives::AccountId = Self::env().caller();
+            let (account_balance, account_borrow_balance, exchange_rate) =
+                self.get_account_snapshot(borrower);
 
-        let controller = self._controller();
-        if controller.is_none() {
-            return Err(Error::ControllerIsNotSet)
+            let pool_attribute = PoolAttributes {
+                underlying: self._underlying(),
+                decimals: self.token_decimals(),
+                account_balance,
+                account_borrow_balance,
+                exchange_rate,
+                total_borrows: self._total_borrows(),
+            };
+
+            ControllerRef::borrow_allowed(
+                &controller,
+                contract_addr,
+                borrower,
+                borrow_amount,
+                Some(pool_attribute),
+            )?;
+
+            let current_timestamp = Self::env().block_timestamp();
+            if self._accrual_block_timestamp() != current_timestamp {
+                return Err(Error::AccrualBlockNumberIsNotFresh)
+            };
+            if self._get_cash_prior() < borrow_amount {
+                return Err(Error::BorrowCashNotAvailable)
+            }
+
+            let account_borrows_prev = self._borrow_balance_stored(borrower);
+            let account_borrows_new = account_borrows_prev + borrow_amount;
+            let total_borrows_new = self._total_borrows() + borrow_amount;
+
+            if release_underlying {
+                self._transfer_underlying(caller, borrow_amount)?;
+            }
+            self._increase_debt(borrower, borrow_amount, false);
+
+            self._emit_borrow_event(
+                borrower,
+                borrow_amount,
+                account_borrows_new,
+                total_borrows_new,
+            );
+
+            // skip post-process because nothing is done
+            // ControllerRef::borrow_verify(&self._controller(), contract_addr, borrower, borrow_amount)?;
+
+            return Ok(())
         }
-        let _controller = controller.unwrap();
-
-        ControllerRef::borrow_allowed(
-            &_controller,
-            contract_addr,
-            borrower,
-            borrow_amount,
-            Some(pool_attribute),
-        )?;
-
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
-            return Err(Error::AccrualBlockNumberIsNotFresh)
-        };
-        if self._get_cash_prior() < borrow_amount {
-            return Err(Error::BorrowCashNotAvailable)
-        }
-
-        let account_borrows_prev = self._borrow_balance_stored(borrower);
-        let account_borrows_new = account_borrows_prev + borrow_amount;
-        let total_borrows_new = self._total_borrows() + borrow_amount;
-
-        if release_underlying {
-            self._transfer_underlying(caller, borrow_amount)?;
-        }
-        self._increase_debt(borrower, borrow_amount, false);
-
-        self._emit_borrow_event(
-            borrower,
-            borrow_amount,
-            account_borrows_new,
-            total_borrows_new,
-        );
-
-        // skip post-process because nothing is done
-        // ControllerRef::borrow_verify(&self._controller(), contract_addr, borrower, borrow_amount)?;
-
-        Ok(())
+        Err(Error::ControllerIsNotSet)
     }
 
     default fn _repay_borrow(
@@ -1017,48 +1012,47 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._accrue_reward(borrower)?;
         self._accrue_reward(payer)?;
         let contract_addr = Self::env().account_id();
-        let controller = self._controller();
-        if controller.is_none() {
-            return Err(Error::ControllerIsNotSet)
+
+        if let Some(controller) = self._controller() {
+            ControllerRef::repay_borrow_allowed(
+                &controller,
+                contract_addr,
+                payer,
+                borrower,
+                repay_amount,
+            )?;
+
+            let current_timestamp = Self::env().block_timestamp();
+            if self._accrual_block_timestamp() != current_timestamp {
+                return Err(Error::AccrualBlockNumberIsNotFresh)
+            };
+
+            let account_borrow_prev = self._borrow_balance_stored(borrower);
+            let repay_amount_final = if repay_amount == u128::MAX {
+                account_borrow_prev
+            } else {
+                repay_amount
+            };
+
+            self._transfer_underlying_from(payer, contract_addr, repay_amount_final)?;
+
+            let account_borrows_new = account_borrow_prev - repay_amount_final;
+            let total_borrows_new = self._total_borrows() - repay_amount_final;
+            self._increase_debt(borrower, repay_amount_final, true);
+            self._emit_repay_borrow_event(
+                payer,
+                borrower,
+                repay_amount_final,
+                account_borrows_new,
+                total_borrows_new,
+            );
+
+            // skip post-process because nothing is done
+            // ControllerRef::repay_borrow_verify(&self._controller(), contract_addr, payer, borrower, repay_amount_final, 0)?; // temp: index is zero (type difference)
+
+            return Ok(repay_amount_final)
         }
-        let _controller = controller.unwrap();
-        ControllerRef::repay_borrow_allowed(
-            &_controller,
-            contract_addr,
-            payer,
-            borrower,
-            repay_amount,
-        )?;
-
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
-            return Err(Error::AccrualBlockNumberIsNotFresh)
-        };
-
-        let account_borrow_prev = self._borrow_balance_stored(borrower);
-        let repay_amount_final = if repay_amount == u128::MAX {
-            account_borrow_prev
-        } else {
-            repay_amount
-        };
-
-        self._transfer_underlying_from(payer, contract_addr, repay_amount_final)?;
-
-        let account_borrows_new = account_borrow_prev - repay_amount_final;
-        let total_borrows_new = self._total_borrows() - repay_amount_final;
-        self._increase_debt(borrower, repay_amount_final, true);
-        self._emit_repay_borrow_event(
-            payer,
-            borrower,
-            repay_amount_final,
-            account_borrows_new,
-            total_borrows_new,
-        );
-
-        // skip post-process because nothing is done
-        // ControllerRef::repay_borrow_verify(&self._controller(), contract_addr, payer, borrower, repay_amount_final, 0)?; // temp: index is zero (type difference)
-
-        Ok(repay_amount_final)
+        Err(Error::ControllerIsNotSet)
     }
 
     default fn _liquidate_borrow(
@@ -1070,101 +1064,99 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     ) -> Result<()> {
         self._accrue_reward(liquidator)?;
         self._accrue_reward(borrower)?;
-        let contract_addr = Self::env().account_id();
-        let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(borrower);
-        let pool_attribute = PoolAttributes {
-            underlying: self._underlying(),
-            decimals: self.token_decimals(),
-            account_balance,
-            account_borrow_balance,
-            exchange_rate,
-            total_borrows: self._total_borrows(),
-        };
 
-        let controller = self._controller();
-        if controller.is_none() {
-            return Err(Error::ControllerIsNotSet)
-        }
-        let _controller = controller.unwrap();
+        if let Some(controller) = self._controller() {
+            let contract_addr = Self::env().account_id();
+            let (account_balance, account_borrow_balance, exchange_rate) =
+                self.get_account_snapshot(borrower);
+            let pool_attribute = PoolAttributes {
+                underlying: self._underlying(),
+                decimals: self.token_decimals(),
+                account_balance,
+                account_borrow_balance,
+                exchange_rate,
+                total_borrows: self._total_borrows(),
+            };
 
-        ControllerRef::liquidate_borrow_allowed(
-            &_controller,
-            contract_addr,
-            collateral,
-            liquidator,
-            borrower,
-            repay_amount,
-            Some(pool_attribute),
-        )?;
+            ControllerRef::liquidate_borrow_allowed(
+                &controller,
+                contract_addr,
+                collateral,
+                liquidator,
+                borrower,
+                repay_amount,
+                Some(pool_attribute),
+            )?;
 
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
-            return Err(Error::AccrualBlockNumberIsNotFresh)
-        }
-        if collateral != contract_addr {
-            if PoolRef::get_accrual_block_timestamp(&collateral) != current_timestamp {
+            let current_timestamp = Self::env().block_timestamp();
+            if self._accrual_block_timestamp() != current_timestamp {
                 return Err(Error::AccrualBlockNumberIsNotFresh)
             }
-        }
-        if liquidator == borrower {
-            return Err(Error::LiquidateLiquidatorIsBorrower)
-        }
-        if repay_amount == 0 {
-            return Err(Error::LiquidateCloseAmountIsZero)
-        }
+            if collateral != contract_addr {
+                if PoolRef::get_accrual_block_timestamp(&collateral) != current_timestamp {
+                    return Err(Error::AccrualBlockNumberIsNotFresh)
+                }
+            }
+            if liquidator == borrower {
+                return Err(Error::LiquidateLiquidatorIsBorrower)
+            }
+            if repay_amount == 0 {
+                return Err(Error::LiquidateCloseAmountIsZero)
+            }
 
-        let actual_repay_amount = self._repay_borrow(liquidator, borrower, repay_amount)?;
-        let pool_borrowed_attributes = Some(PoolAttributesForSeizeCalculation {
-            underlying: self._underlying(),
-            decimals: self.token_decimals(),
-        });
-        let seize_tokens = if collateral == contract_addr {
-            let pool_collateral_attributes = pool_borrowed_attributes.clone();
-            let seize_tokens = ControllerRef::liquidate_calculate_seize_tokens(
-                &_controller,
-                contract_addr,
-                collateral,
-                WrappedU256::from(self._exchange_rate_stored()),
+            let actual_repay_amount = self._repay_borrow(liquidator, borrower, repay_amount)?;
+            let pool_borrowed_attributes = Some(PoolAttributesForSeizeCalculation {
+                underlying: self._underlying(),
+                decimals: self.token_decimals(),
+            });
+            let seize_tokens = if collateral == contract_addr {
+                let pool_collateral_attributes = pool_borrowed_attributes.clone();
+                let seize_tokens = ControllerRef::liquidate_calculate_seize_tokens(
+                    &controller,
+                    contract_addr,
+                    collateral,
+                    WrappedU256::from(self._exchange_rate_stored()),
+                    actual_repay_amount,
+                    pool_borrowed_attributes,
+                    pool_collateral_attributes,
+                )?;
+
+                self._seize(contract_addr, liquidator, borrower, seize_tokens)?;
+
+                seize_tokens
+            } else {
+                let seize_tokens = ControllerRef::liquidate_calculate_seize_tokens(
+                    &controller,
+                    contract_addr,
+                    collateral,
+                    PoolRef::exchange_rate_stored(&collateral),
+                    actual_repay_amount,
+                    pool_borrowed_attributes,
+                    Some(PoolAttributesForSeizeCalculation {
+                        underlying: PoolRef::underlying(&collateral),
+                        decimals: PoolRef::token_decimals(&collateral),
+                    }),
+                )?;
+
+                PoolRef::seize(&collateral, liquidator, borrower, seize_tokens)?;
+
+                seize_tokens
+            };
+
+            self._emit_liquidate_borrow_event(
+                liquidator,
+                borrower,
                 actual_repay_amount,
-                pool_borrowed_attributes,
-                pool_collateral_attributes,
-            )?;
-
-            self._seize(contract_addr, liquidator, borrower, seize_tokens)?;
-
-            seize_tokens
-        } else {
-            let seize_tokens = ControllerRef::liquidate_calculate_seize_tokens(
-                &_controller,
-                contract_addr,
                 collateral,
-                PoolRef::exchange_rate_stored(&collateral),
-                actual_repay_amount,
-                pool_borrowed_attributes,
-                Some(PoolAttributesForSeizeCalculation {
-                    underlying: PoolRef::underlying(&collateral),
-                    decimals: PoolRef::token_decimals(&collateral),
-                }),
-            )?;
+                seize_tokens,
+            );
 
-            PoolRef::seize(&collateral, liquidator, borrower, seize_tokens)?;
+            // skip post-process because nothing is done
+            // ControllerRef::liquidate_borrow_verify(&self._controller(), contract_addr, collateral, liquidator, borrower, actual_repay_amount, seize_tokens)?;
 
-            seize_tokens
-        };
-
-        self._emit_liquidate_borrow_event(
-            liquidator,
-            borrower,
-            actual_repay_amount,
-            collateral,
-            seize_tokens,
-        );
-
-        // skip post-process because nothing is done
-        // ControllerRef::liquidate_borrow_verify(&self._controller(), contract_addr, collateral, liquidator, borrower, actual_repay_amount, seize_tokens)?;
-
-        Ok(())
+            return Ok(())
+        }
+        Err(Error::ControllerIsNotSet)
     }
 
     default fn _seize(
@@ -1177,48 +1169,52 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._accrue_reward(borrower)?;
         self._accrue_reward(liquidator)?;
         let contract_addr = Self::env().account_id();
-        let controller = self._controller();
-        if controller.is_none() {
-            return Err(Error::ControllerIsNotSet)
+
+        if let Some(controller) = self._controller() {
+            ControllerRef::seize_allowed(
+                &controller,
+                contract_addr,
+                seizer_token,
+                liquidator,
+                borrower,
+                seize_tokens,
+            )?;
+
+            if liquidator == borrower {
+                return Err(Error::LiquidateSeizeLiquidatorIsBorrower)
+            }
+            // calculate the new borrower and liquidator token balances
+            let exchange_rate = Exp {
+                mantissa: WrappedU256::from(self._exchange_rate_stored()),
+            };
+            let (liquidator_seize_tokens, protocol_seize_amount, protocol_seize_tokens) =
+                protocol_seize_amount(exchange_rate, seize_tokens, protocol_seize_share_mantissa());
+            let total_reserves_new = self._total_reserves() + protocol_seize_amount;
+
+            // EFFECTS & INTERACTIONS
+            self.data::<Data>().reserves_scaled += scaled_amount_of(
+                protocol_seize_amount,
+                Exp {
+                    mantissa: self._borrow_index(),
+                },
+            );
+            self.data::<PSP22Data>().supply -= protocol_seize_tokens;
+            self._burn_from(borrower, seize_tokens)?;
+            self._mint_to(liquidator, liquidator_seize_tokens)?;
+
+            self._emit_reserves_added_event(
+                contract_addr,
+                protocol_seize_amount,
+                total_reserves_new,
+            );
+
+            // skip post-process because nothing is done
+            // ControllerRef::seize_verify(&self._controller(), contract_addr, seizer_token, liquidator, borrower, seize_tokens)?;
+
+            return Ok(())
         }
-        let _controller = controller.unwrap();
-        ControllerRef::seize_allowed(
-            &_controller,
-            contract_addr,
-            seizer_token,
-            liquidator,
-            borrower,
-            seize_tokens,
-        )?;
 
-        if liquidator == borrower {
-            return Err(Error::LiquidateSeizeLiquidatorIsBorrower)
-        }
-        // calculate the new borrower and liquidator token balances
-        let exchange_rate = Exp {
-            mantissa: WrappedU256::from(self._exchange_rate_stored()),
-        };
-        let (liquidator_seize_tokens, protocol_seize_amount, protocol_seize_tokens) =
-            protocol_seize_amount(exchange_rate, seize_tokens, protocol_seize_share_mantissa());
-        let total_reserves_new = self._total_reserves() + protocol_seize_amount;
-
-        // EFFECTS & INTERACTIONS
-        self.data::<Data>().reserves_scaled += scaled_amount_of(
-            protocol_seize_amount,
-            Exp {
-                mantissa: self._borrow_index(),
-            },
-        );
-        self.data::<PSP22Data>().supply -= protocol_seize_tokens;
-        self._burn_from(borrower, seize_tokens)?;
-        self._mint_to(liquidator, liquidator_seize_tokens)?;
-
-        self._emit_reserves_added_event(contract_addr, protocol_seize_amount, total_reserves_new);
-
-        // skip post-process because nothing is done
-        // ControllerRef::seize_verify(&self._controller(), contract_addr, seizer_token, liquidator, borrower, seize_tokens)?;
-
-        Ok(())
+        Err(Error::ControllerIsNotSet)
     }
 
     // admin functions
@@ -1310,19 +1306,17 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _sweep_token(&mut self, asset: AccountId) -> Result<()> {
-        let underlying = self._underlying();
-        if underlying.is_none() {
-            return Err(Error::UnderlyingIsNotSet)
-        }
-        let _underlying = underlying.unwrap();
+        if let Some(underlying) = self._underlying() {
+            if asset == underlying {
+                return Err(Error::CannotSweepUnderlyingToken)
+            }
 
-        if asset == _underlying {
-            return Err(Error::CannotSweepUnderlyingToken)
-        }
+            let balance = PSP22Ref::balance_of(&asset, Self::env().account_id());
+            PSP22Ref::transfer(&asset, Self::env().caller(), balance, Vec::<u8>::new())?;
 
-        let balance = PSP22Ref::balance_of(&asset, Self::env().account_id());
-        PSP22Ref::transfer(&asset, Self::env().caller(), balance, Vec::<u8>::new())?;
-        Ok(())
+            return Ok(())
+        }
+        Err(Error::UnderlyingIsNotSet)
     }
 
     default fn _set_liquidation_threshold(
@@ -1390,31 +1384,31 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         }
 
         let contract_addr = Self::env().account_id();
-        let pool_attributes = PoolAttributesForWithdrawValidation {
-            pool: Some(contract_addr),
-            underlying: self._underlying(),
-            liquidation_threshold: self._liquidation_threshold(),
-            account_balance,
-            account_borrow_balance,
-        };
 
-        let controller = self._controller();
-        if controller.is_none() {
-            return Err(Error::ControllerIsNotSet)
+        if let Some(controller) = self._controller() {
+            let pool_attributes = PoolAttributesForWithdrawValidation {
+                pool: Some(contract_addr),
+                underlying: self._underlying(),
+                liquidation_threshold: self._liquidation_threshold(),
+                account_balance,
+                account_borrow_balance,
+            };
+
+            let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
+                &controller,
+                pool_attributes,
+                user,
+                account_balance,
+            )?;
+
+            if !balance_decrease_allowed {
+                return Err(Error::DepositAlreadyInUse)
+            }
+
+            return Ok(())
         }
-        let _controller = controller.unwrap();
 
-        let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
-            &_controller,
-            pool_attributes,
-            user,
-            account_balance,
-        )?;
-
-        if !balance_decrease_allowed {
-            return Err(Error::DepositAlreadyInUse)
-        }
-        Ok(())
+        Err(Error::ControllerIsNotSet)
     }
 
     default fn _accrue_reward(&self, user: AccountId) -> Result<()> {
@@ -1443,38 +1437,37 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         to: AccountId,
         value: Balance,
     ) -> Result<()> {
-        let underlying = self._underlying();
-        if underlying.is_none() {
-            return Err(Error::UnderlyingIsNotSet)
+        if let Some(underlying) = self._underlying() {
+            return PSP22Ref::transfer_from_builder(&underlying, from, to, value, Vec::<u8>::new())
+                .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
+                .try_invoke()
+                .unwrap()
+                .unwrap()
+                .map_err(to_psp22_error)
         }
-        let _underlying = underlying.unwrap();
-        PSP22Ref::transfer_from_builder(&_underlying, from, to, value, Vec::<u8>::new())
-            .call_flags(ink::env::CallFlags::default().set_allow_reentry(true))
-            .try_invoke()
-            .unwrap()
-            .unwrap()
-            .map_err(to_psp22_error)
+
+        Err(Error::UnderlyingIsNotSet)
     }
 
     default fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()> {
-        let underlying = self._underlying();
-        if underlying.is_none() {
-            return Err(Error::UnderlyingIsNotSet)
+        if let Some(underlying) = self._underlying() {
+            return PSP22Ref::transfer(&underlying, to, value, Vec::<u8>::new())
+                .map_err(to_psp22_error)
         }
-        let _underlying = underlying.unwrap();
-        PSP22Ref::transfer(&_underlying, to, value, Vec::<u8>::new()).map_err(to_psp22_error)
+
+        Err(Error::UnderlyingIsNotSet)
     }
 
     default fn _assert_manager(&self) -> Result<()> {
-        let manager = self._manager();
-        if manager.is_none() {
-            return Err(Error::ManagerIsNotSet)
+        if let Some(manager) = self._manager() {
+            if Self::env().caller() != manager {
+                return Err(Error::CallerIsNotManager)
+            }
+
+            return Ok(())
         }
-        let _manager = manager.unwrap();
-        if Self::env().caller() != _manager {
-            return Err(Error::CallerIsNotManager)
-        }
-        Ok(())
+
+        Err(Error::ManagerIsNotSet)
     }
 
     default fn _set_incentives_controller(
@@ -1503,12 +1496,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _get_cash_prior(&self) -> Balance {
-        let underlying = self._underlying();
-        if underlying.is_none() {
-            return 0
+        if let Some(underlying) = self._underlying() {
+            let contract_addr = Self::env().account_id();
+            return PSP22Ref::balance_of(&underlying, contract_addr)
         }
-        let _underlying = underlying.unwrap();
-        PSP22Ref::balance_of(&_underlying, Self::env().account_id())
+        0
     }
 
     default fn _total_borrows(&self) -> Balance {
@@ -1538,12 +1530,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         borrows: Balance,
         reserves: Balance,
     ) -> WrappedU256 {
-        let rate_model = self._rate_model();
-        if rate_model.is_none() {
-            return WrappedU256::from(U256::zero())
+        if let Some(rate_model) = self._rate_model() {
+            return InterestRateModelRef::get_borrow_rate(&rate_model, cash, borrows, reserves)
         }
-        let _rate_model = rate_model.unwrap();
-        InterestRateModelRef::get_borrow_rate(&_rate_model, cash, borrows, reserves)
+
+        WrappedU256::from(U256::zero())
     }
 
     default fn _supply_rate_per_msec(
@@ -1553,18 +1544,17 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         reserves: Balance,
         reserve_factor_mantissa: WrappedU256,
     ) -> WrappedU256 {
-        let rate_model = self._rate_model();
-        if rate_model.is_none() {
-            return WrappedU256::from(U256::zero())
+        if let Some(rate_model) = self._rate_model() {
+            return InterestRateModelRef::get_supply_rate(
+                &rate_model,
+                cash,
+                borrows,
+                reserves,
+                reserve_factor_mantissa,
+            )
         }
-        let _rate_model = rate_model.unwrap();
-        InterestRateModelRef::get_supply_rate(
-            &_rate_model,
-            cash,
-            borrows,
-            reserves,
-            reserve_factor_mantissa,
-        )
+
+        WrappedU256::from(U256::zero())
     }
 
     default fn _accrual_block_timestamp(&self) -> Timestamp {

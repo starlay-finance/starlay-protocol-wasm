@@ -406,7 +406,7 @@ describe('Controller spec', () => {
       priceOracle,
       users,
       gasLimit,
-      incentivesController
+      incentivesController,
     } = await setup()
     const { dai, usdc } = await preparePoolsWithPreparedTokens({
       api,
@@ -490,14 +490,15 @@ describe('Controller spec', () => {
   })
 
   it('.support_market', async () => {
-    const { api, deployer, rateModel, controller, incentivesController } = await setup()
+    const { api, deployer, rateModel, controller, incentivesController } =
+      await setup()
 
     const pools = await preparePoolsWithPreparedTokens({
       api,
       controller,
       rateModel,
       manager: deployer,
-      incentivesController
+      incentivesController,
     })
 
     await controller.tx.supportMarket(
@@ -511,14 +512,20 @@ describe('Controller spec', () => {
 
   describe('.support_market_with_collateral_factor_mantissa', () => {
     it('success', async () => {
-      const { api, deployer, controller, rateModel, priceOracle, incentivesController } =
-        await setup()
+      const {
+        api,
+        deployer,
+        controller,
+        rateModel,
+        priceOracle,
+        incentivesController,
+      } = await setup()
       const pools = await preparePoolsWithPreparedTokens({
         api,
         controller,
         rateModel,
         manager: deployer,
-        incentivesController
+        incentivesController,
       })
 
       // prepares
@@ -541,14 +548,15 @@ describe('Controller spec', () => {
     })
     describe('fail', () => {
       const setupWithOnePool = async () => {
-        const { api, deployer, controller, rateModel ,incentivesController} = await setup()
+        const { api, deployer, controller, rateModel, incentivesController } =
+          await setup()
         const dai = await preparePoolWithMockToken({
           api,
           controller,
           rateModel,
           manager: deployer,
           metadata: TEST_METADATAS.dai,
-          incentivesController
+          incentivesController,
         })
         return { controller, pool: dai.pool, token: dai.token }
       }
@@ -586,7 +594,7 @@ describe('Controller spec', () => {
       priceOracle,
       users,
       gasLimit,
-      incentivesController
+      incentivesController,
     } = await setup()
     const user = users[0]
     const pools = await preparePoolsWithPreparedTokens({
@@ -594,7 +602,7 @@ describe('Controller spec', () => {
       controller,
       rateModel,
       manager: deployer,
-      incentivesController
+      incentivesController,
     })
     const { dai, usdc, usdt } = pools
 
@@ -694,7 +702,7 @@ describe('Controller spec', () => {
           controller,
           rateModel,
           manager: deployer,
-          incentivesController
+          incentivesController,
         })
         const [daiUser, usdcUser] = users
 
@@ -776,6 +784,7 @@ describe('Controller spec', () => {
             shortfall: 500 - 450,
           },
         )
+        expect(1).toEqual(1)
       })
       it('multi asset', async () => {
         const {
@@ -786,14 +795,14 @@ describe('Controller spec', () => {
           priceOracle,
           users,
           gasLimit,
-          incentivesController
+          incentivesController,
         } = await setup()
         const { dai, usdc, usdt } = await preparePoolsWithPreparedTokens({
           api,
           controller,
           rateModel,
           manager: deployer,
-          incentivesController
+          incentivesController,
         })
         const user = users[0]
 
@@ -885,6 +894,7 @@ describe('Controller spec', () => {
             shortfall: 0,
           },
         )
+        expect(1).toEqual(1)
       })
     })
     describe('with borrows', () => {
@@ -897,14 +907,14 @@ describe('Controller spec', () => {
           priceOracle,
           users,
           gasLimit,
-          incentivesController
+          incentivesController,
         } = await setup()
         const { dai, usdc, usdt } = await preparePoolsWithPreparedTokens({
           api,
           controller,
           rateModel,
           manager: deployer,
-          incentivesController
+          incentivesController,
         })
         const user = users[0]
 
@@ -1026,6 +1036,7 @@ describe('Controller spec', () => {
             shortfall: 0,
           },
         )
+        expect(1).toEqual(1)
       })
     })
   })
