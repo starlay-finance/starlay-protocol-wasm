@@ -80,19 +80,16 @@ where
     default fn deposit_eth(&mut self, pool: AccountId) -> Result<()> {
         let deposit_value = Self::env().transferred_value();
         let caller = Self::env().caller();
-        let weth = self._weth_address();
-        if weth.is_none() {
-            return Err(Error::WethIsNotSet)
+        if let Some(weth) = self._weth_address() {
+            WETHRef::deposit_builder(&weth)
+                .transferred_value(deposit_value)
+                .invoke()?;
+            WETHRef::approve(&weth, pool, deposit_value)?;
+            PoolRef::mint_to(&pool, caller, deposit_value)?;
+            self._emit_deposit_eth_event_(pool, caller, deposit_value);
+            return Ok(())
         }
-        let _weth = weth.unwrap();
-
-        WETHRef::deposit_builder(&_weth)
-            .transferred_value(deposit_value)
-            .invoke()?;
-        WETHRef::approve(&_weth, pool, deposit_value)?;
-        PoolRef::mint_to(&pool, caller, deposit_value)?;
-        self._emit_deposit_eth_event_(pool, caller, deposit_value);
-        Ok(())
+        Err(Error::WethIsNotSet)
     }
 
     default fn withdraw_eth(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
@@ -105,23 +102,21 @@ where
             amount_to_withdraw = user_balance;
         }
 
-        let weth = self._weth_address();
-        if weth.is_none() {
-            return Err(Error::WethIsNotSet)
+        if let Some(weth) = self._weth_address() {
+            PoolRef::transfer_from(
+                &pool,
+                caller,
+                contract_address,
+                amount_to_withdraw,
+                Vec::<u8>::new(),
+            )?;
+            PoolRef::redeem_underlying(&pool, amount_to_withdraw)?;
+            WETHRef::withdraw(&weth, amount_to_withdraw)?;
+            self._emit_withdraw_eth_event_(pool, caller, amount_to_withdraw);
+            return self._safe_transfer_eth(caller, amount_to_withdraw)
         }
-        let _weth = weth.unwrap();
 
-        PoolRef::transfer_from(
-            &pool,
-            caller,
-            contract_address,
-            amount_to_withdraw,
-            Vec::<u8>::new(),
-        )?;
-        PoolRef::redeem_underlying(&pool, amount_to_withdraw)?;
-        WETHRef::withdraw(&_weth, amount_to_withdraw)?;
-        self._emit_withdraw_eth_event_(pool, caller, amount_to_withdraw);
-        self._safe_transfer_eth(caller, amount_to_withdraw)
+        Err(Error::WethIsNotSet)
     }
 
     default fn repay_eth(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
@@ -135,36 +130,32 @@ where
             return Err(Error::InsufficientPayback)
         }
 
-        let weth = self._weth_address();
-        if weth.is_none() {
-            return Err(Error::WethIsNotSet)
+        if let Some(weth) = self._weth_address() {
+            WETHRef::deposit_builder(&weth)
+                .transferred_value(payback_amount)
+                .invoke()?;
+            WETHRef::approve(&weth, pool, payback_amount)?;
+            PoolRef::repay_borrow_behalf(&pool, caller, payback_amount)?;
+            self._emit_repay_eth_event_(pool, caller, payback_amount);
+            if transferred_value > payback_amount {
+                self._safe_transfer_eth(caller, transferred_value - payback_amount)?;
+            }
+            return Ok(())
         }
-        let _weth = weth.unwrap();
 
-        WETHRef::deposit_builder(&_weth)
-            .transferred_value(payback_amount)
-            .invoke()?;
-        WETHRef::approve(&_weth, pool, payback_amount)?;
-        PoolRef::repay_borrow_behalf(&pool, caller, payback_amount)?;
-        self._emit_repay_eth_event_(pool, caller, payback_amount);
-        if transferred_value > payback_amount {
-            self._safe_transfer_eth(caller, transferred_value - payback_amount)?;
-        }
-        Ok(())
+        Err(Error::WethIsNotSet)
     }
 
     default fn borrow_eth(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
         let caller = Self::env().caller();
-        let weth = self._weth_address();
-        if weth.is_none() {
-            return Err(Error::WethIsNotSet)
+        if let Some(weth) = self._weth_address() {
+            PoolRef::borrow_for(&pool, caller, amount)?;
+            WETHRef::withdraw(&weth, amount)?;
+            self._emit_borrow_eth_event_(pool, caller, amount);
+            return self._safe_transfer_eth(caller, amount)
         }
-        let _weth = weth.unwrap();
 
-        PoolRef::borrow_for(&pool, caller, amount)?;
-        WETHRef::withdraw(&_weth, amount)?;
-        self._emit_borrow_eth_event_(pool, caller, amount);
-        self._safe_transfer_eth(caller, amount)
+        Err(Error::WethIsNotSet)
     }
 
     default fn emergency_token_transfer(

@@ -67,74 +67,73 @@ impl<T: Storage<Data>> FlashloanGateway for T {
         let mut lp_token_addresses: Vec<AccountId> = Default::default();
         let mut premiums: Vec<Balance> = Default::default();
 
-        let controller = self._controller();
-        if controller.is_none() {
-            return Err(Error::ControllerIsNotSet)
-        }
-        let _controller = controller.unwrap();
+        if let Some(controller) = self._controller() {
+            let flashloan_premium_total = self._flashloan_premium_total();
+            for index in 0..assets.len() {
+                if let Some(market) =
+                    ControllerRef::market_of_underlying(&controller, assets[index])
+                {
+                    lp_token_addresses.push(market);
+                    let premium: u128 = amounts[index] * flashloan_premium_total / 10000;
+                    premiums.push(premium);
 
-        let flashloan_premium_total = self._flashloan_premium_total();
-        for index in 0..assets.len() {
-            let market = ControllerRef::market_of_underlying(&_controller, assets[index]);
-            if market.is_none() {
+                    PoolRef::transfer_underlying(
+                        &lp_token_addresses[index],
+                        receiver_address,
+                        amounts[index],
+                    )?;
+                }
                 return Err(Error::MarketNotListed)
             }
-            lp_token_addresses.push(market.unwrap());
-            let premium: u128 = amounts[index] * flashloan_premium_total / 10000;
-            premiums.push(premium);
 
-            PoolRef::transfer_underlying(
-                &lp_token_addresses[index],
-                receiver_address,
-                amounts[index],
-            )?;
-        }
+            let caller = Self::env().caller();
+            let operation_result = FlashloanReceiverRef::execute_operation(
+                &receiver_address,
+                assets.clone(),
+                amounts.clone(),
+                premiums.clone(),
+                caller,
+                params.clone(),
+            );
 
-        let caller = Self::env().caller();
-        let operation_result = FlashloanReceiverRef::execute_operation(
-            &receiver_address,
-            assets.clone(),
-            amounts.clone(),
-            premiums.clone(),
-            caller,
-            params.clone(),
-        );
-
-        if !operation_result {
-            return Err(Error::InvalidFlashloanExecutorReturn)
-        }
-
-        for index in 0..assets.len() {
-            let current_asset = assets[index];
-            let current_amount = amounts[index];
-            let current_premium = premiums[index];
-            let current_lp_token = lp_token_addresses[index];
-            let current_amount_plus_premium = current_amount + current_premium;
-
-            if mods[index] == FlashLoanType::None as u8 {
-                PoolRef::accrue_interest(&current_lp_token)?;
-
-                PSP22Ref::transfer_from(
-                    &current_asset,
-                    receiver_address,
-                    current_lp_token,
-                    current_amount_plus_premium,
-                    Vec::<u8>::new(),
-                )?;
-            } else {
-                PoolRef::borrow_for_flashloan(&current_lp_token, caller, current_amount)?;
+            if !operation_result {
+                return Err(Error::InvalidFlashloanExecutorReturn)
             }
 
-            self._emit_flashloan_event(
-                receiver_address,
-                caller,
-                current_asset,
-                current_amount,
-                current_premium,
-            );
+            for index in 0..assets.len() {
+                let current_asset = assets[index];
+                let current_amount = amounts[index];
+                let current_premium = premiums[index];
+                let current_lp_token = lp_token_addresses[index];
+                let current_amount_plus_premium = current_amount + current_premium;
+
+                if mods[index] == FlashLoanType::None as u8 {
+                    PoolRef::accrue_interest(&current_lp_token)?;
+
+                    PSP22Ref::transfer_from(
+                        &current_asset,
+                        receiver_address,
+                        current_lp_token,
+                        current_amount_plus_premium,
+                        Vec::<u8>::new(),
+                    )?;
+                } else {
+                    PoolRef::borrow_for_flashloan(&current_lp_token, caller, current_amount)?;
+                }
+
+                self._emit_flashloan_event(
+                    receiver_address,
+                    caller,
+                    current_asset,
+                    current_amount,
+                    current_premium,
+                );
+            }
+
+            return Ok(())
         }
 
-        Ok(())
+        Err(Error::ControllerIsNotSet)
     }
 
     default fn flashloan_premium_total(&self) -> u128 {
