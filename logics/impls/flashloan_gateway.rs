@@ -82,8 +82,9 @@ impl<T: Storage<Data>> FlashloanGateway for T {
                         receiver_address,
                         amounts[index],
                     )?;
+                } else {
+                    return Err(Error::MarketNotListed)
                 }
-                return Err(Error::MarketNotListed)
             }
 
             let caller = Self::env().caller();
