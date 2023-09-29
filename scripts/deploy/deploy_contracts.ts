@@ -7,6 +7,7 @@ import {
   deployFaucet,
   deployFlashLoanGateway,
   deployLens,
+  deployLeverager,
   deployPriceOracle,
   deployWETHGateway,
 } from './../helper/deploy_helper'
@@ -66,6 +67,12 @@ export const deployContracts = async ({
   })
   await controller.tx.setFlashloanGateway(flashloanGateway.address)
 
+  const leverager = await deployLeverager({
+    api,
+    signer,
+    args: [signer.address],
+  })
+
   return {
     lens,
     faucet,
@@ -75,5 +82,6 @@ export const deployContracts = async ({
     pools,
     wethGateway,
     flashloanGateway,
+    leverager,
   }
 }
