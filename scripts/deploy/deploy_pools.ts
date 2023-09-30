@@ -1,6 +1,5 @@
 import { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
-import { BN } from '@polkadot/util'
 import Controller from '../../types/contracts/controller'
 import InterestRateModel from '../../types/contracts/default_interest_rate_model'
 import Pool from '../../types/contracts/pool'
@@ -54,7 +53,6 @@ const deployDummyTokens = async (
       args: [config.totalSupply, config.name, config.symbol, config.decimals],
     })
 
-    await token.tx.mint(signer.address, new BN('1000000000000000000000000'))
     res.push({ token, config })
   }
   return res
