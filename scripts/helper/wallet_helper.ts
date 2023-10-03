@@ -23,17 +23,10 @@ const getSigner = async (env: Env, api) => {
   const signer = keyring.addFromMnemonic(mnemonic())
   if (env === ENV.local) {
     const alice = keyring.addFromUri('//Alice')
-    const { data: aliceBalance } = await api.query.system.account(alice.address)
-    console.log('aliceBalance', aliceBalance.free)
 
-    const amount = new BN('1052869610870319726')
-    console.log('signer.address', signer.address)
+    const amount = new BN('1100000000000000000')
     const transfer = api.tx.balances.transfer(signer.address, amount)
-    const result = await transfer.signAndSend(alice)
-    console.log('result', JSON.stringify(result))
-
-    const { data: balance } = await api.query.system.account(signer.address)
-    console.log('balance', balance.free)
+    await transfer.signAndSend(alice)
 
     return signer
   }
