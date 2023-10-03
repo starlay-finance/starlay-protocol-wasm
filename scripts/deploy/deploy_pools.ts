@@ -52,6 +52,7 @@ const deployDummyTokens = async (
       signer,
       args: [config.totalSupply, config.name, config.symbol, config.decimals],
     })
+
     res.push({ token, config })
   }
   return res
@@ -74,7 +75,7 @@ const deployAndSetupPool = async (
     priceOracle,
     config: { collateralNamePrefix, collateralSymbolPrefix },
     option,
-    incentivesController
+    incentivesController,
   }: SetupPoolArgs,
 ) => {
   console.log(
