@@ -31,7 +31,6 @@
     "lint": "prettier --check . && eslint . && cargo check",
     "lint:fix": "prettier --write . && eslint . --fix && cargo fmt --all",
     "deploy:local": "yarn compile:release && ts-node scripts/deploy/index.ts local",
-    "deploy:local1": "ts-node scripts/deploy/index.ts local",
     "deploy:shibuya": "yarn compile:release && ts-node scripts/deploy/index.ts shibuya"
   },
   "resolutions": {
