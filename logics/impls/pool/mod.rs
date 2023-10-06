@@ -750,7 +750,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
                 src,
                 dst,
                 value,
-                Some(pool_attribute),
+                pool_attribute,
             )?;
 
             if src == dst {
@@ -884,7 +884,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
                 contract_addr,
                 redeemer,
                 redeem_amount,
-                Some(pool_attribute),
+                pool_attribute,
             )?;
             let current_timestamp = Self::env().block_timestamp();
             if self._accrual_block_timestamp() != current_timestamp {
@@ -1785,6 +1785,7 @@ impl From<controller::Error> for PSP22Error {
             controller::Error::PoolIsNotSet => convert("PoolIsNotSet"),
             controller::Error::ManagerIsNotSet => convert("ManagerIsNotSet"),
             controller::Error::OracleIsNotSet => convert("OracleIsNotSet"),
+            controller::Error::BalanceDecreaseNotAllowed => convert("BalanceDecreaseNotAllowed"),
         }
     }
 }

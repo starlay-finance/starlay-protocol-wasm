@@ -46,7 +46,7 @@ pub trait Controller {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
-        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
+        pool_attribute: PoolAttributesForWithdrawValidation,
     ) -> Result<()>;
 
     /// Validates redeem and reverts on rejection. May emit logs.
@@ -152,7 +152,7 @@ pub trait Controller {
         src: AccountId,
         dst: AccountId,
         transfer_tokens: Balance,
-        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
+        pool_attribute: PoolAttributesForWithdrawValidation,
     ) -> Result<()>;
 
     /// Validates transfer and reverts on rejection. May emit logs.
@@ -405,6 +405,7 @@ pub enum Error {
     PoolIsNotSet,
     ManagerIsNotSet,
     OracleIsNotSet,
+    BalanceDecreaseNotAllowed,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;
