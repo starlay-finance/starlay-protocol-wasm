@@ -700,7 +700,9 @@ impl<T: Storage<Data>> Internal for T {
             let asset_price: u128;
             let (shortfall, account_data) = {
                 // For each asset the account is in
-                let account_assets = self._account_assets(redeemer, Some(pool));
+                let caller = Self::env().caller();
+
+                let markets = self._markets();
                 let mut asset_params = Vec::<HypotheticalAccountLiquidityCalculationParam>::new();
 
                 let mut total_collateral_in_base_currency = U256::from(0);
@@ -772,13 +774,21 @@ impl<T: Storage<Data>> Internal for T {
                 });
 
                 // Prepare parameters for calculation
-                for asset in account_assets {
+                for asset in markets {
+                    if asset == pool || asset == caller {
+                        continue
+                    }
                     // Read the balances and exchange rate from the pool
                     let (
                         compounded_liquidity_balance,
                         borrow_balance_stored,
                         exchange_rate_mantissa,
                     ) = PoolRef::get_account_snapshot(&asset, redeemer);
+
+                    if compounded_liquidity_balance == 0 && borrow_balance_stored == 0 {
+                        continue
+                    }
+
                     let decimals = PoolRef::token_decimals(&asset);
 
                     // Get the normalized price of the asset
@@ -1386,7 +1396,6 @@ impl<T: Storage<Data>> Internal for T {
         let markets = self._markets();
         let caller = Self::env().caller();
         let mut pool = caller;
-        // let account_assets = self._account_assets(account, token_modify);
         let mut asset_params = Vec::<HypotheticalAccountLiquidityCalculationParam>::new();
 
         if let Some(oracle) = self._oracle() {
@@ -1484,7 +1493,6 @@ impl<T: Storage<Data>> Internal for T {
         account: AccountId,
         pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<AccountData> {
-        // let account_assets: Vec<AccountId> = self._account_assets(account, None);
         let markets = self._markets();
 
         let mut total_collateral_in_base_currency = U256::from(0);
