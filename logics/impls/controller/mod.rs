@@ -109,7 +109,7 @@ pub trait Internal {
         pool: AccountId,
         redeemer: AccountId,
         amount: Balance,
-        pool_attribute: PoolAttributesForWithdrawValidation,
+        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()>;
     fn _redeem_verify(
         &self,
@@ -185,7 +185,7 @@ pub trait Internal {
         src: AccountId,
         dst: AccountId,
         transfer_tokens: Balance,
-        pool_attribute: PoolAttributesForWithdrawValidation,
+        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()>;
     fn _transfer_verify(
         &self,
@@ -314,7 +314,7 @@ impl<T: Storage<Data>> Controller for T {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
-        pool_attribute: PoolAttributesForWithdrawValidation,
+        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()> {
         self._redeem_allowed(pool, redeemer, redeem_amount, pool_attribute)
     }
@@ -446,7 +446,7 @@ impl<T: Storage<Data>> Controller for T {
         src: AccountId,
         dst: AccountId,
         transfer_tokens: Balance,
-        pool_attribute: PoolAttributesForWithdrawValidation,
+        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()> {
         self._transfer_allowed(pool, src, dst, transfer_tokens, pool_attribute)
     }
@@ -694,13 +694,15 @@ impl<T: Storage<Data>> Internal for T {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
-        pool_attribute: PoolAttributesForWithdrawValidation,
+        pool_attributes: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()> {
         if let Some(oracle) = self._oracle() {
-            let asset_price: u128;
+            let mut asset_price: u128 = 0;
+            let mut liquidation_threshold: u128 = 0;
             let (shortfall, account_data) = {
                 // For each asset the account is in
                 let caller = Self::env().caller();
+                let mut skip_pool = caller;
 
                 let markets = self._markets();
                 let mut asset_params = Vec::<HypotheticalAccountLiquidityCalculationParam>::new();
@@ -710,72 +712,79 @@ impl<T: Storage<Data>> Internal for T {
                 let mut avg_liquidation_threshold = U256::from(0);
                 let mut total_debt_in_base_currency: U256 = U256::from(0);
 
-                // if caller is a pool, get parameters for the pool without call the pool
-                if pool_attribute.underlying.is_none() {
-                    return Err(Error::UnderlyingIsNotSet)
+                if let Some(pool_attribute) = pool_attributes {
+                    // if caller is a pool, get parameters for the pool without call the pool
+                    if pool_attribute.underlying.is_none() {
+                        return Err(Error::UnderlyingIsNotSet)
+                    }
+                    if pool_attribute.pool.is_none() {
+                        return Err(Error::PoolIsNotSet)
+                    }
+                    if pool_attribute.pool != Some(pool) {
+                        return Err(Error::PoolIsNotSet)
+                    }
+
+                    let collateral_factor_mantissa: Option<WrappedU256> =
+                        self.collateral_factor_mantissa(pool_attribute.pool.unwrap());
+                    if collateral_factor_mantissa.is_none() {
+                        return Err(Error::MarketNotListed)
+                    }
+                    let ltv = U256::from(collateral_factor_mantissa.unwrap());
+
+                    liquidation_threshold = pool_attribute.liquidation_threshold;
+
+                    let oracle_price: Option<u128> =
+                        PriceOracleRef::get_price(&oracle, pool_attribute.underlying.unwrap());
+                    if let None | Some(0) = oracle_price {
+                        return Err(Error::PriceError)
+                    }
+                    let oracle_price_mantissa = Exp {
+                        mantissa: WrappedU256::from(U256::from(oracle_price.clone().unwrap())),
+                    };
+
+                    asset_price = oracle_price.unwrap();
+                    let compounded_liquidity_balance = pool_attribute.account_balance;
+                    let borrow_balance_stored = pool_attribute.account_borrow_balance;
+
+                    if compounded_liquidity_balance != 0 {
+                        let liquidity_balance_eth = U256::from(asset_price)
+                            .mul(U256::from(compounded_liquidity_balance))
+                            .div(U256::from(PRICE_PRECISION));
+                        total_collateral_in_base_currency =
+                            total_collateral_in_base_currency.add(liquidity_balance_eth);
+                        avg_ltv = avg_ltv.add(liquidity_balance_eth.mul(U256::from(ltv)));
+                        avg_liquidation_threshold = avg_liquidation_threshold
+                            .add(liquidity_balance_eth.mul(U256::from(liquidation_threshold)));
+                    }
+
+                    if borrow_balance_stored != 0 {
+                        let borrow_balance_eth = U256::from(asset_price)
+                            .mul(U256::from(borrow_balance_stored))
+                            .div(U256::from(PRICE_PRECISION));
+                        total_debt_in_base_currency =
+                            total_debt_in_base_currency.add(borrow_balance_eth);
+                    }
+
+                    asset_params.push(HypotheticalAccountLiquidityCalculationParam {
+                        asset: pool,
+                        decimals: pool_attribute.decimals,
+                        token_balance: pool_attribute.account_balance,
+                        borrow_balance: pool_attribute.account_borrow_balance,
+                        exchange_rate_mantissa: Exp {
+                            mantissa: WrappedU256::from(pool_attribute.exchange_rate),
+                        },
+                        collateral_factor_mantissa: Exp {
+                            mantissa: self._collateral_factor_mantissa(pool).unwrap(),
+                        },
+                        oracle_price_mantissa: oracle_price_mantissa.clone(),
+                    });
+
+                    skip_pool = pool;
                 }
-                if pool_attribute.pool.is_none() {
-                    return Err(Error::PoolIsNotSet)
-                }
-
-                let collateral_factor_mantissa: Option<WrappedU256> =
-                    self.collateral_factor_mantissa(pool_attribute.pool.unwrap());
-                if collateral_factor_mantissa.is_none() {
-                    return Err(Error::MarketNotListed)
-                }
-                let ltv = U256::from(collateral_factor_mantissa.unwrap());
-
-                let liquidation_threshold = pool_attribute.liquidation_threshold;
-
-                let oracle_price: Option<u128> =
-                    PriceOracleRef::get_price(&oracle, pool_attribute.underlying.unwrap());
-                if let None | Some(0) = oracle_price {
-                    return Err(Error::PriceError)
-                }
-                let oracle_price_mantissa = Exp {
-                    mantissa: WrappedU256::from(U256::from(oracle_price.clone().unwrap())),
-                };
-
-                asset_price = oracle_price.unwrap();
-                let compounded_liquidity_balance = pool_attribute.account_balance;
-                let borrow_balance_stored = pool_attribute.account_borrow_balance;
-
-                if compounded_liquidity_balance != 0 {
-                    let liquidity_balance_eth = U256::from(asset_price)
-                        .mul(U256::from(compounded_liquidity_balance))
-                        .div(U256::from(PRICE_PRECISION));
-                    total_collateral_in_base_currency =
-                        total_collateral_in_base_currency.add(liquidity_balance_eth);
-                    avg_ltv = avg_ltv.add(liquidity_balance_eth.mul(U256::from(ltv)));
-                    avg_liquidation_threshold = avg_liquidation_threshold
-                        .add(liquidity_balance_eth.mul(U256::from(liquidation_threshold)));
-                }
-
-                if borrow_balance_stored != 0 {
-                    let borrow_balance_eth = U256::from(asset_price)
-                        .mul(U256::from(borrow_balance_stored))
-                        .div(U256::from(PRICE_PRECISION));
-                    total_debt_in_base_currency =
-                        total_debt_in_base_currency.add(borrow_balance_eth);
-                }
-
-                asset_params.push(HypotheticalAccountLiquidityCalculationParam {
-                    asset: pool,
-                    decimals: pool_attribute.decimals,
-                    token_balance: pool_attribute.account_balance,
-                    borrow_balance: pool_attribute.account_borrow_balance,
-                    exchange_rate_mantissa: Exp {
-                        mantissa: WrappedU256::from(pool_attribute.exchange_rate),
-                    },
-                    collateral_factor_mantissa: Exp {
-                        mantissa: self._collateral_factor_mantissa(pool).unwrap(),
-                    },
-                    oracle_price_mantissa: oracle_price_mantissa.clone(),
-                });
 
                 // Prepare parameters for calculation
                 for asset in markets {
-                    if asset == pool || asset == caller {
+                    if asset == skip_pool || asset == caller {
                         continue
                     }
                     // Read the balances and exchange rate from the pool
@@ -906,7 +915,7 @@ impl<T: Storage<Data>> Internal for T {
                     avg_liquidation_threshold: account_data.avg_liquidation_threshold,
                     amount_in_base_currency_unit: U256::from(redeem_amount),
                     asset_price: U256::from(asset_price),
-                    liquidation_threshold: U256::from(pool_attribute.liquidation_threshold),
+                    liquidation_threshold: U256::from(liquidation_threshold),
                 });
 
             if !balance_decrease_allowed_result {
@@ -1113,7 +1122,7 @@ impl<T: Storage<Data>> Internal for T {
         src: AccountId,
         _dst: AccountId,
         transfer_tokens: Balance,
-        pool_attribute: PoolAttributesForWithdrawValidation,
+        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()> {
         if self._transfer_guardian_paused() {
             return Err(Error::TransferIsPaused)
@@ -1395,7 +1404,7 @@ impl<T: Storage<Data>> Internal for T {
         // For each asset the account is in
         let markets = self._markets();
         let caller = Self::env().caller();
-        let mut pool = caller;
+        let mut skip_pool = caller;
         let mut asset_params = Vec::<HypotheticalAccountLiquidityCalculationParam>::new();
 
         if let Some(oracle) = self._oracle() {
@@ -1425,12 +1434,12 @@ impl<T: Storage<Data>> Internal for T {
                     },
                     oracle_price_mantissa: oracle_price_mantissa.clone(),
                 });
-                pool = caller_pool_id;
+                skip_pool = caller_pool_id;
             }
 
             // Prepare parameters for calculation
             for asset in &markets {
-                if *asset == caller || *asset == pool {
+                if *asset == caller || *asset == skip_pool {
                     continue
                 }
                 // Read the balances and exchange rate from the pool
@@ -1502,7 +1511,7 @@ impl<T: Storage<Data>> Internal for T {
 
         // Skip the provided pool
         let caller = Self::env().caller();
-        let mut pool = caller;
+        let mut skip_pool = caller;
         if let Some(oracle) = self._oracle() {
             if let Some(pool_attributes) = pool_attribute {
                 if pool_attributes.pool.is_none() {
@@ -1549,11 +1558,11 @@ impl<T: Storage<Data>> Internal for T {
                         total_debt_in_base_currency.add(borrow_balance_eth);
                 }
 
-                pool = pool_attributes.pool.unwrap();
+                skip_pool = pool_attributes.pool.unwrap();
             }
 
             for asset in markets {
-                if asset == pool || asset == caller {
+                if asset == skip_pool || asset == caller {
                     continue
                 }
                 let (compounded_liquidity_balance, borrow_balance_stored, _) =

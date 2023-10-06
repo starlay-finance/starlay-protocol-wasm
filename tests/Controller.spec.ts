@@ -765,7 +765,7 @@ describe('Controller spec', () => {
             )
           ).value.ok.ok,
           {
-            collateral: 90 - (50 * 90) / 100,
+            collateral: 90,
             shortfall: 0,
           },
         )
@@ -780,8 +780,8 @@ describe('Controller spec', () => {
             )
           ).value.ok.ok,
           {
-            collateral: 0,
-            shortfall: 500 - 450,
+            collateral: 450,
+            shortfall: 0,
           },
         )
         expect(1).toEqual(1)
@@ -1126,15 +1126,8 @@ describe('Controller spec', () => {
     })
 
     it('check account data', async () => {
-      const { dai } = pools
       const deployerAccountData = (
-        await controller.query.calculateUserAccountData(deployer.address, {
-          pool: dai.pool.address,
-          underlying: dai.token.address,
-          liquidationThreshold: 10000,
-          accountBalance: 0,
-          accountBorrowBalance: 0,
-        })
+        await controller.query.calculateUserAccountData(deployer.address, null)
       ).value.ok.ok
 
       // Total Collateral In Eth
