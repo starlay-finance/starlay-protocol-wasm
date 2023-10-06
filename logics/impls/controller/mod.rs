@@ -1383,7 +1383,10 @@ impl<T: Storage<Data>> Internal for T {
         caller_pool: Option<(AccountId, PoolAttributes)>,
     ) -> Result<(U256, U256)> {
         // For each asset the account is in
-        let account_assets = self._account_assets(account, token_modify);
+        let markets = self._markets();
+        let caller = Self::env().caller();
+        let mut pool = caller;
+        // let account_assets = self._account_assets(account, token_modify);
         let mut asset_params = Vec::<HypotheticalAccountLiquidityCalculationParam>::new();
 
         if let Some(oracle) = self._oracle() {
@@ -1412,14 +1415,23 @@ impl<T: Storage<Data>> Internal for T {
                         mantissa: self._collateral_factor_mantissa(caller_pool_id).unwrap(),
                     },
                     oracle_price_mantissa: oracle_price_mantissa.clone(),
-                })
+                });
+                pool = caller_pool_id;
             }
 
             // Prepare parameters for calculation
-            for asset in &account_assets {
+            for asset in &markets {
+                if *asset == caller || *asset == pool {
+                    continue
+                }
                 // Read the balances and exchange rate from the pool
                 let (token_balance, borrow_balance, exchange_rate_mantissa) =
                     PoolRef::get_account_snapshot(asset, account);
+
+                if token_balance == 0 && borrow_balance == 0 {
+                    continue
+                }
+
                 let decimals = PoolRef::token_decimals(asset);
 
                 // Get the normalized price of the asset
