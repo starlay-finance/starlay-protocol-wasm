@@ -732,9 +732,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let contract_addr = Self::env().account_id();
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(src);
-        let pool_attribute = PoolAttributes {
+        let pool_attribute = PoolAttributesForWithdrawValidation {
+            pool: Some(contract_addr),
             underlying: self._underlying(),
             decimals: self.token_decimals(),
+            liquidation_threshold: self._liquidation_threshold(),
             account_balance,
             account_borrow_balance,
             exchange_rate,
@@ -847,26 +849,31 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             let (_, account_borrow_balance, exchange_rate) = self.get_account_snapshot(redeemer);
             let account_balance = Internal::_balance_of(self, &redeemer);
             let contract_addr = Self::env().account_id();
-            let pool_attributes = PoolAttributesForWithdrawValidation {
+            // let pool_attributes = PoolAttributesForWithdrawValidation {
+            //     pool: Some(contract_addr),
+            //     underlying: self._underlying(),
+            //     decimals: self.token_decimals(),
+            //     liquidation_threshold: self._liquidation_threshold(),
+            //     account_balance,
+            //     account_borrow_balance,
+            //     exchange_rate,
+            //     total_borrows: self._total_borrows(),
+            // };
+            // let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
+            //     &controller,
+            //     pool_attributes,
+            //     redeemer,
+            //     redeem_amount,
+            // )?;
+            // if !balance_decrease_allowed {
+            //     return Err(Error::RedeemTransferOutNotPossible)
+            // }
+
+            let pool_attribute = PoolAttributesForWithdrawValidation {
                 pool: Some(contract_addr),
                 underlying: self._underlying(),
-                liquidation_threshold: self._liquidation_threshold(),
-                account_balance,
-                account_borrow_balance,
-            };
-            let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
-                &controller,
-                pool_attributes,
-                redeemer,
-                redeem_amount,
-            )?;
-            if !balance_decrease_allowed {
-                return Err(Error::RedeemTransferOutNotPossible)
-            }
-
-            let pool_attribute = PoolAttributes {
-                underlying: self._underlying(),
                 decimals: self.token_decimals(),
+                liquidation_threshold: self._liquidation_threshold(),
                 account_balance,
                 account_borrow_balance,
                 exchange_rate,
@@ -1378,7 +1385,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Ok(())
         }
 
-        let (account_balance, account_borrow_balance, _) = self.get_account_snapshot(user);
+        let (account_balance, account_borrow_balance, exchange_rate) =
+            self.get_account_snapshot(user);
         if account_balance == 0 {
             return Err(Error::from(PSP22Error::InsufficientBalance))
         }
@@ -1386,13 +1394,17 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let contract_addr = Self::env().account_id();
 
         if let Some(controller) = self._controller() {
-            let pool_attributes = PoolAttributesForWithdrawValidation {
-                pool: Some(contract_addr),
-                underlying: self._underlying(),
-                liquidation_threshold: self._liquidation_threshold(),
-                account_balance,
-                account_borrow_balance,
-            };
+            let pool_attributes: PoolAttributesForWithdrawValidation =
+                PoolAttributesForWithdrawValidation {
+                    pool: Some(contract_addr),
+                    underlying: self._underlying(),
+                    decimals: self.token_decimals(),
+                    liquidation_threshold: self._liquidation_threshold(),
+                    account_balance,
+                    account_borrow_balance,
+                    exchange_rate,
+                    total_borrows: self._total_borrows(),
+                };
 
             let balance_decrease_allowed = ControllerRef::balance_decrease_allowed(
                 &controller,

@@ -93,31 +93,6 @@ impl Default for Data {
     }
 }
 
-impl Default for PoolAttributes {
-    fn default() -> Self {
-        PoolAttributes {
-            underlying: None,
-            decimals: Default::default(),
-            account_balance: Default::default(),
-            account_borrow_balance: Default::default(),
-            exchange_rate: Default::default(),
-            total_borrows: Default::default(),
-        }
-    }
-}
-
-impl Default for PoolAttributesForWithdrawValidation {
-    fn default() -> Self {
-        PoolAttributesForWithdrawValidation {
-            pool: None,
-            underlying: None,
-            liquidation_threshold: Default::default(),
-            account_balance: Default::default(),
-            account_borrow_balance: Default::default(),
-        }
-    }
-}
-
 pub trait Internal {
     fn _mint_allowed(&self, pool: AccountId, minter: AccountId, mint_amount: Balance)
         -> Result<()>;
@@ -133,7 +108,7 @@ pub trait Internal {
         pool: AccountId,
         redeemer: AccountId,
         amount: Balance,
-        pool_attribute: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()>;
     fn _redeem_verify(
         &self,
@@ -209,7 +184,7 @@ pub trait Internal {
         src: AccountId,
         dst: AccountId,
         transfer_tokens: Balance,
-        pool_attribute: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()>;
     fn _transfer_verify(
         &self,
@@ -338,7 +313,7 @@ impl<T: Storage<Data>> Controller for T {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
-        pool_attribute: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()> {
         self._redeem_allowed(pool, redeemer, redeem_amount, pool_attribute)
     }
@@ -470,7 +445,7 @@ impl<T: Storage<Data>> Controller for T {
         src: AccountId,
         dst: AccountId,
         transfer_tokens: Balance,
-        pool_attribute: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()> {
         self._transfer_allowed(pool, src, dst, transfer_tokens, pool_attribute)
     }
@@ -718,10 +693,20 @@ impl<T: Storage<Data>> Internal for T {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
-        pool_attribute: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()> {
         let caller_pool = if let Some(_pool_attribute) = pool_attribute {
-            Some((pool, _pool_attribute))
+            Some((
+                pool,
+                PoolAttributes {
+                    underlying: _pool_attribute.underlying,
+                    decimals: _pool_attribute.decimals,
+                    account_balance: _pool_attribute.account_balance,
+                    account_borrow_balance: _pool_attribute.account_borrow_balance,
+                    exchange_rate: _pool_attribute.exchange_rate,
+                    total_borrows: _pool_attribute.total_borrows,
+                },
+            ))
         } else {
             None
         };
@@ -934,7 +919,7 @@ impl<T: Storage<Data>> Internal for T {
         src: AccountId,
         _dst: AccountId,
         transfer_tokens: Balance,
-        pool_attribute: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()> {
         if self._transfer_guardian_paused() {
             return Err(Error::TransferIsPaused)

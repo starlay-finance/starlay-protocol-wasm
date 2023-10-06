@@ -46,7 +46,7 @@ pub trait Controller {
         pool: AccountId,
         redeemer: AccountId,
         redeem_amount: Balance,
-        pool_attribute: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()>;
 
     /// Validates redeem and reverts on rejection. May emit logs.
@@ -152,7 +152,7 @@ pub trait Controller {
         src: AccountId,
         dst: AccountId,
         transfer_tokens: Balance,
-        pool_attribute: Option<PoolAttributes>,
+        pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()>;
 
     /// Validates transfer and reverts on rejection. May emit logs.
@@ -333,7 +333,7 @@ pub trait Controller {
 /// Structure for holding information about the Pool
 ///
 /// NOTE: Used to prevent cross contract calls to the caller pool
-#[derive(Clone, Decode, Encode)]
+#[derive(Clone, Decode, Encode, Default)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributes {
     pub underlying: Option<AccountId>,
@@ -347,7 +347,7 @@ pub struct PoolAttributes {
 /// Structure for having information for Seize about the Pool
 ///
 /// NOTE: Used to prevent cross contract calls to the caller pool
-#[derive(Clone, Decode, Encode)]
+#[derive(Clone, Decode, Encode, Default)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributesForSeizeCalculation {
     pub underlying: Option<AccountId>,
@@ -357,14 +357,17 @@ pub struct PoolAttributesForSeizeCalculation {
 /// Structure for having information for Withdraw's validations about the Pool
 ///
 /// NOTE: Used to prevent cross contract calls to the caller pool
-#[derive(Clone, Decode, Encode)]
+#[derive(Clone, Decode, Encode, Default)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributesForWithdrawValidation {
     pub pool: Option<AccountId>,
     pub underlying: Option<AccountId>,
+    pub decimals: u8,
     pub liquidation_threshold: u128,
     pub account_balance: Balance,
     pub account_borrow_balance: Balance,
+    pub exchange_rate: U256,
+    pub total_borrows: Balance,
 }
 
 /// Structure to hold status information of a user
