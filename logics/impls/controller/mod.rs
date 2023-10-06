@@ -1472,13 +1472,17 @@ impl<T: Storage<Data>> Internal for T {
         account: AccountId,
         pool_attribute: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<AccountData> {
-        let account_assets: Vec<AccountId> = self._account_assets(account, None);
+        // let account_assets: Vec<AccountId> = self._account_assets(account, None);
+        let markets = self._markets();
 
         let mut total_collateral_in_base_currency = U256::from(0);
         let mut avg_ltv = U256::from(0);
         let mut avg_liquidation_threshold = U256::from(0);
         let mut total_debt_in_base_currency: U256 = U256::from(0);
 
+        // Skip the provided pool
+        let caller = Self::env().caller();
+        let mut pool = caller;
         if let Some(oracle) = self._oracle() {
             if let Some(pool_attributes) = pool_attribute {
                 if pool_attributes.pool.is_none() {
@@ -1524,9 +1528,20 @@ impl<T: Storage<Data>> Internal for T {
                     total_debt_in_base_currency =
                         total_debt_in_base_currency.add(borrow_balance_eth);
                 }
+
+                pool = pool_attributes.pool.unwrap();
             }
 
-            for asset in account_assets {
+            for asset in markets {
+                if asset == pool || asset == caller {
+                    continue
+                }
+                let (compounded_liquidity_balance, borrow_balance_stored, _) =
+                    PoolRef::get_account_snapshot(&asset, account);
+                if compounded_liquidity_balance == 0 && borrow_balance_stored == 0 {
+                    continue
+                }
+
                 let collateral_factor_mantissa: Option<WrappedU256> =
                     self.collateral_factor_mantissa(asset);
                 if collateral_factor_mantissa.is_none() {
@@ -1546,8 +1561,6 @@ impl<T: Storage<Data>> Internal for T {
                     return Err(Error::PriceError)
                 }
                 let unit_price = unit_price_result.unwrap();
-                let (compounded_liquidity_balance, borrow_balance_stored, _) =
-                    PoolRef::get_account_snapshot(&asset, account);
 
                 if compounded_liquidity_balance != 0 {
                     let liquidity_balance_eth = U256::from(unit_price)
