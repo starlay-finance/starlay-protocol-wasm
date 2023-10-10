@@ -137,24 +137,24 @@ jobs:
           rustup component add rust-src
       - name: Check targets are installed correctly
         run: rustup target list --installed
-      - name: Restore cached Primes
-        id: cache-primes-restore
-        uses: actions/cache/restore@v3
-        with:
-          path: |
-            **/target
-          key: primes-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
-          restore-keys: |
-            primes-${{ runner.os }}-${{ runner.arch }}-
-      - name: Restore cached Artifacts
-        id: cache-artifacts-restore
-        uses: actions/cache/restore@v3
-        with:
-          path: |
-            **/artifacts
-          key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
-          restore-keys: |
-            artifacts-${{ runner.os }}-${{ runner.arch }}-
+      # - name: Restore cached Primes
+      #   id: cache-primes-restore
+      #   uses: actions/cache/restore@v3
+      #   with:
+      #     path: |
+      #       **/target
+      #     key: primes-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      #     restore-keys: |
+      #       primes-${{ runner.os }}-${{ runner.arch }}-
+      # - name: Restore cached Artifacts
+      #   id: cache-artifacts-restore
+      #   uses: actions/cache/restore@v3
+      #   with:
+      #     path: |
+      #       **/artifacts
+      #     key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      #     restore-keys: |
+      #       artifacts-${{ runner.os }}-${{ runner.arch }}-
       - name: Check if cargo-contract exists
         id: check-cargo-contract
         continue-on-error: true
@@ -179,20 +179,20 @@ jobs:
         uses: borales/actions-yarn@v4
         with:
           cmd: generate
-      - name: Save Primes
-        id: cache-primes-save
-        uses: actions/cache/save@v3
-        with:
-          path: |
-            **/target
-          key: primes-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
-      - name: Save Artifacts
-        id: cache-artifacts-save
-        uses: actions/cache/save@v3
-        with:
-          path: |
-            **/artifacts
-          key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      # - name: Save Primes
+      #   id: cache-primes-save
+      #   uses: actions/cache/save@v3
+      #   with:
+      #     path: |
+      #       **/target
+      #     key: primes-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+      # - name: Save Artifacts
+      #   id: cache-artifacts-save
+      #   uses: actions/cache/save@v3
+      #   with:
+      #     path: |
+      #       **/artifacts
+      #     key: artifacts-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
       - name: Check if substrate node exists
         id: check-substrate-node
         continue-on-error: true
