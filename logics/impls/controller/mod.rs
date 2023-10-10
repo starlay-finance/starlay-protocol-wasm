@@ -697,9 +697,9 @@ impl<T: Storage<Data>> Internal for T {
         pool_attributes: Option<PoolAttributesForWithdrawValidation>,
     ) -> Result<()> {
         let oracle = self._oracle().ok_or(Error::OracleIsNotSet)?;
-        let mut asset_price: u128 = 0;
-        let mut liquidation_threshold: u128 = 0;
-        let (shortfall, account_data) = {
+        let (shortfall, account_data, asset_price, liquidation_threshold) = {
+            let mut asset_price: u128 = 0;
+            let mut liquidation_threshold: u128 = 0;
             // For each asset the account is in
             let caller = Self::env().caller();
             let mut skip_pool = caller;
@@ -778,6 +778,7 @@ impl<T: Storage<Data>> Internal for T {
             }
 
             // Prepare parameters for calculation
+            // NOTE: do not use account_asset function as it is making duplicated cross-contract calling leads to high gas.
             for asset in markets {
                 if asset == skip_pool || asset == caller {
                     continue
@@ -877,9 +878,19 @@ impl<T: Storage<Data>> Internal for T {
             };
             // These are safe, as the underflow condition is checked first
             let value = if sum_collateral > sum_borrow_plus_effect {
-                (U256::from(0), account_data)
+                (
+                    U256::from(0),
+                    account_data,
+                    asset_price,
+                    liquidation_threshold,
+                )
             } else {
-                (sum_borrow_plus_effect.sub(sum_collateral), account_data)
+                (
+                    sum_borrow_plus_effect.sub(sum_collateral),
+                    account_data,
+                    asset_price,
+                    liquidation_threshold,
+                )
             };
 
             value
