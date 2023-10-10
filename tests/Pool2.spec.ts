@@ -1101,7 +1101,7 @@ describe('Pool spec 2', () => {
             .withSigner(users[1])
             .query.setUseReserveAsCollateral(false)
         ).value.ok.err,
-      ).toEqual({ depositAlreadyInUse: null })
+      ).toEqual({ controller: 'BalanceDecreaseNotAllowed' })
     })
 
     it('User 1 Deposits 2000 USDC, disables USDT as collateral. Should revert as 2000 USDC are not enough to cover the debt (revert expected)', async () => {
@@ -1124,7 +1124,7 @@ describe('Pool spec 2', () => {
             .withSigner(users[1])
             .query.setUseReserveAsCollateral(false)
         ).value.ok.err,
-      ).toEqual({ depositAlreadyInUse: null })
+      ).toEqual({ controller: 'BalanceDecreaseNotAllowed' })
     })
 
     it('User 1 Deposits 2000 more USDC (enough to cover the DAI debt), disables USDT as collateral', async () => {
@@ -1155,7 +1155,7 @@ describe('Pool spec 2', () => {
             .withSigner(users[1])
             .query.setUseReserveAsCollateral(false)
         ).value.ok.err,
-      ).toEqual({ depositAlreadyInUse: null })
+      ).toEqual({ controller: 'BalanceDecreaseNotAllowed' })
     })
 
     it('User 1 withdraw USDT', async () => {

@@ -314,7 +314,7 @@ pub trait Controller {
         pool_attributes: PoolAttributesForWithdrawValidation,
         account: AccountId,
         amount: Balance,
-    ) -> Result<bool>;
+    ) -> Result<()>;
     /// Determine the current account liquidity with respect to collateral requirements
     #[ink(message)]
     fn get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)>;
