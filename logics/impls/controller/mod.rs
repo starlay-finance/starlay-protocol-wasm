@@ -266,7 +266,6 @@ pub trait Internal {
         &self,
         account: AccountId,
         pool_attributes: Option<PoolAttributes>,
-        get_asset_param: bool,
     ) -> Result<(
         AccountCollateralData,
         Vec<HypotheticalAccountLiquidityCalculationParam>,
@@ -675,8 +674,7 @@ impl<T: Storage<Data>> Controller for T {
         account: AccountId,
         pool_attributes: Option<PoolAttributes>,
     ) -> Result<AccountData> {
-        let (account_data, _) =
-            self._calculate_user_account_data(account, pool_attributes, false)?;
+        let (account_data, _) = self._calculate_user_account_data(account, pool_attributes)?;
 
         Ok(AccountData {
             total_collateral_in_base_currency: account_data.total_collateral_in_base_currency,
@@ -740,7 +738,7 @@ impl<T: Storage<Data>> Internal for T {
                 health_factor: _,
             },
             asset_params,
-        ) = self._calculate_user_account_data(redeemer, pool_attributes, true)?;
+        ) = self._calculate_user_account_data(redeemer, pool_attributes)?;
 
         // Prepare parameters for calculation
         let (sum_collateral, sum_borrow_plus_effect) =
@@ -1270,8 +1268,7 @@ impl<T: Storage<Data>> Internal for T {
         borrow_amount: Balance,
         pool_attributes: Option<PoolAttributes>,
     ) -> Result<(U256, U256)> {
-        let (_, asset_params) =
-            self._calculate_user_account_data(account, pool_attributes, true)?;
+        let (_, asset_params) = self._calculate_user_account_data(account, pool_attributes)?;
 
         let (sum_collateral, sum_borrow_plus_effect) =
             get_hypothetical_account_liquidity(GetHypotheticalAccountLiquidityInput {
@@ -1295,7 +1292,6 @@ impl<T: Storage<Data>> Internal for T {
         &self,
         account: AccountId,
         pool_attributes: Option<PoolAttributes>,
-        get_asset_param: bool,
     ) -> Result<(
         AccountCollateralData,
         Vec<HypotheticalAccountLiquidityCalculationParam>,
@@ -1331,21 +1327,19 @@ impl<T: Storage<Data>> Internal for T {
                 mantissa: WrappedU256::from(U256::from(oracle_price)),
             };
 
-            if get_asset_param {
-                asset_params.push(HypotheticalAccountLiquidityCalculationParam {
-                    asset: attr_pool,
-                    decimals: pool_attribute.decimals,
-                    token_balance: pool_attribute.account_balance,
-                    borrow_balance: pool_attribute.account_borrow_balance,
-                    exchange_rate_mantissa: Exp {
-                        mantissa: WrappedU256::from(pool_attribute.exchange_rate),
-                    },
-                    collateral_factor_mantissa: Exp {
-                        mantissa: collateral_factor_mantissa,
-                    },
-                    oracle_price_mantissa: oracle_price_mantissa.clone(),
-                });
-            }
+            asset_params.push(HypotheticalAccountLiquidityCalculationParam {
+                asset: attr_pool,
+                decimals: pool_attribute.decimals,
+                token_balance: pool_attribute.account_balance,
+                borrow_balance: pool_attribute.account_borrow_balance,
+                exchange_rate_mantissa: Exp {
+                    mantissa: WrappedU256::from(pool_attribute.exchange_rate),
+                },
+                collateral_factor_mantissa: Exp {
+                    mantissa: collateral_factor_mantissa,
+                },
+                oracle_price_mantissa: oracle_price_mantissa.clone(),
+            });
 
             let compounded_liquidity_balance = pool_attribute.account_balance;
             if compounded_liquidity_balance != 0 {
@@ -1410,22 +1404,20 @@ impl<T: Storage<Data>> Internal for T {
                 ._collateral_factor_mantissa(asset)
                 .ok_or(Error::MarketNotListed)?;
 
-            if get_asset_param {
-                // Store data for input to calculate the available capacity
-                asset_params.push(HypotheticalAccountLiquidityCalculationParam {
-                    asset,
-                    decimals,
-                    token_balance: compounded_liquidity_balance,
-                    borrow_balance: borrow_balance_stored,
-                    exchange_rate_mantissa: Exp {
-                        mantissa: WrappedU256::from(exchange_rate_mantissa),
-                    },
-                    collateral_factor_mantissa: Exp {
-                        mantissa: collateral_factor_mantissa,
-                    },
-                    oracle_price_mantissa: oracle_price_mantissa.clone(),
-                });
-            }
+            // Store data for input to calculate the available capacity
+            asset_params.push(HypotheticalAccountLiquidityCalculationParam {
+                asset,
+                decimals,
+                token_balance: compounded_liquidity_balance,
+                borrow_balance: borrow_balance_stored,
+                exchange_rate_mantissa: Exp {
+                    mantissa: WrappedU256::from(exchange_rate_mantissa),
+                },
+                collateral_factor_mantissa: Exp {
+                    mantissa: collateral_factor_mantissa,
+                },
+                oracle_price_mantissa: oracle_price_mantissa.clone(),
+            });
 
             // Calculate data for input to calculate the capacity of balance reduction with liquidation threshold
             let ltv = U256::from(collateral_factor_mantissa);
@@ -1490,7 +1482,7 @@ impl<T: Storage<Data>> Internal for T {
         let oracle = self._oracle().ok_or(Error::OracleIsNotSet)?;
 
         let (account_data, _) =
-            self._calculate_user_account_data(account, Some(pool_attributes.clone()), false)?;
+            self._calculate_user_account_data(account, Some(pool_attributes.clone()))?;
 
         let total_debt_in_base_currency = account_data.total_debt_in_base_currency;
 
