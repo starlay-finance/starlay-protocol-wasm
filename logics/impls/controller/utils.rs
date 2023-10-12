@@ -140,10 +140,6 @@ pub fn get_hypothetical_account_liquidity(
         borrow_amount,
     } = input;
 
-    if asset_params.is_empty() {
-        sum_borrow_plus_effect = U256::from(redeem_tokens + borrow_amount);
-    }
-
     for param in asset_params {
         let (token_to_denom, collateral, borrow_plus_effect) =
             get_hypothetical_account_liquidity_per_asset(

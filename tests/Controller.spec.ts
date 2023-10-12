@@ -765,7 +765,7 @@ describe('Controller spec', () => {
             )
           ).value.ok.ok,
           {
-            collateral: 90,
+            collateral: 90 - (50 * 90) / 100,
             shortfall: 0,
           },
         )
@@ -780,8 +780,8 @@ describe('Controller spec', () => {
             )
           ).value.ok.ok,
           {
-            collateral: 450,
-            shortfall: 0,
+            collateral: 0,
+            shortfall: 500 - 450,
           },
         )
         expect(1).toEqual(1)

@@ -266,6 +266,7 @@ pub trait Internal {
         &self,
         account: AccountId,
         pool_attributes: Option<PoolAttributes>,
+        token_modify: Option<AccountId>,
     ) -> Result<(
         AccountCollateralData,
         Vec<HypotheticalAccountLiquidityCalculationParam>,
@@ -674,7 +675,8 @@ impl<T: Storage<Data>> Controller for T {
         account: AccountId,
         pool_attributes: Option<PoolAttributes>,
     ) -> Result<AccountData> {
-        let (account_data, _) = self._calculate_user_account_data(account, pool_attributes)?;
+        let (account_data, _) =
+            self._calculate_user_account_data(account, pool_attributes, None)?;
 
         Ok(AccountData {
             total_collateral_in_base_currency: account_data.total_collateral_in_base_currency,
@@ -738,7 +740,7 @@ impl<T: Storage<Data>> Internal for T {
                 health_factor: _,
             },
             asset_params,
-        ) = self._calculate_user_account_data(redeemer, pool_attributes)?;
+        ) = self._calculate_user_account_data(redeemer, pool_attributes, Some(pool))?;
 
         // Prepare parameters for calculation
         let (sum_collateral, sum_borrow_plus_effect) =
@@ -1262,7 +1264,8 @@ impl<T: Storage<Data>> Internal for T {
         borrow_amount: Balance,
         pool_attributes: Option<PoolAttributes>,
     ) -> Result<(U256, U256)> {
-        let (_, asset_params) = self._calculate_user_account_data(account, pool_attributes)?;
+        let (_, asset_params) =
+            self._calculate_user_account_data(account, pool_attributes, token_modify)?;
 
         let (sum_collateral, sum_borrow_plus_effect) =
             get_hypothetical_account_liquidity(GetHypotheticalAccountLiquidityInput {
@@ -1286,6 +1289,7 @@ impl<T: Storage<Data>> Internal for T {
         &self,
         account: AccountId,
         pool_attributes: Option<PoolAttributes>,
+        token_modify: Option<AccountId>,
     ) -> Result<(
         AccountCollateralData,
         Vec<HypotheticalAccountLiquidityCalculationParam>,
@@ -1374,8 +1378,12 @@ impl<T: Storage<Data>> Internal for T {
             let (compounded_liquidity_balance, borrow_balance_stored, exchange_rate_mantissa) =
                 PoolRef::get_account_snapshot(&asset, account);
 
+            // If user didn't make any action.
             if compounded_liquidity_balance == 0 && borrow_balance_stored == 0 {
-                continue
+                // If it is modifying token, add to asset_params.
+                if token_modify.is_none() || token_modify != Some(asset) {
+                    continue
+                }
             }
 
             // Get Metadata of pool
@@ -1474,7 +1482,7 @@ impl<T: Storage<Data>> Internal for T {
         let oracle = self._oracle().ok_or(Error::OracleIsNotSet)?;
 
         let (account_data, _) =
-            self._calculate_user_account_data(account, Some(pool_attributes.clone()))?;
+            self._calculate_user_account_data(account, Some(pool_attributes.clone()), None)?;
 
         let total_debt_in_base_currency = account_data.total_debt_in_base_currency;
 
@@ -1492,7 +1500,7 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::PriceError)
         }
 
-        let result = utils::balance_decrease_allowed(BalanceDecreaseAllowedParam {
+        let result = balance_decrease_allowed(BalanceDecreaseAllowedParam {
             total_collateral_in_base_currency: account_data.total_collateral_in_base_currency,
             total_debt_in_base_currency,
             avg_liquidation_threshold: account_data.avg_liquidation_threshold,
