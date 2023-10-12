@@ -657,6 +657,22 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     default fn using_reserve_as_collateral(&self, user: AccountId) -> bool {
         self._using_reserve_as_collateral(user).unwrap_or_default()
     }
+
+    default fn metadata(&self) -> PoolMetaData {
+        PoolMetaData {
+            underlying: self._underlying(),
+            decimals: self.token_decimals(),
+            liquidation_threshold: self._liquidation_threshold(),
+        }
+    }
+
+    default fn status(&self) -> PoolStatus {
+        PoolStatus {
+            total_supply: self._principal_total_supply(),
+            total_borrows: self._total_borrows(),
+            exchange_rate: self._exchange_rate_stored(),
+        }
+    }
 }
 
 impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metadata::Data>> Internal

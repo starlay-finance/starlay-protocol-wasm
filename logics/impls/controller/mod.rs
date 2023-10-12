@@ -1,7 +1,10 @@
 use super::exp_no_err::Exp;
 pub use crate::traits::{
     controller::*,
-    pool::PoolRef,
+    pool::{
+        PoolMetaData,
+        PoolRef,
+    },
 };
 use crate::{
     impls::price_oracle::PRICE_PRECISION,
@@ -1386,7 +1389,12 @@ impl<T: Storage<Data>> Internal for T {
                 continue
             }
 
-            let decimals = PoolRef::token_decimals(&asset);
+            // Get Metadata of pool
+            let PoolMetaData {
+                decimals,
+                liquidation_threshold,
+                underlying: _,
+            } = PoolRef::metadata(&asset);
             // Get the normalized price of the asset
             let oracle_price: u128 =
                 PriceOracleRef::get_underlying_price(&oracle, asset).ok_or(Error::PriceError)?;
@@ -1400,9 +1408,24 @@ impl<T: Storage<Data>> Internal for T {
             let collateral_factor_mantissa = self
                 ._collateral_factor_mantissa(asset)
                 .ok_or(Error::MarketNotListed)?;
-            let ltv = U256::from(collateral_factor_mantissa);
 
-            let liquidation_threshold = PoolRef::liquidation_threshold(&asset);
+            // Store data for input to calculate the available capacity
+            asset_params.push(HypotheticalAccountLiquidityCalculationParam {
+                asset,
+                decimals,
+                token_balance: compounded_liquidity_balance,
+                borrow_balance: borrow_balance_stored,
+                exchange_rate_mantissa: Exp {
+                    mantissa: WrappedU256::from(exchange_rate_mantissa),
+                },
+                collateral_factor_mantissa: Exp {
+                    mantissa: collateral_factor_mantissa,
+                },
+                oracle_price_mantissa: oracle_price_mantissa.clone(),
+            });
+
+            // Calculate data for input to calculate the capacity of balance reduction with liquidation threshold
+            let ltv = U256::from(collateral_factor_mantissa);
 
             if compounded_liquidity_balance != 0 {
                 let liquidity_balance_eth = U256::from(oracle_price)
@@ -1421,20 +1444,6 @@ impl<T: Storage<Data>> Internal for T {
                     .div(U256::from(PRICE_PRECISION));
                 total_debt_in_base_currency = total_debt_in_base_currency.add(borrow_balance_eth);
             }
-
-            asset_params.push(HypotheticalAccountLiquidityCalculationParam {
-                asset,
-                decimals,
-                token_balance: compounded_liquidity_balance,
-                borrow_balance: borrow_balance_stored,
-                exchange_rate_mantissa: Exp {
-                    mantissa: WrappedU256::from(exchange_rate_mantissa),
-                },
-                collateral_factor_mantissa: Exp {
-                    mantissa: collateral_factor_mantissa,
-                },
-                oracle_price_mantissa: oracle_price_mantissa.clone(),
-            });
         }
 
         avg_ltv = if total_collateral_in_base_currency.is_zero() {

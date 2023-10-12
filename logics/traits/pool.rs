@@ -237,6 +237,32 @@ pub trait Pool: PSP22 + PSP22Metadata {
     /// Check if user is using reserve as collateral or not
     #[ink(message)]
     fn using_reserve_as_collateral(&self, user: AccountId) -> bool;
+    #[ink(message)]
+    fn metadata(&self) -> PoolMetaData;
+    #[ink(message)]
+    fn status(&self) -> PoolStatus;
+}
+
+/// Structure to hold Metadata information of a Pool
+///
+/// Used to retrieve the Metadata of the Protocol pool.
+#[derive(Clone, Decode, Encode)]
+#[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+pub struct PoolMetaData {
+    pub underlying: Option<AccountId>,
+    pub decimals: u8,
+    pub liquidation_threshold: u128,
+}
+
+/// Structure to hold Status information of a Pool
+///
+/// Used to retrieve the Status of the Protocol pool.
+#[derive(Clone, Decode, Encode)]
+#[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+pub struct PoolStatus {
+    pub total_supply: u128,
+    pub total_borrows: u128,
+    pub exchange_rate: U256,
 }
 
 /// Custom error definitions for Pool
