@@ -9,7 +9,6 @@ use super::{
     controller::{
         PoolAttributes,
         PoolAttributesForSeizeCalculation,
-        PoolAttributesForWithdrawValidation,
     },
     exp_no_err::{
         exp_scale,
@@ -726,7 +725,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let contract_addr = Self::env().account_id();
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(src);
-        let pool_attribute = PoolAttributesForWithdrawValidation {
+        let pool_attribute = PoolAttributes {
             pool: Some(contract_addr),
             underlying: self._underlying(),
             decimals: self.token_decimals(),
@@ -841,7 +840,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let account_balance = Internal::_balance_of(self, &redeemer);
         let contract_addr = Self::env().account_id();
 
-        let pool_attribute = PoolAttributesForWithdrawValidation {
+        let pool_attribute = PoolAttributes {
             pool: Some(contract_addr),
             underlying: self._underlying(),
             decimals: self.token_decimals(),
@@ -931,12 +930,14 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             self.get_account_snapshot(borrower);
 
         let pool_attribute = PoolAttributes {
+            pool: Some(contract_addr),
             underlying: self._underlying(),
             decimals: self.token_decimals(),
             account_balance,
             account_borrow_balance,
             exchange_rate,
             total_borrows: self._total_borrows(),
+            liquidation_threshold: self._liquidation_threshold(),
         };
 
         ControllerRef::borrow_allowed(
@@ -1042,12 +1043,14 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(borrower);
         let pool_attribute = PoolAttributes {
+            pool: Some(contract_addr),
             underlying: self._underlying(),
             decimals: self.token_decimals(),
             account_balance,
             account_borrow_balance,
             exchange_rate,
             total_borrows: self._total_borrows(),
+            liquidation_threshold: self._liquidation_threshold(),
         };
 
         ControllerRef::liquidate_borrow_allowed(
@@ -1348,17 +1351,16 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let contract_addr = Self::env().account_id();
 
         let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
-        let pool_attributes: PoolAttributesForWithdrawValidation =
-            PoolAttributesForWithdrawValidation {
-                pool: Some(contract_addr),
-                underlying: self._underlying(),
-                decimals: self.token_decimals(),
-                liquidation_threshold: self._liquidation_threshold(),
-                account_balance,
-                account_borrow_balance,
-                exchange_rate,
-                total_borrows: self._total_borrows(),
-            };
+        let pool_attributes: PoolAttributes = PoolAttributes {
+            pool: Some(contract_addr),
+            underlying: self._underlying(),
+            decimals: self.token_decimals(),
+            liquidation_threshold: self._liquidation_threshold(),
+            account_balance,
+            account_borrow_balance,
+            exchange_rate,
+            total_borrows: self._total_borrows(),
+        };
 
         ControllerRef::balance_decrease_allowed(
             &controller,
