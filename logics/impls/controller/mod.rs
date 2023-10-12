@@ -750,7 +750,7 @@ impl<T: Storage<Data>> Internal for T {
             });
 
         // These are safe, as the underflow condition is checked first
-        if sum_collateral <= sum_borrow_plus_effect {
+        if sum_collateral < sum_borrow_plus_effect {
             return Err(Error::InsufficientLiquidity)
         }
 
