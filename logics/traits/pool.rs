@@ -286,7 +286,6 @@ pub enum Error {
     ZeroOwnerAddress,
     ZeroDelegateeAddress,
     InsufficientDelegateAllowance,
-    DepositAlreadyInUse,
     CallerIsNotFlashloanGateway,
     ControllerIsNotSet,
     InterestRateModelIsNotSet,
