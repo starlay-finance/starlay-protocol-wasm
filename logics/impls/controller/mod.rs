@@ -750,13 +750,7 @@ impl<T: Storage<Data>> Internal for T {
             });
 
         // These are safe, as the underflow condition is checked first
-        let shortfall = if sum_collateral > sum_borrow_plus_effect {
-            U256::from(0)
-        } else {
-            sum_borrow_plus_effect.sub(sum_collateral)
-        };
-
-        if !shortfall.is_zero() {
+        if sum_collateral <= sum_borrow_plus_effect {
             return Err(Error::InsufficientLiquidity)
         }
 
@@ -1315,7 +1309,7 @@ impl<T: Storage<Data>> Internal for T {
 
             let collateral_factor_mantissa = self
                 ._collateral_factor_mantissa(attr_pool)
-                .ok_or(Error::MarketNotListed)?;
+                .ok_or(Error::InvalidCollateralFactor)?;
             let ltv = U256::from(collateral_factor_mantissa);
 
             let oracle_price: u128 =
@@ -1388,11 +1382,12 @@ impl<T: Storage<Data>> Internal for T {
             let PoolMetaData {
                 decimals,
                 liquidation_threshold,
-                underlying: _,
+                underlying,
             } = PoolRef::metadata(&asset);
+            let pool_underlying = underlying.ok_or(Error::UnderlyingIsNotSet)?;
             // Get the normalized price of the asset
             let oracle_price: u128 =
-                PriceOracleRef::get_underlying_price(&oracle, asset).ok_or(Error::PriceError)?;
+                PriceOracleRef::get_price(&oracle, pool_underlying).ok_or(Error::PriceError)?;
             if oracle_price == 0 {
                 return Err(Error::PriceError)
             }
@@ -1402,7 +1397,7 @@ impl<T: Storage<Data>> Internal for T {
 
             let collateral_factor_mantissa = self
                 ._collateral_factor_mantissa(asset)
-                .ok_or(Error::MarketNotListed)?;
+                .ok_or(Error::InvalidCollateralFactor)?;
 
             // Store data for input to calculate the available capacity
             asset_params.push(HypotheticalAccountLiquidityCalculationParam {
@@ -1441,16 +1436,13 @@ impl<T: Storage<Data>> Internal for T {
             }
         }
 
-        avg_ltv = if total_collateral_in_base_currency.is_zero() {
-            U256::from(0)
+        (avg_ltv, avg_liquidation_threshold) = if total_collateral_in_base_currency.is_zero() {
+            (U256::from(0), U256::from(0))
         } else {
-            avg_ltv.div(total_collateral_in_base_currency)
-        };
-
-        avg_liquidation_threshold = if total_collateral_in_base_currency.is_zero() {
-            U256::from(0)
-        } else {
-            avg_liquidation_threshold.div(total_collateral_in_base_currency)
+            (
+                avg_ltv.div(total_collateral_in_base_currency),
+                avg_liquidation_threshold.div(total_collateral_in_base_currency),
+            )
         };
 
         let health_factor = calculate_health_factor_from_balances(
