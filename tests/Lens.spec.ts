@@ -7,7 +7,6 @@ import {
   deployController,
   deployDefaultInterestRateModel,
   deployFaucet,
-  deployIncentivesController,
   deployLens,
   deployPSP22Token,
   deployPoolFromAsset,
@@ -20,7 +19,7 @@ import Lens from '../types/contracts/lens'
 import Pool from '../types/contracts/pool'
 import PriceOracle from '../types/contracts/price_oracle'
 import PSP22Token from '../types/contracts/psp22_token'
-import { shouldNotRevert } from './testHelpers'
+import { shouldNotRevert, shouldNotRevertWithNetworkGas } from './testHelpers'
 
 const MAX_CALL_WEIGHT = new BN(100_000_000_000).isub(BN_ONE).mul(BN_TEN)
 const PROOFSIZE = new BN(2_000_000)
@@ -67,17 +66,11 @@ const setup = async (
     args: [[ONE_ETHER], [ONE_ETHER], [ONE_ETHER], [ONE_ETHER]],
   })
 
-  const incentivesController = await deployIncentivesController({
-    api,
-    signer: deployer,
-    args: [],
-  })
-
   const pool1 = await deployPoolFromAsset({
     api,
     signer: deployer,
     args: [
-      incentivesController.address,
+      null,
       token1.address,
       controller.address,
       interestRateModel.address,
@@ -91,7 +84,7 @@ const setup = async (
     api,
     signer: deployer,
     args: [
-      incentivesController.address,
+      null,
       token2.address,
       controller.address,
       interestRateModel.address,
@@ -110,25 +103,48 @@ const setup = async (
   const users = [bob, charlie]
 
   // initialize
-  await shouldNotRevert(controller, 'setLiquidationIncentiveMantissa', [
-    [liquidationIncentive],
+  await shouldNotRevertWithNetworkGas(
+    api,
+    controller,
+    'setLiquidationIncentiveMantissa',
+    [[liquidationIncentive]],
+  )
+  await shouldNotRevertWithNetworkGas(
+    api,
+    controller,
+    'setCloseFactorMantissa',
+    [[closeFactor]],
+  )
+  await shouldNotRevertWithNetworkGas(api, controller, 'setPriceOracle', [
+    priceOracle.address,
   ])
-  await shouldNotRevert(controller, 'setCloseFactorMantissa', [[closeFactor]])
-  await shouldNotRevert(controller, 'setPriceOracle', [priceOracle.address])
-  await shouldNotRevert(priceOracle, 'setFixedPrice', [token1.address, price])
-  await shouldNotRevert(priceOracle, 'setFixedPrice', [token2.address, price])
-  await shouldNotRevert(
+  await shouldNotRevertWithNetworkGas(api, priceOracle, 'setFixedPrice', [
+    token1.address,
+    price,
+  ])
+  await shouldNotRevertWithNetworkGas(api, priceOracle, 'setFixedPrice', [
+    token2.address,
+    price,
+  ])
+  await shouldNotRevertWithNetworkGas(
+    api,
     controller,
     'supportMarketWithCollateralFactorMantissa',
     [pool1.address, token1.address, [collateralFactor]],
   )
-  await shouldNotRevert(
+  await shouldNotRevertWithNetworkGas(
+    api,
     controller,
     'supportMarketWithCollateralFactorMantissa',
     [pool2.address, token2.address, [collateralFactor]],
   )
-  await shouldNotRevert(pool1, 'setReserveFactorMantissa', [[reserveFactor]])
-  await shouldNotRevert(controller, 'setBorrowCap', [pool1.address, borrowCap])
+  await shouldNotRevertWithNetworkGas(api, pool1, 'setReserveFactorMantissa', [
+    [reserveFactor],
+  ])
+  await shouldNotRevertWithNetworkGas(api, controller, 'setBorrowCap', [
+    pool1.address,
+    borrowCap,
+  ])
 
   const lens = await deployLens({ api, signer: deployer, args: [] })
   const faucet = await deployFaucet({ api, signer: deployer, args: [] })

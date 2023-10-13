@@ -192,13 +192,11 @@ impl<T: Storage<Data>> Internal for T {
     default fn _assert_manager(&mut self) -> Result<()> {
         let caller = Self::env().caller();
 
-        if let Some(manager) = self._manager() {
-            if manager != caller {
-                return Err(Error::CallerIsNotManager)
-            }
-            return Ok(())
+        let manager = self._manager().ok_or(Error::ManagerIsNotSet)?;
+        if manager != caller {
+            return Err(Error::CallerIsNotManager)
         }
-        Err(Error::ManagerIsNotSet)
+        Ok(())
     }
 
     default fn _initialize(
@@ -444,41 +442,34 @@ impl<T: Storage<Data>> Internal for T {
         let contract_addr = Self::env().account_id();
         PSP22Ref::transfer_from(&asset, caller, contract_addr, amount, Default::default())?;
 
-        if let Some(controller) = self._controller() {
-            if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
-                PSP22Ref::approve(&asset, pool, u128::MAX)?;
-                return self._loop(asset, amount, borrow_ratio, loop_count)
-            }
-            return Err(Error::MarketNotListed)
-        }
-        Err(Error::ControllerIsNotSet)
+        let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
+        let pool = ControllerRef::market_of_underlying(&controller, asset)
+            .ok_or(Error::MarketNotListed)?;
+        PSP22Ref::approve(&asset, pool, u128::MAX)?;
+        self._loop(asset, amount, borrow_ratio, loop_count)
     }
 
     default fn _loop_eth(&mut self, borrow_ratio: u128, loop_count: u128) -> Result<()> {
-        if let Some(weth) = self._weth_address() {
-            let _ltv = self._loan_to_value(weth);
+        let weth = self._weth_address().ok_or(Error::WETHIsNotSet)?;
+        let _ltv = self._loan_to_value(weth);
 
-            if borrow_ratio <= 0 || borrow_ratio > _ltv {
-                return Err(Error::InappropriateBorrowRate)
-            }
-            if loop_count < 2 || loop_count > 40 {
-                return Err(Error::InappropriateLoopCount)
-            }
-
-            let deposit_value = Self::env().transferred_value();
-
-            if let Some(controller) = self._controller() {
-                if let Some(pool) = ControllerRef::market_of_underlying(&controller, weth) {
-                    WETHRef::deposit_builder(&weth)
-                        .transferred_value(deposit_value)
-                        .invoke()?;
-                    WETHRef::approve(&weth, pool, u128::MAX)?;
-                    return self._loop(weth, deposit_value, borrow_ratio, loop_count)
-                }
-                return Err(Error::MarketNotListed)
-            }
+        if borrow_ratio <= 0 || borrow_ratio > _ltv {
+            return Err(Error::InappropriateBorrowRate)
         }
-        Err(Error::WETHIsNotSet)
+        if loop_count < 2 || loop_count > 40 {
+            return Err(Error::InappropriateLoopCount)
+        }
+
+        let deposit_value = Self::env().transferred_value();
+
+        let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
+        let pool =
+            ControllerRef::market_of_underlying(&controller, weth).ok_or(Error::MarketNotListed)?;
+        WETHRef::deposit_builder(&weth)
+            .transferred_value(deposit_value)
+            .invoke()?;
+        WETHRef::approve(&weth, pool, u128::MAX)?;
+        self._loop(weth, deposit_value, borrow_ratio, loop_count)
     }
 
     default fn _loop(
@@ -489,90 +480,82 @@ impl<T: Storage<Data>> Internal for T {
         loop_count: u128,
     ) -> Result<()> {
         let caller = Self::env().caller();
-        if let Some(controller) = self._controller() {
-            if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
-                let mut next_deposit_amount = amount;
-                for _i in 0..loop_count {
-                    PoolRef::mint_to_builder(&pool, caller, next_deposit_amount)
-                        .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
-                        .try_invoke()
-                        .unwrap()
-                        .unwrap()?;
+        let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
+        let pool = ControllerRef::market_of_underlying(&controller, asset)
+            .ok_or(Error::MarketNotListed)?;
+        let mut next_deposit_amount = amount;
+        for _i in 0..loop_count {
+            PoolRef::mint_to_builder(&pool, caller, next_deposit_amount)
+                .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
+                .try_invoke()
+                .unwrap()
+                .unwrap()?;
 
-                    next_deposit_amount = (next_deposit_amount * borrow_ratio) / 10000;
+            next_deposit_amount = (next_deposit_amount * borrow_ratio) / 10000;
 
-                    if next_deposit_amount == 0 {
-                        break
-                    }
-
-                    PoolRef::borrow_for_builder(&pool, caller, next_deposit_amount)
-                        .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
-                        .try_invoke()
-                        .unwrap()
-                        .unwrap()?;
-                }
-                if next_deposit_amount != 0 {
-                    PoolRef::mint_to_builder(&pool, caller, next_deposit_amount)
-                        .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
-                        .try_invoke()
-                        .unwrap()
-                        .unwrap()?;
-                }
-                return Ok(())
+            if next_deposit_amount == 0 {
+                break
             }
-            return Err(Error::MarketNotListed)
-        }
 
-        Err(Error::ControllerIsNotSet)
+            PoolRef::borrow_for_builder(&pool, caller, next_deposit_amount)
+                .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
+                .try_invoke()
+                .unwrap()
+                .unwrap()?;
+        }
+        if next_deposit_amount != 0 {
+            PoolRef::mint_to_builder(&pool, caller, next_deposit_amount)
+                .call_flags(ink_env::CallFlags::default().set_allow_reentry(true))
+                .try_invoke()
+                .unwrap()
+                .unwrap()?;
+        }
+        Ok(())
     }
 
     default fn _close(&mut self, asset: AccountId) -> Result<()> {
         let caller = Self::env().caller();
         let contract_addr = Self::env().account_id();
-        if let Some(controller) = self._controller() {
-            if let Some(pool) = ControllerRef::market_of_underlying(&controller, asset) {
-                PSP22Ref::approve(&asset, pool, u128::MAX)?;
+        let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
+        let pool = ControllerRef::market_of_underlying(&controller, asset)
+            .ok_or(Error::MarketNotListed)?;
+        PSP22Ref::approve(&asset, pool, u128::MAX)?;
 
-                let mut withdraw_amount = self._withdrawable_amount(caller, asset).as_u128();
-                let mut repay_amount = PoolRef::borrow_balance_current(&pool, caller)?;
-                let mut loop_remains = CLOSE_MAX_LOOPS;
+        let mut withdraw_amount = self._withdrawable_amount(caller, asset).as_u128();
+        let mut repay_amount = PoolRef::borrow_balance_current(&pool, caller)?;
+        let mut loop_remains = CLOSE_MAX_LOOPS;
 
-                while loop_remains > 0 || withdraw_amount > 0 {
-                    if withdraw_amount > repay_amount {
-                        withdraw_amount = repay_amount;
+        while loop_remains > 0 || withdraw_amount > 0 {
+            if withdraw_amount > repay_amount {
+                withdraw_amount = repay_amount;
 
-                        PoolRef::transfer_from(
-                            &pool,
-                            caller,
-                            contract_addr,
-                            withdraw_amount,
-                            Default::default(),
-                        )?;
-                        PoolRef::redeem(&pool, withdraw_amount)?;
-                        PoolRef::repay_borrow_behalf(&pool, caller, withdraw_amount)?;
-                        break
-                    } else {
-                        PoolRef::transfer_from(
-                            &pool,
-                            caller,
-                            contract_addr,
-                            withdraw_amount,
-                            Default::default(),
-                        )?;
-                        PoolRef::redeem(&pool, withdraw_amount)?;
-                        PoolRef::repay_borrow_behalf(&pool, caller, withdraw_amount)?;
+                PoolRef::transfer_from(
+                    &pool,
+                    caller,
+                    contract_addr,
+                    withdraw_amount,
+                    Default::default(),
+                )?;
+                PoolRef::redeem(&pool, withdraw_amount)?;
+                PoolRef::repay_borrow_behalf(&pool, caller, withdraw_amount)?;
+                break
+            } else {
+                PoolRef::transfer_from(
+                    &pool,
+                    caller,
+                    contract_addr,
+                    withdraw_amount,
+                    Default::default(),
+                )?;
+                PoolRef::redeem(&pool, withdraw_amount)?;
+                PoolRef::repay_borrow_behalf(&pool, caller, withdraw_amount)?;
 
-                        withdraw_amount = self._withdrawable_amount(caller, asset).as_u128();
-                        repay_amount = PoolRef::borrow_balance_current(&pool, caller)?;
-                        loop_remains = loop_remains - 1;
-                    }
-                }
-
-                return Ok(())
+                withdraw_amount = self._withdrawable_amount(caller, asset).as_u128();
+                repay_amount = PoolRef::borrow_balance_current(&pool, caller)?;
+                loop_remains = loop_remains - 1;
             }
-            return Err(Error::MarketNotListed)
         }
 
-        Err(Error::ControllerIsNotSet)
+        Ok(())
     }
 }

@@ -304,17 +304,17 @@ pub trait Controller {
     fn calculate_user_account_data(
         &self,
         account: AccountId,
-        pool_attributes: Option<PoolAttributesForWithdrawValidation>,
+        pool_attributes: Option<PoolAttributes>,
     ) -> Result<AccountData>;
 
     /// Check if withdraw is valid.
     #[ink(message)]
     fn balance_decrease_allowed(
         &self,
-        pool_attributes: PoolAttributesForWithdrawValidation,
+        pool_attributes: PoolAttributes,
         account: AccountId,
         amount: Balance,
-    ) -> Result<bool>;
+    ) -> Result<()>;
     /// Determine the current account liquidity with respect to collateral requirements
     #[ink(message)]
     fn get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)>;
@@ -333,11 +333,13 @@ pub trait Controller {
 /// Structure for holding information about the Pool
 ///
 /// NOTE: Used to prevent cross contract calls to the caller pool
-#[derive(Clone, Decode, Encode)]
+#[derive(Clone, Decode, Encode, Default)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributes {
+    pub pool: Option<AccountId>,
     pub underlying: Option<AccountId>,
     pub decimals: u8,
+    pub liquidation_threshold: u128,
     pub account_balance: Balance,
     pub account_borrow_balance: Balance,
     pub exchange_rate: U256,
@@ -347,24 +349,11 @@ pub struct PoolAttributes {
 /// Structure for having information for Seize about the Pool
 ///
 /// NOTE: Used to prevent cross contract calls to the caller pool
-#[derive(Clone, Decode, Encode)]
+#[derive(Clone, Decode, Encode, Default)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub struct PoolAttributesForSeizeCalculation {
     pub underlying: Option<AccountId>,
     pub decimals: u8,
-}
-
-/// Structure for having information for Withdraw's validations about the Pool
-///
-/// NOTE: Used to prevent cross contract calls to the caller pool
-#[derive(Clone, Decode, Encode)]
-#[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
-pub struct PoolAttributesForWithdrawValidation {
-    pub pool: Option<AccountId>,
-    pub underlying: Option<AccountId>,
-    pub liquidation_threshold: u128,
-    pub account_balance: Balance,
-    pub account_borrow_balance: Balance,
 }
 
 /// Structure to hold status information of a user
@@ -377,6 +366,21 @@ pub struct AccountData {
     pub total_debt_in_base_currency: U256,
     pub avg_ltv: U256,
     pub avg_liquidation_threshold: U256,
+    pub health_factor: U256,
+}
+
+/// Structure to hold status information of a user
+///
+/// Used to retrieve the status of all users in the Protocol pool and to make the calculated results available for use and reference.
+#[derive(Clone, Decode, Encode)]
+#[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+pub struct AccountCollateralData {
+    pub total_collateral_in_base_currency: U256,
+    pub total_debt_in_base_currency: U256,
+    pub avg_ltv: U256,
+    pub avg_liquidation_threshold: U256,
+    pub asset_price: u128,
+    pub liquidation_threshold: u128,
     pub health_factor: U256,
 }
 
@@ -402,6 +406,7 @@ pub enum Error {
     PoolIsNotSet,
     ManagerIsNotSet,
     OracleIsNotSet,
+    BalanceDecreaseNotAllowed,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;
