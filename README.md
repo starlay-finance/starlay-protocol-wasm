@@ -378,5 +378,7 @@ pub mod contract {
 `FlashloanGateway` contract, which is provided by Starlay Finance, has the function to do Flash Loan.
 
 [traits/flashloan_gateway.rs](https://github.com/starlay-finance/starlay-protocol-wasm/blob/main/logics/traits/flashloan_gateway.rs)
+
 [impls/flashloan_gateway.rs](https://github.com/starlay-finance/starlay-protocol-wasm/blob/main/logics/impls/flashloan_gateway.rs)
+
 [contracts/flashloan_gateway.rs](https://github.com/starlay-finance/starlay-protocol-wasm/blob/main/contracts/flashloan_gateway/lib.rs)
