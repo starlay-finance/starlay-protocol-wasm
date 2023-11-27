@@ -935,4 +935,83 @@ describe('Pool spec 1', () => {
     )
     expect(val2.ok.err).toEqual({ controller: 'MarketNotListed' })
   })
+
+  describe('repay_borrow_behalf overflow', () => {
+    /*
+    reproduced in `tests/Pool1.spec.ts`
+    command: `yarn test:single --testNamePattern "repay_borrow_behalf"`
+    */
+    let deployer: KeyringPair
+    let pools: Pools
+    let users: KeyringPair[]
+    beforeAll(async () => {
+      ;({ deployer, users, pools } = await setup())
+    })
+    it('prepare', async () => {
+      const { dai, usdc } = pools
+      // add liquidity to usdc pool
+      await usdc.token.tx.mint(deployer.address, toDec6(100_000))
+      await usdc.token.tx.approve(usdc.pool.address, toDec6(100_000))
+      await usdc.pool.tx.mint(toDec6(100_000))
+      expect(
+        BigInt(
+          (
+            await usdc.pool.query.balanceOf(deployer.address)
+          ).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec6(100_000).toString())
+      // mint to dai pool for collateral
+      const [user1, user2] = users
+      await dai.token.tx.mint(user1.address, toDec18(20_000))
+      await dai.token.tx.mint(user2.address, toDec18(20_000))
+      await dai.token
+        .withSigner(user1)
+        .tx.approve(dai.pool.address, toDec18(20_000))
+      await dai.pool.withSigner(user1).tx.mint(toDec18(20_000))
+      expect(
+        BigInt(
+          (await dai.pool.query.balanceOf(user1.address)).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec18(20_000).toString())
+      await usdc.token.tx.mint(user2.address, toDec6(20_000))
+      // borrow usdc
+      await usdc.pool.withSigner(user1).tx.borrow(toDec6(10_000))
+      expect(
+        BigInt(
+          (await usdc.token.query.balanceOf(user1.address)).value.ok.toString(),
+        ).toString(),
+      ).toEqual(toDec6(10_000).toString())
+    })
+
+    it('execute', async () => {
+      const { token, pool } = pools.usdc
+      const [user1, user2] = users
+
+      await shouldNotRevert(token.withSigner(user2), 'approve', [
+        pool.address,
+        toDec6(20_000),
+      ])
+      const { events } = await pool
+        .withSigner(user2)
+        .tx.repayBorrowBehalf(user1.address, toDec6(10_001))
+      const event = events[0]
+      console.log(event)
+      console.log('repay amount: ', event.args.repayAmount.toString())
+      console.log(
+        'accountBorrows amount : ',
+        event.args.accountBorrows.toString(),
+      )
+      console.log(
+        'totalBorrows amount (this overflowed): ',
+        event.args.totalBorrows.toString(),
+      )
+      const data = (await pool.query.getAccountSnapshot(user1.address)).value.ok
+      console.log('balanceOf: ', data[0].toString())
+      console.log(
+        'borrow balance stored (this overflowed): ',
+        data[1].toString(),
+      )
+      console.log('exchange rate stored: ', data[2].toString())
+    })
+  })
 })
