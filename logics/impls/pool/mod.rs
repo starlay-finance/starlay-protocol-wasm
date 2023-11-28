@@ -503,6 +503,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn set_liquidation_threshold(&mut self, new_liquidation_threshold: u128) -> Result<()> {
+        self._assert_manager()?;
         self._set_liquidation_threshold(new_liquidation_threshold)
     }
 
