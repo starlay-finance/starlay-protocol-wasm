@@ -130,9 +130,9 @@ describe('Controller spec', () => {
     )
   })
 
-  const depositedDai = 3_000_000
-  const depositedUsdc = 3_000_000
-  const depositedUsdt = 3_000_000
+  const depositedDai = 5_000_000
+  const depositedUsdc = 5_000_000
+  const depositedUsdt = 5_000_000
   it('Deployer deposit assets for liquidity', async () => {
     await shouldNotRevert(dai.token, 'mint', [deployer.address, depositedDai])
     await shouldNotRevert(dai.token, 'approve', [
@@ -266,8 +266,8 @@ describe('Controller spec', () => {
     })
   })
 
-  it('Caller deposits 100_000 USDC as collateral, Takes DAI flashloan with mode = 1, does not return the funds. A variable loan for caller is created', async () => {
-    const deposited = 100_000
+  it('Caller deposits 10_000_000 USDC as collateral, Takes DAI flashloan with mode = 1, does not return the funds. A variable loan for caller is created', async () => {
+    const deposited = 10_000_000
     await shouldNotRevert(usdc.token, 'mint', [users[0].address, deposited])
     await shouldNotRevert(usdc.token.withSigner(users[0]), 'approve', [
       usdc.pool.address,
@@ -281,7 +281,7 @@ describe('Controller spec', () => {
       await flashloanGateway.query.flashloanPremiumTotal()
     ).value.ok.toNumber()
 
-    const flashLoanAmount = 80_000
+    const flashLoanAmount = 100_000
     const premiumAmount = (flashLoanAmount * premiumTotal) / 10000
     const { events } = await shouldNotRevert(
       flashloanGateway.withSigner(users[0]),
