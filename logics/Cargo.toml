@@ -17,7 +17,7 @@ scale-info = { version = "2.6", default-features = false, features = [
 ], optional = true }
 
 openbrush = { tag = "3.2.0", git = "https://github.com/Brushfam/openbrush-contracts", default-features = false, features = [
-    "psp22", "ownable"
+    "psp22", "ownable", "access_control",
 ] }
 primitive-types = { version = "0.11.1", default-features = false, features = [
     "codec",
