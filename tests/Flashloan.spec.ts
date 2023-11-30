@@ -327,4 +327,71 @@ describe('Controller spec', () => {
 
     expect(result.err).toStrictEqual({ marketNotListed: null })
   })
+
+  it('free flashloans', async () => {
+    /*
+    reproduced in `tests/Flashloan.spec.ts`
+    command: `yarn test:single --testNamePattern "free flashloans"`
+    note: the flashloan receiver contract was modified to use increase_allowance function instead of approve
+    */
+    // adding some liquidity
+    await shouldNotRevert(dai.token, 'mint', [deployer.address, depositedDai])
+    await shouldNotRevert(dai.token, 'approve', [
+      dai.pool.address,
+      depositedDai,
+    ])
+    await shouldNotRevert(dai.pool, 'mint', [depositedDai])
+    await shouldNotRevert(usdc.token, 'mint', [deployer.address, depositedUsdc])
+    await shouldNotRevert(usdc.token, 'approve', [
+      usdc.pool.address,
+      depositedUsdc,
+    ])
+    await shouldNotRevert(usdc.pool, 'mint', [depositedUsdc])
+    await shouldNotRevert(usdt.token, 'mint', [deployer.address, depositedUsdt])
+    await shouldNotRevert(usdt.token, 'approve', [
+      usdt.pool.address,
+      depositedUsdt,
+    ])
+    await shouldNotRevert(usdt.pool, 'mint', [depositedUsdt])
+    // NOTE: USER HAS NO BALANCE HERE
+    const userBalanceBefore = await dai.token.query.balanceOf(users[0].address)
+    console.log(
+      'User balance before flashloan: ',
+      userBalanceBefore.value.unwrap(),
+    )
+    const flashloanAmount = 1100 // So that after multiplying with premiumTotal it stays below 10000
+    const result = (
+      await flashloanGateway
+        .withSigner(users[0])
+        .query.flashloan(
+          flashloanReceiver.address,
+          [
+            dai.token.address,
+            dai.token.address,
+            dai.token.address,
+            dai.token.address,
+          ],
+          [flashloanAmount, flashloanAmount, flashloanAmount, flashloanAmount],
+          [0, 0, 0, 0],
+          users[0].address,
+          [],
+        )
+    ).value.ok
+    expect(result.err).toStrictEqual({ duplicatedFlashloanAssets: null })
+
+    // Minumum Amount
+    const result0 = (
+      await flashloanGateway
+        .withSigner(users[0])
+        .query.flashloan(
+          flashloanReceiver.address,
+          [dai.token.address],
+          [flashloanAmount],
+          [0],
+          users[0].address,
+          [],
+        )
+    ).value.ok
+    expect(result0.err).toStrictEqual({ invalidFlashloanAmount: null })
+  })
 })

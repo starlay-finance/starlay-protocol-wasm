@@ -51,6 +51,8 @@ pub trait FlashloanGateway {
 pub enum Error {
     InconsistentFlashloanParams,
     InvalidFlashloanExecutorReturn,
+    InvalidFlashloanAmount,
+    DuplicatedFlashloanAssets,
     MarketNotListed,
     ControllerIsNotSet,
     PSP22(PSP22Error),
