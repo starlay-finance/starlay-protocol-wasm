@@ -104,6 +104,22 @@ pub trait Manager {
     /// A public function to sweep accidental token transfers to this contract. (call Pool)
     #[ink(message)]
     fn sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()>;
+
+    /// A public function to set Liquidation Threshold of pool. (call Pool)
+    #[ink(message)]
+    fn set_liquidation_threshold(
+        &mut self,
+        pool: AccountId,
+        liquidation_threshold: u128,
+    ) -> Result<()>;
+
+    /// A public function to Set Seize Guardian Paused in Controller
+    #[ink(message)]
+    fn set_seize_guardian_paused(&mut self, paused: bool) -> Result<()>;
+
+    /// A public function to Set Transfer Guardian Paused in Controller
+    #[ink(message)]
+    fn set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()>;
 }
 
 /// Custom error definitions for Manager
