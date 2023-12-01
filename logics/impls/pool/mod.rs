@@ -792,12 +792,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             self._transfer_from_to(src, dst, psp22_transfer_amount, data)?;
         }
 
-        let lp_balance = self._principal_balance_of(&src);
-        if lp_balance == 0 {
-            self._set_use_reserve_as_collateral(src, false);
-        }
-        self._set_use_reserve_as_collateral(dst, true);
-
         Ok(())
     }
 
