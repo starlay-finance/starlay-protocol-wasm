@@ -536,7 +536,7 @@ impl<T: Storage<Data>> Internal for T {
                     withdraw_amount,
                     Default::default(),
                 )?;
-                PoolRef::redeem(&pool, withdraw_amount)?;
+                PoolRef::redeem_underlying(&pool, withdraw_amount)?;
                 PoolRef::repay_borrow_behalf(&pool, caller, withdraw_amount)?;
                 break
             } else {
@@ -547,7 +547,7 @@ impl<T: Storage<Data>> Internal for T {
                     withdraw_amount,
                     Default::default(),
                 )?;
-                PoolRef::redeem(&pool, withdraw_amount)?;
+                PoolRef::redeem_underlying(&pool, withdraw_amount)?;
                 PoolRef::repay_borrow_behalf(&pool, caller, withdraw_amount)?;
 
                 withdraw_amount = self._withdrawable_amount(caller, asset).as_u128();
