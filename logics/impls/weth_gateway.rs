@@ -101,6 +101,7 @@ where
         }
 
         let weth = self._weth_address().ok_or(Error::WethIsNotSet)?;
+        PoolRef::set_use_reserve_as_collateral(&pool, true)?;
         PoolRef::transfer_from(
             &pool,
             caller,
