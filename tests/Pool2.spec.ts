@@ -223,6 +223,11 @@ describe('Pool spec 2', () => {
           'transfer',
           [userA.address, toDec6(200_000), []],
         )
+        await shouldNotRevert(
+          usdc.pool.withSigner(userA),
+          'setUseReserveAsCollateral',
+          [true],
+        )
         // assertions
         expect(
           (await usdc.pool.query.balanceOf(userA.address)).value.ok.toString(),
