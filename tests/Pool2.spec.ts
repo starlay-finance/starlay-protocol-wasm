@@ -194,6 +194,11 @@ describe('Pool spec 2', () => {
           toDec18(100_000).toString(),
         )
 
+        await shouldNotRevert(
+          dai.pool.withSigner(userB),
+          'setUseReserveAsCollateral',
+          [true],
+        )
         //// check account_liquidity
         assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(userA.address)).value.ok
