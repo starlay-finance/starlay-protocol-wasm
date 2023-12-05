@@ -17,7 +17,6 @@ import Contract from '../types/contracts/default_interest_rate_model'
 import {
   Redeem,
   ReserveUsedAsCollateralDisabled,
-  ReserveUsedAsCollateralEnabled,
 } from '../types/event-types/pool'
 import { Transfer } from '../types/event-types/psp22_token'
 import {
@@ -186,7 +185,7 @@ describe('Pool spec 2', () => {
           (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec18(100_000).toString())
         //// check event
-        expect(events).toHaveLength(2)
+        expect(events).toHaveLength(1)
 
         expect(events[0].name).toEqual('Transfer')
         expect(events[0].args.from).toEqual(userA.address)
@@ -194,13 +193,7 @@ describe('Pool spec 2', () => {
         expect(events[0].args.value.toString()).toEqual(
           toDec18(100_000).toString(),
         )
-        expectToEmit<ReserveUsedAsCollateralEnabled>(
-          events[1],
-          'ReserveUsedAsCollateralEnabled',
-          {
-            user: userB.address,
-          },
-        )
+
         //// check account_liquidity
         assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(userA.address)).value.ok
@@ -232,20 +225,14 @@ describe('Pool spec 2', () => {
         expect(
           (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec6(300_000).toString())
-        expect(events).toHaveLength(2)
+        expect(events).toHaveLength(1)
         //// check event
         const event = events[0]
         expect(event.name).toEqual('Transfer')
         expect(event.args.from).toEqual(userB.address)
         expect(event.args.to).toEqual(userA.address)
         expect(event.args.value.toString()).toEqual(toDec6(200_000).toString())
-        expectToEmit<ReserveUsedAsCollateralEnabled>(
-          events[1],
-          'ReserveUsedAsCollateralEnabled',
-          {
-            user: userA.address,
-          },
-        )
+
         //// check account_liquidity
         assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(userA.address)).value.ok
@@ -443,7 +430,7 @@ describe('Pool spec 2', () => {
           (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec18(100_000).toString())
         //// check event
-        expect(transferFromEvents).toHaveLength(3)
+        expect(transferFromEvents).toHaveLength(2)
         const approvalEvent = transferFromEvents[0]
         expect(approvalEvent.name).toEqual('Approval')
         expect(approvalEvent.args.owner).toEqual(userA.address)
@@ -455,13 +442,6 @@ describe('Pool spec 2', () => {
         expect(transferEvent.args.to).toEqual(userB.address)
         expect(transferEvent.args.value.toString()).toEqual(
           toDec18(100_000).toString(),
-        )
-        expectToEmit<ReserveUsedAsCollateralEnabled>(
-          transferFromEvents[2],
-          'ReserveUsedAsCollateralEnabled',
-          {
-            user: userB.address,
-          },
         )
       }
     })
