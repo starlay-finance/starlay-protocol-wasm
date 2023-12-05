@@ -232,20 +232,20 @@ describe('Pool spec 2', () => {
         expect(
           (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec6(300_000).toString())
-        expect(events).toHaveLength(1)
+        expect(events).toHaveLength(2)
         //// check event
         const event = events[0]
         expect(event.name).toEqual('Transfer')
         expect(event.args.from).toEqual(userB.address)
         expect(event.args.to).toEqual(userA.address)
         expect(event.args.value.toString()).toEqual(toDec6(200_000).toString())
-        // expectToEmit<ReserveUsedAsCollateralEnabled>(
-        //   events[1],
-        //   'ReserveUsedAsCollateralEnabled',
-        //   {
-        //     user: userA.address,
-        //   },
-        // )
+        expectToEmit<ReserveUsedAsCollateralEnabled>(
+          events[1],
+          'ReserveUsedAsCollateralEnabled',
+          {
+            user: userA.address,
+          },
+        )
         //// check account_liquidity
         assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(userA.address)).value.ok
@@ -443,7 +443,7 @@ describe('Pool spec 2', () => {
           (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec18(100_000).toString())
         //// check event
-        expect(transferFromEvents).toHaveLength(2)
+        expect(transferFromEvents).toHaveLength(3)
         const approvalEvent = transferFromEvents[0]
         expect(approvalEvent.name).toEqual('Approval')
         expect(approvalEvent.args.owner).toEqual(userA.address)
@@ -456,13 +456,13 @@ describe('Pool spec 2', () => {
         expect(transferEvent.args.value.toString()).toEqual(
           toDec18(100_000).toString(),
         )
-        // expectToEmit<ReserveUsedAsCollateralEnabled>(
-        //   transferFromEvents[2],
-        //   'ReserveUsedAsCollateralEnabled',
-        //   {
-        //     user: userB.address,
-        //   },
-        // )
+        expectToEmit<ReserveUsedAsCollateralEnabled>(
+          transferFromEvents[2],
+          'ReserveUsedAsCollateralEnabled',
+          {
+            user: userB.address,
+          },
+        )
       }
     })
     it('failure', async () => {
