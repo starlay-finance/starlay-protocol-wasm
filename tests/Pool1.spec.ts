@@ -214,66 +214,6 @@ describe('Pool spec 1', () => {
     })
   })
 
-  describe('.redeem', () => {
-    let deployer: KeyringPair
-    let token: PSP22Token
-    let pool: Pool
-    let gasLimit: WeightV2
-    beforeAll(async () => {
-      ;({
-        deployer,
-        pools: {
-          dai: { token, pool },
-        },
-        gasLimit,
-      } = await setup())
-    })
-
-    const deposited = 10_000
-    const minted = deposited
-    it('preparations', async () => {
-      await shouldNotRevert(token, 'mint', [deployer.address, deposited])
-
-      await shouldNotRevert(token, 'approve', [pool.address, deposited])
-      await shouldNotRevert(pool, 'mint', [deposited])
-      expect(
-        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(minted)
-      expect(
-        (await pool.query.exchangeRateCurrent()).value.ok.ok.toString(),
-      ).toBe(ONE_ETHER.toString())
-    })
-
-    it('execute', async () => {
-      const redeemAmount = 3_000
-      const { events } = await shouldNotRevert(pool, 'redeem', [
-        redeemAmount,
-        { gasLimit },
-      ])
-
-      expect(
-        (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(redeemAmount)
-      expect(
-        (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
-      ).toEqual(deposited - redeemAmount)
-      expect(
-        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(minted - redeemAmount)
-
-      expect(events).toHaveLength(2)
-      expectToEmit<Transfer>(events[0], 'Transfer', {
-        from: deployer.address,
-        to: null,
-        value: redeemAmount,
-      })
-      expectToEmit<Redeem>(events[1], 'Redeem', {
-        redeemer: deployer.address,
-        redeemAmount,
-      })
-    })
-  })
-
   describe('.redeem_underlying', () => {
     let deployer: KeyringPair
     let token: PSP22Token

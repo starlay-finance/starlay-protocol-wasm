@@ -368,11 +368,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._accrual_block_timestamp()
     }
 
-    default fn redeem(&mut self, redeem_tokens: Balance) -> Result<()> {
-        self._accrue_interest()?;
-        self._redeem(Self::env().caller(), redeem_tokens)
-    }
-
     default fn redeem_underlying(&mut self, redeem_amount: Balance) -> Result<()> {
         self._accrue_interest()?;
         self._redeem(Self::env().caller(), redeem_amount)

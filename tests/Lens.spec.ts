@@ -401,7 +401,10 @@ describe('Lens', () => {
 
       await shouldNotRevert(token, 'approve', [pool.address, depositAmount])
       await shouldNotRevert(pool, 'mint', [depositAmount, { gasLimit }])
-      await shouldNotRevert(pool, 'redeem', [redeemAmount, { gasLimit }])
+      await shouldNotRevert(pool, 'redeemUnderlying', [
+        redeemAmount,
+        { gasLimit },
+      ])
 
       const {
         value: { ok: metadata },

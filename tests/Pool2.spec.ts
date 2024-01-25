@@ -972,7 +972,7 @@ describe('Pool spec 2', () => {
 
     it('execute', async () => {
       const redeemAmount = 10_000
-      const { events } = await shouldNotRevert(dai.pool, 'redeem', [
+      const { events } = await shouldNotRevert(dai.pool, 'redeemUnderlying', [
         redeemAmount,
       ])
 
@@ -1149,7 +1149,11 @@ describe('Pool spec 2', () => {
     })
 
     it('User 1 withdraw USDT', async () => {
-      await shouldNotRevert(usdt.pool.withSigner(users[1]), 'redeem', [20000])
+      await shouldNotRevert(
+        usdt.pool.withSigner(users[1]),
+        'redeemUnderlying',
+        [20000],
+      )
     })
   })
 })
