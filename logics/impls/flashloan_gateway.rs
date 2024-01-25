@@ -22,6 +22,7 @@ use openbrush::{
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
+pub const MINUMUM_FLASHLOAN_AMOUNT: u128 = 100000;
 
 #[derive(Debug, Default)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
@@ -64,12 +65,23 @@ impl<T: Storage<Data>> FlashloanGateway for T {
             return Err(Error::InconsistentFlashloanParams)
         }
 
+        let mut deduplicated = assets.clone();
+        deduplicated.sort_unstable();
+        deduplicated.dedup();
+
+        if deduplicated.len() != assets.len() {
+            return Err(Error::DuplicatedFlashloanAssets)
+        }
+
         let mut lp_token_addresses: Vec<AccountId> = Default::default();
         let mut premiums: Vec<Balance> = Default::default();
 
         let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
         let flashloan_premium_total = self._flashloan_premium_total();
         for index in 0..assets.len() {
+            if amounts[index] < MINUMUM_FLASHLOAN_AMOUNT {
+                return Err(Error::InvalidFlashloanAmount)
+            }
             let market = ControllerRef::market_of_underlying(&controller, assets[index])
                 .ok_or(Error::MarketNotListed)?;
             lp_token_addresses.push(market);

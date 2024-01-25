@@ -130,9 +130,9 @@ describe('Controller spec', () => {
     )
   })
 
-  const depositedDai = 3_000_000
-  const depositedUsdc = 3_000_000
-  const depositedUsdt = 3_000_000
+  const depositedDai = 5_000_000
+  const depositedUsdc = 5_000_000
+  const depositedUsdt = 5_000_000
   it('Deployer deposit assets for liquidity', async () => {
     await shouldNotRevert(dai.token, 'mint', [deployer.address, depositedDai])
     await shouldNotRevert(dai.token, 'approve', [
@@ -266,8 +266,8 @@ describe('Controller spec', () => {
     })
   })
 
-  it('Caller deposits 100_000 USDC as collateral, Takes DAI flashloan with mode = 1, does not return the funds. A variable loan for caller is created', async () => {
-    const deposited = 100_000
+  it('Caller deposits 10_000_000 USDC as collateral, Takes DAI flashloan with mode = 1, does not return the funds. A variable loan for caller is created', async () => {
+    const deposited = 10_000_000
     await shouldNotRevert(usdc.token, 'mint', [users[0].address, deposited])
     await shouldNotRevert(usdc.token.withSigner(users[0]), 'approve', [
       usdc.pool.address,
@@ -281,7 +281,7 @@ describe('Controller spec', () => {
       await flashloanGateway.query.flashloanPremiumTotal()
     ).value.ok.toNumber()
 
-    const flashLoanAmount = 80_000
+    const flashLoanAmount = 100_000
     const premiumAmount = (flashLoanAmount * premiumTotal) / 10000
     const { events } = await shouldNotRevert(
       flashloanGateway.withSigner(users[0]),
@@ -326,5 +326,72 @@ describe('Controller spec', () => {
     ).value.ok
 
     expect(result.err).toStrictEqual({ marketNotListed: null })
+  })
+
+  it('free flashloans', async () => {
+    /*
+    reproduced in `tests/Flashloan.spec.ts`
+    command: `yarn test:single --testNamePattern "free flashloans"`
+    note: the flashloan receiver contract was modified to use increase_allowance function instead of approve
+    */
+    // adding some liquidity
+    await shouldNotRevert(dai.token, 'mint', [deployer.address, depositedDai])
+    await shouldNotRevert(dai.token, 'approve', [
+      dai.pool.address,
+      depositedDai,
+    ])
+    await shouldNotRevert(dai.pool, 'mint', [depositedDai])
+    await shouldNotRevert(usdc.token, 'mint', [deployer.address, depositedUsdc])
+    await shouldNotRevert(usdc.token, 'approve', [
+      usdc.pool.address,
+      depositedUsdc,
+    ])
+    await shouldNotRevert(usdc.pool, 'mint', [depositedUsdc])
+    await shouldNotRevert(usdt.token, 'mint', [deployer.address, depositedUsdt])
+    await shouldNotRevert(usdt.token, 'approve', [
+      usdt.pool.address,
+      depositedUsdt,
+    ])
+    await shouldNotRevert(usdt.pool, 'mint', [depositedUsdt])
+    // NOTE: USER HAS NO BALANCE HERE
+    const userBalanceBefore = await dai.token.query.balanceOf(users[0].address)
+    console.log(
+      'User balance before flashloan: ',
+      userBalanceBefore.value.unwrap(),
+    )
+    const flashloanAmount = 1100 // So that after multiplying with premiumTotal it stays below 10000
+    const result = (
+      await flashloanGateway
+        .withSigner(users[0])
+        .query.flashloan(
+          flashloanReceiver.address,
+          [
+            dai.token.address,
+            dai.token.address,
+            dai.token.address,
+            dai.token.address,
+          ],
+          [flashloanAmount, flashloanAmount, flashloanAmount, flashloanAmount],
+          [0, 0, 0, 0],
+          users[0].address,
+          [],
+        )
+    ).value.ok
+    expect(result.err).toStrictEqual({ duplicatedFlashloanAssets: null })
+
+    // Minumum Amount
+    const result0 = (
+      await flashloanGateway
+        .withSigner(users[0])
+        .query.flashloan(
+          flashloanReceiver.address,
+          [dai.token.address],
+          [flashloanAmount],
+          [0],
+          users[0].address,
+          [],
+        )
+    ).value.ok
+    expect(result0.err).toStrictEqual({ invalidFlashloanAmount: null })
   })
 })
