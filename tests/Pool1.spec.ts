@@ -13,7 +13,7 @@ import {
 } from '../scripts/helper/deploy_helper'
 import { getGasLimit } from '../scripts/helper/utils'
 import { RATE_MODELS } from '../scripts/interest_rates'
-import Contract from '../types/contracts/default_interest_rate_model'
+import DefaultInterestRateModel from '../types/contracts/default_interest_rate_model'
 import Pool from '../types/contracts/pool'
 import PSP22Token from '../types/contracts/psp22_token'
 import {
@@ -34,7 +34,7 @@ import {
 const MAX_CALL_WEIGHT = new BN(125_000_000_000).isub(BN_ONE).mul(BN_TEN)
 const PROOFSIZE = new BN(2_000_000)
 describe('Pool spec 1', () => {
-  const setup = async (model?: Contract) => {
+  const setup = async (model?: DefaultInterestRateModel) => {
     const { api, alice: deployer, bob, charlie, django } = globalThis.setup
 
     const gasLimit = getGasLimit(api, MAX_CALL_WEIGHT, PROOFSIZE)

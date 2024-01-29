@@ -43,12 +43,16 @@ pub trait PriceOracle {
     #[ink(message)]
     #[modifiers(only_owner)]
     fn unauthorize_sybil(&mut self, sybil: AccountId) -> Result<()>;
+
+    #[ink(message)]
+    fn is_sybil_authorized(&self, sybil: AccountId) -> bool;
 }
 
 /// Custom error definitions for PriceOracle
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {
+    CallerIsNotAuthorized,
     Ownable(OwnableError),
 }
 

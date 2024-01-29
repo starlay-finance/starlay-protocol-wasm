@@ -26,7 +26,7 @@ pub mod contract {
 
     /// Contract's Storage
     #[ink(storage)]
-    #[derive(Storage)]
+    #[derive(Default, Storage)]
     pub struct PriceOracleContract {
         #[storage_field]
         price_oracle: Data,
@@ -34,15 +34,9 @@ pub mod contract {
         ownable: ownable::Data,
     }
 
-    impl ownable::Ownable for PriceOracleContract {}
+    impl Ownable for PriceOracleContract {}
     impl PriceOracle for PriceOracleContract {}
     impl Internal for PriceOracleContract {}
-
-    impl Default for PriceOracleContract {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
 
     impl PriceOracleContract {
         /// Generate this contract
