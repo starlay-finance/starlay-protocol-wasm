@@ -1034,9 +1034,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         self._transfer_underlying_from(payer, contract_addr, repay_amount_final)?;
 
-        let account_borrows_new = account_borrow_prev - repay_amount_final;
-        let total_borrows_new = self._total_borrows() - repay_amount_final;
         self._increase_debt(borrower, repay_amount_final, true);
+
+        let account_borrows_new = self._borrow_balance_stored(borrower);
+        let total_borrows_new = self._total_borrows();
+
         self._emit_repay_borrow_event(
             payer,
             borrower,
