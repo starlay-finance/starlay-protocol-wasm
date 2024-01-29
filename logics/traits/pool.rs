@@ -293,6 +293,7 @@ pub enum Error {
     ManagerIsNotSet,
     IncentivesControllerIsNotSet,
     AccrueRewardFailed,
+    InvalidLiquidationThreshold,
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),

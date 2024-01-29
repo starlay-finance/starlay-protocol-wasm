@@ -21,7 +21,10 @@ use crate::traits::{
     types::WrappedU256,
 };
 pub use crate::traits::{
-    controller::ControllerRef,
+    controller::{
+        ControllerRef,
+        Error as ControllerError,
+    },
     interest_rate_model::InterestRateModelRef,
     pool::*,
 };
@@ -1304,6 +1307,17 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         &mut self,
         new_liquidation_threshold: u128,
     ) -> Result<()> {
+        let contract_addr = Self::env().account_id();
+        let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
+        let collateral_factor_result: Option<WrappedU256> =
+            ControllerRef::collateral_factor_mantissa(&controller, contract_addr);
+        let collateral_factor = collateral_factor_result
+            .ok_or(Error::from(ControllerError::InvalidCollateralFactor))?;
+
+        if U256::from(collateral_factor).ge(&U256::from(new_liquidation_threshold)) {
+            return Err(Error::InvalidLiquidationThreshold)
+        }
+
         self.data::<Data>().liquidation_threshold = new_liquidation_threshold;
         Ok(())
     }
