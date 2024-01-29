@@ -18,31 +18,15 @@ pub mod contract {
         EmitEvent,
         Env,
     };
-    use logics::{
-        impls::manager::{
-            self,
-            Internal as ManagerInternal,
-        },
-        traits::{
-            manager::Result,
-            types::WrappedU256,
-        },
-    };
+    use logics::impls::manager;
     use openbrush::{
         contracts::access_control::{
             self,
             Internal as AccessControlInternal,
             RoleType,
-            DEFAULT_ADMIN_ROLE,
         },
-        modifiers,
         traits::Storage,
     };
-
-    pub const CONTROLLER_ADMIN: RoleType = ink::selector_id!("CONTROLLER_ADMIN");
-    pub const TOKEN_ADMIN: RoleType = ink::selector_id!("TOKEN_ADMIN");
-    pub const BORROW_CAP_GUARDIAN: RoleType = ink::selector_id!("BORROW_CAP_GUARDIAN");
-    pub const PAUSE_GUARDIAN: RoleType = ink::selector_id!("PAUSE_GUARDIAN");
 
     /// Contract's Storage
     #[ink(storage)]
@@ -87,102 +71,7 @@ pub mod contract {
         pub admin: AccountId,
     }
 
-    /// NOTE: Apply permission control by overriding the Default implementation to use the permission settings in Manager.
-    impl manager::Manager for ManagerContract {
-        #[ink(message)]
-        #[modifiers(access_control::only_role(DEFAULT_ADMIN_ROLE))]
-        fn set_controller(&mut self, id: AccountId) -> Result<()> {
-            self._set_controller(id)
-        }
-        #[ink(message)]
-        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
-        fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
-            self._set_price_oracle(new_oracle)
-        }
-        #[ink(message)]
-        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
-        fn set_flashloan_gateway(&mut self, new_flashloan_gateway: AccountId) -> Result<()> {
-            self._set_flashloan_gateway(new_flashloan_gateway)
-        }
-        #[ink(message)]
-        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
-        fn support_market(&mut self, pool: AccountId, underlying: AccountId) -> Result<()> {
-            self._support_market(pool, underlying)
-        }
-        #[ink(message)]
-        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
-        fn support_market_with_collateral_factor_mantissa(
-            &mut self,
-            pool: AccountId,
-            underlying: AccountId,
-            collateral_factor_mantissa: WrappedU256,
-        ) -> Result<()> {
-            self._support_market_with_collateral_factor_mantissa(
-                pool,
-                underlying,
-                collateral_factor_mantissa,
-            )
-        }
-        #[ink(message)]
-        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
-        fn set_collateral_factor_mantissa(
-            &mut self,
-            pool: AccountId,
-            new_collateral_factor_mantissa: WrappedU256,
-        ) -> Result<()> {
-            self._set_collateral_factor_mantissa(pool, new_collateral_factor_mantissa)
-        }
-        #[ink(message)]
-        #[modifiers(access_control::only_role(PAUSE_GUARDIAN))]
-        fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
-            self._set_mint_guardian_paused(pool, paused)
-        }
-        #[ink(message)]
-        #[modifiers(access_control::only_role(PAUSE_GUARDIAN))]
-        fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
-            self._set_borrow_guardian_paused(pool, paused)
-        }
-        #[ink(message)]
-        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
-        fn set_close_factor_mantissa(
-            &mut self,
-            new_close_factor_mantissa: WrappedU256,
-        ) -> Result<()> {
-            self._set_close_factor_mantissa(new_close_factor_mantissa)
-        }
-        #[ink(message)]
-        #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
-        fn set_liquidation_incentive_mantissa(
-            &mut self,
-            new_liquidation_incentive_mantissa: WrappedU256,
-        ) -> Result<()> {
-            self._set_liquidation_incentive_mantissa(new_liquidation_incentive_mantissa)
-        }
-        #[ink(message)]
-        #[modifiers(access_control::only_role(BORROW_CAP_GUARDIAN))]
-        fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()> {
-            self._set_borrow_cap(pool, new_cap)
-        }
-        #[ink(message)]
-        #[modifiers(access_control::only_role(TOKEN_ADMIN))]
-        fn set_reserve_factor_mantissa(
-            &mut self,
-            pool: AccountId,
-            new_reserve_factor_mantissa: WrappedU256,
-        ) -> Result<()> {
-            self._set_reserve_factor_mantissa(pool, new_reserve_factor_mantissa)
-        }
-        #[ink(message)]
-        #[modifiers(access_control::only_role(TOKEN_ADMIN))]
-        fn reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
-            self._reduce_reserves(pool, amount)
-        }
-        #[ink(message)]
-        #[modifiers(access_control::only_role(TOKEN_ADMIN))]
-        fn sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()> {
-            self._sweep_token(pool, asset)
-        }
-    }
+    impl manager::Manager for ManagerContract {}
 
     impl access_control::AccessControl for ManagerContract {}
 

@@ -7,7 +7,13 @@ use ink::env::{
     DefaultEnvironment,
 };
 use logics::{
-    impls::manager::Manager,
+    impls::manager::{
+        Manager,
+        BORROW_CAP_GUARDIAN,
+        CONTROLLER_ADMIN,
+        PAUSE_GUARDIAN,
+        TOKEN_ADMIN,
+    },
     traits::{
         manager::Error,
         types::WrappedU256,
