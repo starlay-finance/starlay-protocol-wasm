@@ -513,10 +513,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn increase_delegate_allowance(
         &mut self,
-        owner: AccountId,
         delegatee: AccountId,
         amount: Balance,
     ) -> Result<()> {
+        let owner = Self::env().caller();
         self._approve_delegate(
             owner,
             delegatee,
@@ -526,10 +526,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn decrease_delegate_allowance(
         &mut self,
-        owner: AccountId,
         delegatee: AccountId,
         amount: Balance,
     ) -> Result<()> {
+        let owner = Self::env().caller();
         let delegate_allowance = self._delegate_allowance(&owner, &delegatee);
 
         if delegate_allowance < amount {
