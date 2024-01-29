@@ -113,6 +113,14 @@ pub trait Manager {
         liquidation_threshold: u128,
     ) -> Result<()>;
 
+    /// A public function to Set Incentives Controller in Pool
+    #[ink(message)]
+    fn set_incentives_controller(
+        &mut self,
+        pool: AccountId,
+        incentives_controller: AccountId,
+    ) -> Result<()>;
+
     /// A public function to Set Seize Guardian Paused in Controller
     #[ink(message)]
     fn set_seize_guardian_paused(&mut self, paused: bool) -> Result<()>;

@@ -78,6 +78,11 @@ pub trait Internal {
         pool: AccountId,
         liquidation_threshold: u128,
     ) -> Result<()>;
+    fn _set_incentives_controller(
+        &mut self,
+        pool: AccountId,
+        incentives_controller: AccountId,
+    ) -> Result<()>;
 }
 
 impl<T: Storage<Data> + Storage<access_control::Data>> Manager for T {
@@ -202,6 +207,15 @@ impl<T: Storage<Data> + Storage<access_control::Data>> Manager for T {
     ) -> Result<()> {
         self._set_reserve_factor_mantissa(pool, new_reserve_factor_mantissa)
     }
+
+    #[modifiers(access_control::only_role(TOKEN_ADMIN))]
+    default fn set_incentives_controller(
+        &mut self,
+        pool: AccountId,
+        incentives_controller: AccountId,
+    ) -> Result<()> {
+        self._set_incentives_controller(pool, incentives_controller)
+    }
 }
 
 impl<T: Storage<Data>> Internal for T {
@@ -309,6 +323,14 @@ impl<T: Storage<Data>> Internal for T {
         liquidation_threshold: u128,
     ) -> Result<()> {
         PoolRef::set_liquidation_threshold(&pool, liquidation_threshold)?;
+        Ok(())
+    }
+    default fn _set_incentives_controller(
+        &mut self,
+        pool: AccountId,
+        incentives_controller: AccountId,
+    ) -> Result<()> {
+        PoolRef::set_incentives_controller(&pool, incentives_controller)?;
         Ok(())
     }
 }
