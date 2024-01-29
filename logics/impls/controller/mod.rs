@@ -53,7 +53,7 @@ pub struct Data {
     pub markets: Vec<AccountId>,
     /// Pair of pool and underlying
     pub markets_pair: Mapping<AccountId, AccountId>,
-    /// Mapping of Pool and Collateral Factors
+    /// Mapping of Pool and Collateral Factors (Decimals: 18)
     pub collateral_factor_mantissa: Mapping<AccountId, WrappedU256>,
     /// Whether Pool has paused `Mint` Action
     pub mint_guardian_paused: Mapping<AccountId, bool>,

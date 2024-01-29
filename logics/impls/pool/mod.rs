@@ -75,6 +75,8 @@ use self::utils::{
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
+pub const COLLATERAL_FACTOR_MANTISSA_DECIMALS: u32 = 18;
+pub const LIQUIDATION_THRESHOLD_DECIMALS: u32 = 4;
 
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
@@ -103,7 +105,7 @@ pub struct Data {
     pub initial_exchange_rate_mantissa: WrappedU256,
     /// Maximum fraction of interest that can be set aside for reserves
     pub reserve_factor_mantissa: WrappedU256,
-    /// Liquidation Threshold
+    /// Liquidation Threshold (Decimals: 4)
     pub liquidation_threshold: u128,
     /// Delegation Allowance for borrowing
     pub delegate_allowance: Mapping<(AccountId, AccountId), Balance, AllowancesKey>,
@@ -1314,7 +1316,9 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let collateral_factor = collateral_factor_result
             .ok_or(Error::from(ControllerError::InvalidCollateralFactor))?;
 
-        if U256::from(collateral_factor).ge(&U256::from(new_liquidation_threshold)) {
+        if U256::from(collateral_factor).ge(&U256::from(new_liquidation_threshold).mul(U256::from(
+            10_u128.pow(COLLATERAL_FACTOR_MANTISSA_DECIMALS - LIQUIDATION_THRESHOLD_DECIMALS),
+        ))) {
             return Err(Error::InvalidLiquidationThreshold)
         }
 
