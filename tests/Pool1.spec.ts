@@ -214,66 +214,6 @@ describe('Pool spec 1', () => {
     })
   })
 
-  describe('.redeem', () => {
-    let deployer: KeyringPair
-    let token: PSP22Token
-    let pool: Pool
-    let gasLimit: WeightV2
-    beforeAll(async () => {
-      ;({
-        deployer,
-        pools: {
-          dai: { token, pool },
-        },
-        gasLimit,
-      } = await setup())
-    })
-
-    const deposited = 10_000
-    const minted = deposited
-    it('preparations', async () => {
-      await shouldNotRevert(token, 'mint', [deployer.address, deposited])
-
-      await shouldNotRevert(token, 'approve', [pool.address, deposited])
-      await shouldNotRevert(pool, 'mint', [deposited])
-      expect(
-        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(minted)
-      expect(
-        (await pool.query.exchangeRateCurrent()).value.ok.ok.toString(),
-      ).toBe(ONE_ETHER.toString())
-    })
-
-    it('execute', async () => {
-      const redeemAmount = 3_000
-      const { events } = await shouldNotRevert(pool, 'redeem', [
-        redeemAmount,
-        { gasLimit },
-      ])
-
-      expect(
-        (await token.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(redeemAmount)
-      expect(
-        (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
-      ).toEqual(deposited - redeemAmount)
-      expect(
-        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
-      ).toEqual(minted - redeemAmount)
-
-      expect(events).toHaveLength(2)
-      expectToEmit<Transfer>(events[0], 'Transfer', {
-        from: deployer.address,
-        to: null,
-        value: redeemAmount,
-      })
-      expectToEmit<Redeem>(events[1], 'Redeem', {
-        redeemer: deployer.address,
-        redeemAmount,
-      })
-    })
-  })
-
   describe('.redeem_underlying', () => {
     let deployer: KeyringPair
     let token: PSP22Token
@@ -1012,6 +952,25 @@ describe('Pool spec 1', () => {
         data[1].toString(),
       )
       console.log('exchange rate stored: ', data[2].toString())
+    })
+  })
+
+  it('Unprotected liquidation threshold setter', async () => {
+    /*
+    reproduced in `tests/Pool1.spec.ts`
+    command: `yarn test:single --testNamePattern "Unprotected liquidation threshold setter"`
+    */
+    const { pools, users } = await setup()
+    const liqThresholdBefore = (
+      await pools.dai.pool.query.liquidationThreshold()
+    ).value.ok.toString()
+    console.log('threshold before: ', liqThresholdBefore)
+    const result = await pools.dai.pool
+      .withSigner(users[1])
+      .query.setLiquidationThreshold(10)
+
+    expect(result.value.ok.err).toStrictEqual({
+      callerIsNotManager: null,
     })
   })
 })

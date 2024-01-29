@@ -49,10 +49,6 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn mint_to(&mut self, mint_account: AccountId, mint_amount: Balance) -> Result<()>;
 
-    /// Sender redeems pool tokens in exchange for the underlying asset
-    #[ink(message)]
-    fn redeem(&mut self, redeem_tokens: Balance) -> Result<()>;
-
     /// Sender redeems pool tokens in exchange for a specified amount of underlying asset
     #[ink(message)]
     fn redeem_underlying(&mut self, redeem_amount: Balance) -> Result<()>;
@@ -293,6 +289,7 @@ pub enum Error {
     ManagerIsNotSet,
     IncentivesControllerIsNotSet,
     AccrueRewardFailed,
+    InvalidLiquidationThreshold,
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),

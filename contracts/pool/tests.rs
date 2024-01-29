@@ -264,6 +264,9 @@ fn assert_manager_works() {
 }
 
 #[ink::test]
+#[should_panic(
+    expected = "not implemented: off-chain environment does not support contract invocation"
+)]
 fn set_liquidation_threshold_works() {
     let accounts = default_accounts();
     set_caller(accounts.bob);

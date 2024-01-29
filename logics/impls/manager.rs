@@ -11,10 +11,18 @@ use crate::traits::{
     pool::PoolRef,
     types::WrappedU256,
 };
-use openbrush::traits::{
-    AccountId,
-    Balance,
-    Storage,
+use openbrush::{
+    contracts::access_control::{
+        self,
+        RoleType,
+        DEFAULT_ADMIN_ROLE,
+    },
+    modifiers,
+    traits::{
+        AccountId,
+        Balance,
+        Storage,
+    },
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
@@ -25,6 +33,11 @@ pub struct Data {
     /// AccountId of Controller
     pub controller: AccountId,
 }
+
+pub const CONTROLLER_ADMIN: RoleType = ink::selector_id!("CONTROLLER_ADMIN");
+pub const TOKEN_ADMIN: RoleType = ink::selector_id!("TOKEN_ADMIN");
+pub const BORROW_CAP_GUARDIAN: RoleType = ink::selector_id!("BORROW_CAP_GUARDIAN");
+pub const PAUSE_GUARDIAN: RoleType = ink::selector_id!("PAUSE_GUARDIAN");
 
 pub trait Internal {
     fn _controller(&self) -> AccountId;
@@ -58,24 +71,49 @@ pub trait Internal {
     ) -> Result<()>;
     fn _reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
     fn _sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()>;
+    fn _set_seize_guardian_paused(&mut self, paused: bool) -> Result<()>;
+    fn _set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()>;
+    fn _set_liquidation_threshold(
+        &mut self,
+        pool: AccountId,
+        liquidation_threshold: u128,
+    ) -> Result<()>;
+    fn _set_incentives_controller(
+        &mut self,
+        pool: AccountId,
+        incentives_controller: AccountId,
+    ) -> Result<()>;
 }
 
-impl<T: Storage<Data>> Manager for T {
+impl<T: Storage<Data> + Storage<access_control::Data>> Manager for T {
+    // View Function
     default fn controller(&self) -> AccountId {
         self._controller()
     }
+
+    // Default Admin
+    #[modifiers(access_control::only_role(DEFAULT_ADMIN_ROLE))]
     default fn set_controller(&mut self, id: AccountId) -> Result<()> {
         self._set_controller(id)
     }
+
+    // For Controller Admin
+    #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
     default fn set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
         self._set_price_oracle(new_oracle)
     }
+
+    #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
     default fn set_flashloan_gateway(&mut self, new_flashloan_gateway: AccountId) -> Result<()> {
         self._set_flashloan_gateway(new_flashloan_gateway)
     }
+
+    #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
     default fn support_market(&mut self, pool: AccountId, underlying: AccountId) -> Result<()> {
         self._support_market(pool, underlying)
     }
+
+    #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
     default fn support_market_with_collateral_factor_mantissa(
         &mut self,
         pool: AccountId,
@@ -88,6 +126,8 @@ impl<T: Storage<Data>> Manager for T {
             collateral_factor_mantissa,
         )
     }
+
+    #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
     default fn set_collateral_factor_mantissa(
         &mut self,
         pool: AccountId,
@@ -95,27 +135,71 @@ impl<T: Storage<Data>> Manager for T {
     ) -> Result<()> {
         self._set_collateral_factor_mantissa(pool, new_collateral_factor_mantissa)
     }
-    default fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
-        self._set_mint_guardian_paused(pool, paused)
-    }
-    default fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
-        self._set_borrow_guardian_paused(pool, paused)
-    }
+
+    #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
     default fn set_close_factor_mantissa(
         &mut self,
         new_close_factor_mantissa: WrappedU256,
     ) -> Result<()> {
         self._set_close_factor_mantissa(new_close_factor_mantissa)
     }
+
+    #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
     default fn set_liquidation_incentive_mantissa(
         &mut self,
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()> {
         self._set_liquidation_incentive_mantissa(new_liquidation_incentive_mantissa)
     }
+
+    // For Borrow Cap Admin
+    #[modifiers(access_control::only_role(BORROW_CAP_GUARDIAN))]
     default fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()> {
         self._set_borrow_cap(pool, new_cap)
     }
+
+    // For Pause Guardian
+    #[modifiers(access_control::only_role(PAUSE_GUARDIAN))]
+    default fn set_mint_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
+        self._set_mint_guardian_paused(pool, paused)
+    }
+
+    #[modifiers(access_control::only_role(PAUSE_GUARDIAN))]
+    default fn set_borrow_guardian_paused(&mut self, pool: AccountId, paused: bool) -> Result<()> {
+        self._set_borrow_guardian_paused(pool, paused)
+    }
+
+    #[modifiers(access_control::only_role(PAUSE_GUARDIAN))]
+    default fn set_seize_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        self._set_seize_guardian_paused(paused)
+    }
+
+    #[modifiers(access_control::only_role(PAUSE_GUARDIAN))]
+    default fn set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        self._set_transfer_guardian_paused(paused)
+    }
+
+    // For Pool Admin
+    #[modifiers(access_control::only_role(TOKEN_ADMIN))]
+    default fn reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
+        self._reduce_reserves(pool, amount)
+    }
+
+    #[modifiers(access_control::only_role(TOKEN_ADMIN))]
+    default fn sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()> {
+        self._sweep_token(pool, asset)
+    }
+
+    #[modifiers(access_control::only_role(TOKEN_ADMIN))]
+    default fn set_liquidation_threshold(
+        &mut self,
+        pool: AccountId,
+        liquidation_threshold: u128,
+    ) -> Result<()> {
+        self._set_liquidation_threshold(pool, liquidation_threshold)
+    }
+
+    #[modifiers(access_control::only_role(TOKEN_ADMIN))]
     default fn set_reserve_factor_mantissa(
         &mut self,
         pool: AccountId,
@@ -123,11 +207,14 @@ impl<T: Storage<Data>> Manager for T {
     ) -> Result<()> {
         self._set_reserve_factor_mantissa(pool, new_reserve_factor_mantissa)
     }
-    default fn reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
-        self._reduce_reserves(pool, amount)
-    }
-    default fn sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()> {
-        self._sweep_token(pool, asset)
+
+    #[modifiers(access_control::only_role(TOKEN_ADMIN))]
+    default fn set_incentives_controller(
+        &mut self,
+        pool: AccountId,
+        incentives_controller: AccountId,
+    ) -> Result<()> {
+        self._set_incentives_controller(pool, incentives_controller)
     }
 }
 
@@ -220,6 +307,30 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()> {
         PoolRef::sweep_token(&pool, asset)?;
+        Ok(())
+    }
+    default fn _set_seize_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        ControllerRef::set_seize_guardian_paused(&self._controller(), paused)?;
+        Ok(())
+    }
+    default fn _set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()> {
+        ControllerRef::set_transfer_guardian_paused(&self._controller(), paused)?;
+        Ok(())
+    }
+    default fn _set_liquidation_threshold(
+        &mut self,
+        pool: AccountId,
+        liquidation_threshold: u128,
+    ) -> Result<()> {
+        PoolRef::set_liquidation_threshold(&pool, liquidation_threshold)?;
+        Ok(())
+    }
+    default fn _set_incentives_controller(
+        &mut self,
+        pool: AccountId,
+        incentives_controller: AccountId,
+    ) -> Result<()> {
+        PoolRef::set_incentives_controller(&pool, incentives_controller)?;
         Ok(())
     }
 }

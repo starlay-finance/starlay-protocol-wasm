@@ -17,7 +17,6 @@ import Contract from '../types/contracts/default_interest_rate_model'
 import {
   Redeem,
   ReserveUsedAsCollateralDisabled,
-  ReserveUsedAsCollateralEnabled,
 } from '../types/event-types/pool'
 import { Transfer } from '../types/event-types/psp22_token'
 import {
@@ -186,7 +185,7 @@ describe('Pool spec 2', () => {
           (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec18(100_000).toString())
         //// check event
-        expect(events).toHaveLength(2)
+        expect(events).toHaveLength(1)
 
         expect(events[0].name).toEqual('Transfer')
         expect(events[0].args.from).toEqual(userA.address)
@@ -194,12 +193,11 @@ describe('Pool spec 2', () => {
         expect(events[0].args.value.toString()).toEqual(
           toDec18(100_000).toString(),
         )
-        expectToEmit<ReserveUsedAsCollateralEnabled>(
-          events[1],
-          'ReserveUsedAsCollateralEnabled',
-          {
-            user: userB.address,
-          },
+
+        await shouldNotRevert(
+          dai.pool.withSigner(userB),
+          'setUseReserveAsCollateral',
+          [true],
         )
         //// check account_liquidity
         assertAccountLiquidity(
@@ -225,6 +223,11 @@ describe('Pool spec 2', () => {
           'transfer',
           [userA.address, toDec6(200_000), []],
         )
+        await shouldNotRevert(
+          usdc.pool.withSigner(userA),
+          'setUseReserveAsCollateral',
+          [true],
+        )
         // assertions
         expect(
           (await usdc.pool.query.balanceOf(userA.address)).value.ok.toString(),
@@ -232,20 +235,14 @@ describe('Pool spec 2', () => {
         expect(
           (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec6(300_000).toString())
-        expect(events).toHaveLength(2)
+        expect(events).toHaveLength(1)
         //// check event
         const event = events[0]
         expect(event.name).toEqual('Transfer')
         expect(event.args.from).toEqual(userB.address)
         expect(event.args.to).toEqual(userA.address)
         expect(event.args.value.toString()).toEqual(toDec6(200_000).toString())
-        expectToEmit<ReserveUsedAsCollateralEnabled>(
-          events[1],
-          'ReserveUsedAsCollateralEnabled',
-          {
-            user: userA.address,
-          },
-        )
+
         //// check account_liquidity
         assertAccountLiquidity(
           (await controller.query.getAccountLiquidity(userA.address)).value.ok
@@ -443,7 +440,7 @@ describe('Pool spec 2', () => {
           (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec18(100_000).toString())
         //// check event
-        expect(transferFromEvents).toHaveLength(3)
+        expect(transferFromEvents).toHaveLength(2)
         const approvalEvent = transferFromEvents[0]
         expect(approvalEvent.name).toEqual('Approval')
         expect(approvalEvent.args.owner).toEqual(userA.address)
@@ -455,13 +452,6 @@ describe('Pool spec 2', () => {
         expect(transferEvent.args.to).toEqual(userB.address)
         expect(transferEvent.args.value.toString()).toEqual(
           toDec18(100_000).toString(),
-        )
-        expectToEmit<ReserveUsedAsCollateralEnabled>(
-          transferFromEvents[2],
-          'ReserveUsedAsCollateralEnabled',
-          {
-            user: userB.address,
-          },
         )
       }
     })
@@ -956,7 +946,7 @@ describe('Pool spec 2', () => {
       ).toBe(ONE_ETHER.toString())
     })
 
-    const newLiquidationThreshold = 8000 // 80%
+    const newLiquidationThreshold = 9500 // 80%
     it('preparations - set Liquidation Threshold', async () => {
       await shouldNotRevert(dai.pool, 'setLiquidationThreshold', [
         newLiquidationThreshold,
@@ -982,7 +972,7 @@ describe('Pool spec 2', () => {
 
     it('execute', async () => {
       const redeemAmount = 10_000
-      const { events } = await shouldNotRevert(dai.pool, 'redeem', [
+      const { events } = await shouldNotRevert(dai.pool, 'redeemUnderlying', [
         redeemAmount,
       ])
 
@@ -1159,7 +1149,11 @@ describe('Pool spec 2', () => {
     })
 
     it('User 1 withdraw USDT', async () => {
-      await shouldNotRevert(usdt.pool.withSigner(users[1]), 'redeem', [20000])
+      await shouldNotRevert(
+        usdt.pool.withSigner(users[1]),
+        'redeemUnderlying',
+        [20000],
+      )
     })
   })
 })

@@ -94,7 +94,7 @@ describe('Controller spec', () => {
       await controller.tx.supportMarketWithCollateralFactorMantissa(
         sym.pool.address,
         sym.token.address,
-        [ONE_ETHER.mul(new BN(90)).div(new BN(100))],
+        [ONE_ETHER.mul(new BN(75)).div(new BN(100))],
       )
     }
 

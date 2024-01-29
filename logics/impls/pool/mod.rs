@@ -21,7 +21,10 @@ use crate::traits::{
     types::WrappedU256,
 };
 pub use crate::traits::{
-    controller::ControllerRef,
+    controller::{
+        ControllerRef,
+        Error as ControllerError,
+    },
     interest_rate_model::InterestRateModelRef,
     pool::*,
 };
@@ -72,6 +75,8 @@ use self::utils::{
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
+pub const COLLATERAL_FACTOR_MANTISSA_DECIMALS: u32 = 18;
+pub const LIQUIDATION_THRESHOLD_DECIMALS: u32 = 4;
 
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
@@ -100,7 +105,7 @@ pub struct Data {
     pub initial_exchange_rate_mantissa: WrappedU256,
     /// Maximum fraction of interest that can be set aside for reserves
     pub reserve_factor_mantissa: WrappedU256,
-    /// Liquidation Threshold
+    /// Liquidation Threshold (Decimals: 4)
     pub liquidation_threshold: u128,
     /// Delegation Allowance for borrowing
     pub delegate_allowance: Mapping<(AccountId, AccountId), Balance, AllowancesKey>,
@@ -368,11 +373,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._accrual_block_timestamp()
     }
 
-    default fn redeem(&mut self, redeem_tokens: Balance) -> Result<()> {
-        self._accrue_interest()?;
-        self._redeem(Self::env().caller(), redeem_tokens)
-    }
-
     default fn redeem_underlying(&mut self, redeem_amount: Balance) -> Result<()> {
         self._accrue_interest()?;
         self._redeem(Self::env().caller(), redeem_amount)
@@ -503,6 +503,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn set_liquidation_threshold(&mut self, new_liquidation_threshold: u128) -> Result<()> {
+        self._assert_manager()?;
         self._set_liquidation_threshold(new_liquidation_threshold)
     }
 
@@ -791,12 +792,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             self._approve_from_to(src, spender, allowance - psp22_transfer_amount)?;
             self._transfer_from_to(src, dst, psp22_transfer_amount, data)?;
         }
-
-        let lp_balance = self._principal_balance_of(&src);
-        if lp_balance == 0 {
-            self._set_use_reserve_as_collateral(src, false);
-        }
-        self._set_use_reserve_as_collateral(dst, true);
 
         Ok(())
     }
@@ -1315,6 +1310,19 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         &mut self,
         new_liquidation_threshold: u128,
     ) -> Result<()> {
+        let contract_addr = Self::env().account_id();
+        let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
+        let collateral_factor_result: Option<WrappedU256> =
+            ControllerRef::collateral_factor_mantissa(&controller, contract_addr);
+        let collateral_factor = collateral_factor_result
+            .ok_or(Error::from(ControllerError::InvalidCollateralFactor))?;
+
+        if U256::from(collateral_factor).ge(&U256::from(new_liquidation_threshold).mul(U256::from(
+            10_u128.pow(COLLATERAL_FACTOR_MANTISSA_DECIMALS - LIQUIDATION_THRESHOLD_DECIMALS),
+        ))) {
+            return Err(Error::InvalidLiquidationThreshold)
+        }
+
         self.data::<Data>().liquidation_threshold = new_liquidation_threshold;
         Ok(())
     }
