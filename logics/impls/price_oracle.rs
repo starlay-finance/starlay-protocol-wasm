@@ -8,6 +8,7 @@
 use crate::traits::pool::PoolRef;
 pub use crate::traits::price_oracle::*;
 use openbrush::{
+    contracts::ownable::*,
     storage::Mapping,
     traits::{
         AccountId,
@@ -21,6 +22,8 @@ pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 pub struct Data {
     /// Fixed prices to behave as Mock
     pub fixed_prices: Mapping<AccountId, u128>,
+    /// Authorized sybils for updating Price
+    pub sybils: Mapping<AccountId, bool>,
 }
 
 pub const PRICE_PRECISION: u128 = 10_u128.pow(18);
@@ -29,9 +32,11 @@ pub trait Internal {
     fn _get_price(&self, asset: AccountId) -> Option<u128>;
     fn _get_underlying_price(&self, pool: AccountId) -> Option<u128>;
     fn _set_fixed_price(&mut self, asset: AccountId, price: u128) -> Result<()>;
+    fn _authorize_sybil(&mut self, sybil: AccountId) -> Result<()>;
+    fn _unauthorize_sybil(&mut self, sybil: AccountId) -> Result<()>;
 }
 
-impl<T: Storage<Data>> PriceOracle for T {
+impl<T: Storage<Data> + Storage<ownable::Data>> PriceOracle for T {
     default fn get_price(&self, asset: AccountId) -> Option<u128> {
         self._get_price(asset)
     }
@@ -41,11 +46,17 @@ impl<T: Storage<Data>> PriceOracle for T {
     default fn set_fixed_price(&mut self, asset: AccountId, value: u128) -> Result<()> {
         self._set_fixed_price(asset, value)
     }
+    default fn authorize_sybil(&mut self, sybil: AccountId) -> Result<()> {
+        self._authorize_sybil(sybil)
+    }
+    default fn unauthorize_sybil(&mut self, sybil: AccountId) -> Result<()> {
+        self._unauthorize_sybil(sybil)
+    }
 }
 
-impl<T: Storage<Data>> Internal for T {
+impl<T: Storage<Data> + Storage<ownable::Data>> Internal for T {
     default fn _get_price(&self, asset: AccountId) -> Option<u128> {
-        self.data().fixed_prices.get(&asset)
+        self.data::<Data>().fixed_prices.get(&asset)
     }
     default fn _get_underlying_price(&self, pool: AccountId) -> Option<u128> {
         if let Some(underlying) = PoolRef::underlying(&pool) {
@@ -54,7 +65,15 @@ impl<T: Storage<Data>> Internal for T {
         None
     }
     default fn _set_fixed_price(&mut self, asset: AccountId, value: u128) -> Result<()> {
-        self.data().fixed_prices.insert(&asset, &value);
+        self.data::<Data>().fixed_prices.insert(&asset, &value);
+        Ok(())
+    }
+    default fn _authorize_sybil(&mut self, sybil: AccountId) -> Result<()> {
+        self.data::<Data>().sybils.insert(&sybil, &true);
+        Ok(())
+    }
+    default fn _unauthorize_sybil(&mut self, sybil: AccountId) -> Result<()> {
+        self.data::<Data>().sybils.insert(&sybil, &false);
         Ok(())
     }
 }
