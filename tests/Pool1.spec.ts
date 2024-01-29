@@ -875,4 +875,23 @@ describe('Pool spec 1', () => {
     )
     expect(val2.ok.err).toEqual({ controller: 'MarketNotListed' })
   })
+
+  it('Unprotected liquidation threshold setter', async () => {
+    /*
+    reproduced in `tests/Pool1.spec.ts`
+    command: `yarn test:single --testNamePattern "Unprotected liquidation threshold setter"`
+    */
+    const { pools, users } = await setup()
+    const liqThresholdBefore = (
+      await pools.dai.pool.query.liquidationThreshold()
+    ).value.ok.toString()
+    console.log('threshold before: ', liqThresholdBefore)
+    const result = await pools.dai.pool
+      .withSigner(users[1])
+      .query.setLiquidationThreshold(10)
+
+    expect(result.value.ok.err).toStrictEqual({
+      callerIsNotManager: null,
+    })
+  })
 })

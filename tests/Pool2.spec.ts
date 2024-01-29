@@ -946,7 +946,7 @@ describe('Pool spec 2', () => {
       ).toBe(ONE_ETHER.toString())
     })
 
-    const newLiquidationThreshold = 8000 // 80%
+    const newLiquidationThreshold = 9500 // 80%
     it('preparations - set Liquidation Threshold', async () => {
       await shouldNotRevert(dai.pool, 'setLiquidationThreshold', [
         newLiquidationThreshold,
