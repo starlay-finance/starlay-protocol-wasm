@@ -150,17 +150,7 @@ pub mod contract {
         pub user: AccountId,
     }
 
-    impl Pool for PoolContract {
-        #[ink(message)]
-        fn add_reserves(&mut self, _amount: Balance) -> Result<()> {
-            Err(Error::NotImplemented)
-        }
-
-        #[ink(message)]
-        fn set_interest_rate_model(&mut self, _new_interest_rate_model: AccountId) -> Result<()> {
-            Err(Error::NotImplemented)
-        }
-    }
+    impl Pool for PoolContract {}
     impl Internal for PoolContract {
         fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance) {
             self.env().emit_event(Mint {
