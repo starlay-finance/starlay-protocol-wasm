@@ -224,6 +224,11 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _set_controller(&mut self, id: AccountId) -> Result<()> {
         self.data().controller = id;
+
+        let markets: Vec<AccountId> = ControllerRef::markets(&id);
+        for market in markets {
+            PoolRef::set_controller(&market, id)?;
+        }
         Ok(())
     }
     default fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {

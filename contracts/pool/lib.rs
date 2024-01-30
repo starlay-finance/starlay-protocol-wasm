@@ -152,11 +152,6 @@ pub mod contract {
 
     impl Pool for PoolContract {
         #[ink(message)]
-        fn set_controller(&mut self, _new_controller: AccountId) -> Result<()> {
-            Err(Error::NotImplemented)
-        }
-
-        #[ink(message)]
         fn add_reserves(&mut self, _amount: Balance) -> Result<()> {
             Err(Error::NotImplemented)
         }
