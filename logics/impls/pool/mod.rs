@@ -393,7 +393,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     #[modifiers(delegated_allowed(borrower, borrow_amount))]
     default fn borrow_for(&mut self, borrower: AccountId, borrow_amount: Balance) -> Result<()> {
         self._accrue_interest()?;
-        self._borrow(borrower, borrow_amount, true)
+        self._borrow(borrower, borrow_amount, true)?;
+
+        let delegatee = Self::env().caller();
+        let delegate_allowance = self._delegate_allowance(&borrower, &delegatee);
+        self._approve_delegate(borrower, delegatee, delegate_allowance - borrow_amount)
     }
 
     #[modifiers(only_flashloan_gateway)]
