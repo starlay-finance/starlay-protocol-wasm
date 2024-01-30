@@ -62,12 +62,6 @@ describe('WETHGateway spec', () => {
       args: [],
     })
 
-    const wethGateway = await deployWETHGateway({
-      api,
-      signer: deployer,
-      args: [weth.address],
-    })
-
     const incentivesController = await deployIncentivesController({
       api,
       signer: deployer,
@@ -81,6 +75,12 @@ describe('WETHGateway spec', () => {
       manager: deployer,
       wethToken: weth,
       incentivesController,
+    })
+
+    const wethGateway = await deployWETHGateway({
+      api,
+      signer: deployer,
+      args: [weth.address, pools.weth.pool.address],
     })
 
     const users = [bob, charlie, django]
@@ -145,7 +145,6 @@ describe('WETHGateway spec', () => {
     } = await api.query.system.account(weth.address)
 
     await shouldNotRevert(wethGateway, 'depositEth', [
-      pool.address,
       {
         value: depositAmount,
         gasLimit,
@@ -177,12 +176,7 @@ describe('WETHGateway spec', () => {
   const borrowAmount = 2000
   describe('Borrow WETH', () => {
     it('Should Fail', async () => {
-      const { pool } = pools.weth
-
-      const result = await wethGateway.query.borrowEth(
-        pool.address,
-        borrowAmount,
-      )
+      const result = await wethGateway.query.borrowEth(borrowAmount)
 
       expect(result.value.ok.err).toStrictEqual({
         pool: { insufficientDelegateAllowance: null },
@@ -201,7 +195,6 @@ describe('WETHGateway spec', () => {
         data: { free: beforeWethContractBalance },
       } = await api.query.system.account(weth.address)
       await shouldNotRevert(wethGateway, 'borrowEth', [
-        pool.address,
         borrowAmount,
         { gasLimit },
       ])
@@ -236,7 +229,6 @@ describe('WETHGateway spec', () => {
       data: { free: beforeWethContractBalance },
     } = await api.query.system.account(weth.address)
     await shouldNotRevert(wethGateway, 'repayEth', [
-      pool.address,
       repayAmount,
       {
         value: repayAmount,
@@ -279,7 +271,6 @@ describe('WETHGateway spec', () => {
       data: { free: beforeWethContractBalance },
     } = await api.query.system.account(weth.address)
     await shouldNotRevert(wethGateway, 'withdrawEth', [
-      pool.address,
       withdrawAmount,
       { gasLimit },
     ])

@@ -28,7 +28,7 @@ pub mod contract {
 
     /// Contract's Storage
     #[ink(storage)]
-    #[derive(Default, Storage)]
+    #[derive(Storage)]
     pub struct WETHGatewayContract {
         #[storage_field]
         gateway: Data,
@@ -100,11 +100,13 @@ pub mod contract {
     impl WETHGatewayContract {
         /// Generate this contract
         #[ink(constructor)]
-        pub fn new(weth: AccountId) -> Self {
-            let mut instance = Self::default();
+        pub fn new(weth: AccountId, pool: AccountId) -> Self {
+            let mut instance = Self {
+                gateway: Data { weth, pool },
+                ownable: Default::default(),
+            };
             let caller = Self::env().caller();
             instance._init_with_owner(caller);
-            instance._initialize(weth);
             instance
         }
     }
