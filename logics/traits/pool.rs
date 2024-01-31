@@ -143,21 +143,11 @@ pub trait Pool: PSP22 + PSP22Metadata {
 
     /// Increase delegate allowance from owner
     #[ink(message)]
-    fn increase_delegate_allowance(
-        &mut self,
-        owner: AccountId,
-        delegatee: AccountId,
-        amount: Balance,
-    ) -> Result<()>;
+    fn increase_delegate_allowance(&mut self, delegatee: AccountId, amount: Balance) -> Result<()>;
 
     /// Decrease delegate allowance from owner
     #[ink(message)]
-    fn decrease_delegate_allowance(
-        &mut self,
-        owner: AccountId,
-        delegatee: AccountId,
-        amount: Balance,
-    ) -> Result<()>;
+    fn decrease_delegate_allowance(&mut self, delegatee: AccountId, amount: Balance) -> Result<()>;
 
     /// Set whether user's asset to use as collateral or not
     #[ink(message)]
