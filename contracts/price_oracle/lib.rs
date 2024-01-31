@@ -14,34 +14,38 @@ mod tests;
 /// Definition of PriceOracle Contract
 #[openbrush::contract]
 pub mod contract {
-    use logics::impls::price_oracle::*;
-    use openbrush::traits::Storage;
+    use logics::impls::price_oracle::{
+        Data,
+        Internal,
+        *,
+    };
+    use openbrush::{
+        contracts::ownable::*,
+        traits::Storage,
+    };
 
     /// Contract's Storage
     #[ink(storage)]
-    #[derive(Storage)]
+    #[derive(Default, Storage)]
     pub struct PriceOracleContract {
         #[storage_field]
         price_oracle: Data,
+        #[storage_field]
+        ownable: ownable::Data,
     }
 
+    impl Ownable for PriceOracleContract {}
     impl PriceOracle for PriceOracleContract {}
-
-    impl Default for PriceOracleContract {
-        fn default() -> Self {
-            Self::new()
-        }
-    }
+    impl Internal for PriceOracleContract {}
 
     impl PriceOracleContract {
         /// Generate this contract
         #[ink(constructor)]
         pub fn new() -> Self {
-            Self {
-                price_oracle: Data {
-                    fixed_prices: Default::default(),
-                },
-            }
+            let mut instance = Self::default();
+            let caller = Self::env().caller();
+            instance._init_with_owner(caller);
+            instance
         }
     }
 }
