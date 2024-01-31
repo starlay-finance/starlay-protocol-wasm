@@ -419,6 +419,75 @@ describe('Pool spec 1', () => {
     })
   })
 
+  describe('.borrow_for', () => {
+    let deployer: KeyringPair
+    let token: PSP22Token
+    let pool: Pool
+    let users: KeyringPair[]
+    let gasLimit: WeightV2
+
+    beforeAll(async () => {
+      ;({
+        deployer,
+        users,
+        pools: {
+          dai: { token, pool },
+        },
+        gasLimit,
+      } = await setup())
+    })
+
+    it('preparations', async () => {
+      const [user1] = users
+      await token.withSigner(deployer).tx.mint(user1.address, 5_000)
+      await token.withSigner(user1).tx.approve(pool.address, 5_000)
+      await pool.withSigner(user1).tx.mint(5_000, { gasLimit })
+      expect((await pool.query.totalSupply()).value.ok.toNumber()).toEqual(
+        5_000,
+      )
+      expect(
+        (await pool.query.balanceOf(user1.address)).value.ok.toNumber(),
+      ).toEqual(5_000)
+    })
+
+    it('execute', async () => {
+      const [user1, user2] = users
+
+      await shouldNotRevert(pool.withSigner(user1), 'approveDelegate', [
+        user2.address,
+        3_000,
+      ])
+
+      const delegateAllowanceBefore = (
+        await pool.query.delegateAllowance(user1.address, user2.address)
+      ).value.ok
+      expect(delegateAllowanceBefore.toString()).toEqual('3000')
+
+      const { events } = await pool
+        .withSigner(user2)
+        .tx.borrowFor(user1.address, 3_000, { gasLimit })
+
+      const delegateAllowanceAfter = (
+        await pool.query.delegateAllowance(user1.address, user2.address)
+      ).value.ok
+      expect(delegateAllowanceAfter.toString()).toEqual('0')
+
+      expect(
+        (await token.query.balanceOf(user2.address)).value.ok.toNumber(),
+      ).toEqual(3_000)
+
+      expect(
+        (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
+      ).toEqual(2_000)
+      const event1 = events[0]
+      expect(event1.name).toEqual('Borrow')
+      expect(event1.args.borrower).toEqual(user1.address)
+      expect(event1.args.borrowAmount.toNumber()).toEqual(3_000)
+      expect(event1.args.accountBorrows.toNumber()).toEqual(3_000)
+      expect(event1.args.totalBorrows.toNumber()).toEqual(3_000)
+    })
+  })
+
   describe('.borrow (fail case)', () => {
     it('when no cash in pool', async () => {
       const {
