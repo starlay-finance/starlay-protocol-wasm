@@ -57,7 +57,7 @@ export const deployContracts = async ({
   const wethGateway = await deployWETHGateway({
     api,
     signer,
-    args: [pools.WASTR.token.address],
+    args: [pools.WASTR.token.address, pools.WASTR.pool.address],
   })
 
   const flashloanGateway = await deployFlashLoanGateway({

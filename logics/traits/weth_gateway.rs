@@ -30,19 +30,19 @@ pub type WETHGatewayRef = dyn WETHGateway + Ownable;
 pub trait WETHGateway: Ownable {
     /// Deposits WETH into the reserve, using native ETH. A corresponding amount of the overlying asset (lTokens) is minted.
     #[ink(message, payable)]
-    fn deposit_eth(&mut self, pool: AccountId) -> Result<()>;
+    fn deposit_eth(&mut self) -> Result<()>;
 
     /// Withdraws the WETH _reserves of caller.
     #[ink(message)]
-    fn withdraw_eth(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
+    fn withdraw_eth(&mut self, amount: Balance) -> Result<()>;
 
     /// Repays a borrow on the WETH reserve, for the specified amount (or for the whole amount, if Balance::MAX is specified).
     #[ink(message, payable)]
-    fn repay_eth(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
+    fn repay_eth(&mut self, amount: Balance) -> Result<()>;
 
     /// Borrow WETH, unwraps to ETH and send both the ETH and DebtTokens to caller, via `approveDelegation` and onBehalf argument in `pool.borrow`.
     #[ink(message)]
-    fn borrow_eth(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
+    fn borrow_eth(&mut self, amount: Balance) -> Result<()>;
 
     /// Transfer PSP22 from the utility contract, for PSP22 recovery in case of stuck tokens due direct transfers to the contract address.
     #[ink(message)]
@@ -61,7 +61,11 @@ pub trait WETHGateway: Ownable {
 
     /// Get WETH address used by WETHGateway
     #[ink(message)]
-    fn get_weth_address(&self) -> Option<AccountId>;
+    fn get_weth_address(&self) -> AccountId;
+
+    /// Get Pool address used by WETHGateway
+    #[ink(message)]
+    fn get_pool_address(&self) -> AccountId;
 }
 
 #[derive(Debug, PartialEq, Eq, Encode, Decode)]
