@@ -40,4 +40,4 @@ std = [
 ]
 
 [profile.release]
-overflow-checks = false
+overflow-checks = true
