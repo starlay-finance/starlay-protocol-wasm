@@ -1,4 +1,4 @@
-import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
+import { SignAndSendSuccessResponse } from '@starlay-finance/typechain-types'
 import { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { WeightV2 } from '@polkadot/types/interfaces'

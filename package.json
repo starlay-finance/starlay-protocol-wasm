@@ -3,9 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
-    "@727-ventures/typechain-compiler": "^1.1.4",
-    "@727-ventures/typechain-polkadot": "^1.1.1",
-    "@727-ventures/typechain-types": "^1.1.2",
+    "@starlay-finance/typechain-compiler": "^1.0.1",
+    "@starlay-finance/typechain-polkadot": "^1.0.2",
+    "@starlay-finance/typechain-types": "^1.0.3",
     "@types/jest": "^29.4.0",
     "@typescript-eslint/eslint-plugin": "^5.54.0",
     "@typescript-eslint/parser": "^5.54.0",
@@ -21,9 +21,9 @@
     "ts-node": "^10.9.1"
   },
   "scripts": {
-    "compile:nogenerate": "typechain-compiler --toolchain nightly-2023-03-05 --nt --skip-wasm-validation",
-    "compile": "typechain-compiler --toolchain nightly-2023-03-05 --nt --skip-wasm-validation && yarn generate",
-    "compile:release": "typechain-compiler --release --toolchain nightly-2023-03-05 --nt --skip-wasm-validation && yarn generate",
+    "compile:nogenerate": "typechain-compiler --toolchain nightly-2023-03-05 --nt --skipWasmValidation",
+    "compile": "typechain-compiler --toolchain nightly-2023-03-05 --nt --skipWasmValidation && yarn generate",
+    "compile:release": "typechain-compiler --release --toolchain nightly-2023-03-05 --nt --skipWasmValidation && yarn generate",
     "test:typechain": "jest --testPathPattern \".spec.ts$\" --runInBand --detectOpenHandles",
     "test:single": "jest --detectOpenHandles",
     "test": "yarn compile && yarn test:typechain",

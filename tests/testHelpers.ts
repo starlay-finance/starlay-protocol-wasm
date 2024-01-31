@@ -1,6 +1,6 @@
-import { ReturnNumber } from '@727-ventures/typechain-types'
 import { WeightV2 } from '@polkadot/types/interfaces'
 import { BN, BN_TEN, BN_TWO } from '@polkadot/util'
+import { ReturnNumber } from '@starlay-finance/typechain-types'
 import { ReplacedType } from '../scripts/helper/utilityTypes'
 import { waitForTx } from '../scripts/helper/utils'
 

@@ -1,6 +1,6 @@
-import { TypechainPlugin } from '@727-ventures/typechain-polkadot/src/types/interfaces'
-import { writeFileSync } from '@727-ventures/typechain-polkadot/src/utils/directories'
 import { Abi } from '@polkadot/api-contract'
+import { TypechainPlugin } from '@starlay-finance/typechain-polkadot/src/types/interfaces'
+import { writeFileSync } from '@starlay-finance/typechain-polkadot/src/utils/directories'
 import { readFileSync } from 'fs'
 
 const replaceRecursive = (obj: any, name: string, replaced: any) => {

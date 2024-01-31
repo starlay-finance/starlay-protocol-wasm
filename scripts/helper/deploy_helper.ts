@@ -1,6 +1,6 @@
-import { SignAndSendSuccessResponse } from '@727-ventures/typechain-types'
 import type { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
+import { SignAndSendSuccessResponse } from '@starlay-finance/typechain-types'
 import { LastArrayElement } from 'type-fest'
 
 import Controller_factory from '../../types/constructors/controller'

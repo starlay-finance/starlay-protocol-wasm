@@ -1,8 +1,8 @@
-import { ReturnNumber } from '@727-ventures/typechain-types'
 import { encodeAddress } from '@polkadot/keyring'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { WeightV2 } from '@polkadot/types/interfaces'
 import { BN, BN_ONE, BN_TEN } from '@polkadot/util'
+import { ReturnNumber } from '@starlay-finance/typechain-types'
 import { ONE_ETHER, ZERO_ADDRESS } from '../scripts/helper/constants'
 import {
   deployController,
