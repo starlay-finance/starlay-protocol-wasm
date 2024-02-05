@@ -918,10 +918,22 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             .get(&borrower)
             .unwrap_or(0);
         if neg {
+            // Check overflow
+            let borrow_amount = if account_borrows_prev >= scaled {
+                account_borrows_prev - scaled
+            } else {
+                0
+            };
+            let borrow_scaled_prev = self.data::<Data>().borrows_scaled;
+            let borrow_scaled_new = if borrow_scaled_prev >= scaled {
+                borrow_scaled_prev - scaled
+            } else {
+                0
+            };
             self.data::<Data>()
                 .account_borrows
-                .insert(&borrower, &(account_borrows_prev - scaled));
-            self.data::<Data>().borrows_scaled -= scaled
+                .insert(&borrower, &(borrow_amount));
+            self.data::<Data>().borrows_scaled = borrow_scaled_new;
         } else {
             self.data::<Data>()
                 .account_borrows
@@ -1018,7 +1030,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         };
 
         let account_borrow_prev = self._borrow_balance_stored(borrower);
-        let repay_amount_final = if repay_amount == u128::MAX {
+        let repay_amount_final = if repay_amount > account_borrow_prev {
             account_borrow_prev
         } else {
             repay_amount
@@ -1026,9 +1038,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         self._transfer_underlying_from(payer, contract_addr, repay_amount_final)?;
 
-        let account_borrows_new = account_borrow_prev - repay_amount_final;
-        let total_borrows_new = self._total_borrows() - repay_amount_final;
         self._increase_debt(borrower, repay_amount_final, true);
+
+        let account_borrows_new = self._borrow_balance_stored(borrower);
+        let total_borrows_new = self._total_borrows();
+
         self._emit_repay_borrow_event(
             payer,
             borrower,
