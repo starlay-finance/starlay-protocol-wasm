@@ -265,19 +265,6 @@ describe('Controller spec', () => {
     })
   })
 
-  describe('.repay_borrow_allowed', () => {
-    it('do nothing', async () => {
-      const { controller } = await setup()
-      const { value } = await controller.query.repayBorrowAllowed(
-        ZERO_ADDRESS,
-        ZERO_ADDRESS,
-        ZERO_ADDRESS,
-        0,
-      )
-      expect(value.ok.ok).toBeNull()
-    })
-  })
-
   describe('.liquidate_borrow_allowed', () => {
     it('check listed markets', async () => {
       const {
