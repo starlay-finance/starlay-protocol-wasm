@@ -1173,6 +1173,14 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let contract_addr = Self::env().account_id();
 
         let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
+
+        let seizer_controller: AccountId =
+            PoolRef::controller(&seizer_token).ok_or(Error::ControllerIsNotSet)?;
+
+        if seizer_controller != controller {
+            return Err(Error::from(ControllerError::ControllerMismatch))
+        }
+
         ControllerRef::seize_allowed(
             &controller,
             contract_addr,
