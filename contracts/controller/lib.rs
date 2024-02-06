@@ -37,6 +37,15 @@ pub mod contract {
         pub pool: AccountId,
     }
 
+    /// Event: Controller Manager changed
+    #[ink(event)]
+    pub struct ManagerAddressUpdated {
+        #[ink(topic)]
+        pub old: AccountId,
+        #[ink(topic)]
+        pub new: AccountId,
+    }
+
     impl Controller for ControllerContract {}
 
     impl ControllerContract {
@@ -52,6 +61,10 @@ pub mod contract {
     impl Internal for ControllerContract {
         fn _emit_market_listed_event(&self, pool: AccountId) {
             self.env().emit_event(MarketListed { pool });
+        }
+
+        fn _emit_manager_updated_event(&self, old: AccountId, new: AccountId) {
+            self.env().emit_event(ManagerAddressUpdated { old, new })
         }
     }
 }
