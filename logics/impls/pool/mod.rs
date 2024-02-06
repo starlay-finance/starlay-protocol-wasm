@@ -826,7 +826,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             .as_u128();
 
         // Check if it is first deposit.
-        let lp_balance = self._principal_balance_of(&caller);
+        let lp_balance = self._principal_balance_of(&minter);
         if lp_balance == 0 {
             self._set_use_reserve_as_collateral(minter, true);
         }
