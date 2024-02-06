@@ -239,6 +239,14 @@ pub trait Controller {
     #[ink(message)]
     fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()>;
 
+    /// Set Manager
+    #[ink(message)]
+    fn set_manager(&mut self, manager: AccountId) -> Result<()>;
+
+    /// Accept Manager
+    #[ink(message)]
+    fn accept_manager(&mut self) -> Result<()>;
+
     // view function
     /// Returns the list of all markets that are currently supported
     #[ink(message)]
@@ -290,6 +298,10 @@ pub trait Controller {
     /// Returns the account id of the manager account
     #[ink(message)]
     fn manager(&self) -> Option<AccountId>;
+
+    /// Returns the account id of the pending manager account
+    #[ink(message)]
+    fn pending_manager(&self) -> Option<AccountId>;
 
     /// Returns whether a given pool is currently listed
     #[ink(message)]
@@ -401,10 +413,12 @@ pub enum Error {
     InsufficientLiquidity,
     InsufficientShortfall,
     CallerIsNotManager,
+    CallerIsNotPendingManager,
     InvalidCollateralFactor,
     UnderlyingIsNotSet,
     PoolIsNotSet,
     ManagerIsNotSet,
+    PendingManagerIsNotSet,
     OracleIsNotSet,
     BalanceDecreaseNotAllowed,
 }

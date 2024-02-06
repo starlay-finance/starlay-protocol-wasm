@@ -87,6 +87,8 @@ pub struct Data {
     pub controller: Option<AccountId>,
     /// AccountId of Manager, the administrator of this pool
     pub manager: Option<AccountId>,
+    /// AccountId of Pending Manager use for transfer manager role
+    pub pending_manager: Option<AccountId>,
     /// AccountId of incentives conroller
     pub incentives_controller: Option<AccountId>,
     /// AccountId of Rate Model
@@ -125,6 +127,7 @@ impl Default for Data {
             underlying: None,
             controller: None,
             manager: None,
+            pending_manager: None,
             rate_model: None,
             incentives_controller: None,
             borrows_scaled: Default::default(),
@@ -213,6 +216,7 @@ pub trait Internal {
     ) -> Result<()>;
     fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()>;
     fn _assert_manager(&self) -> Result<()>;
+    fn _assert_pending_manager(&self) -> Result<()>;
     fn _validate_set_use_reserve_as_collateral(
         &self,
         user: AccountId,
@@ -220,10 +224,13 @@ pub trait Internal {
     ) -> Result<()>;
     fn _accrue_reward(&self, user: AccountId) -> Result<()>;
     fn _set_incentives_controller(&mut self, incentives_controller: AccountId) -> Result<()>;
+    fn _set_manager(&mut self, manager: AccountId) -> Result<()>;
+    fn _accept_manager(&mut self) -> Result<()>;
     // view functions
     fn _underlying(&self) -> Option<AccountId>;
     fn _controller(&self) -> Option<AccountId>;
     fn _manager(&self) -> Option<AccountId>;
+    fn _pending_manager(&self) -> Option<AccountId>;
     fn _incentives_controller(&self) -> Option<AccountId>;
     fn _get_cash_prior(&self) -> Balance;
     fn _total_borrows(&self) -> Balance;
@@ -308,6 +315,7 @@ pub trait Internal {
     );
     fn _emit_reserve_used_as_collateral_enabled_event(&self, user: AccountId);
     fn _emit_reserve_used_as_collateral_disabled_event(&self, user: AccountId);
+    fn _emit_manager_updated_event(&self, old: AccountId, new: AccountId);
 }
 
 #[modifier_definition]
@@ -558,6 +566,18 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._set_incentives_controller(incentives_controller)
     }
 
+    default fn set_manager(&mut self, manager: AccountId) -> Result<()> {
+        self._assert_manager()?;
+        self._set_manager(manager)?;
+        Ok(())
+    }
+
+    default fn accept_manager(&mut self) -> Result<()> {
+        self._assert_pending_manager()?;
+        self._accept_manager()?;
+        Ok(())
+    }
+
     default fn underlying(&self) -> Option<AccountId> {
         self._underlying()
     }
@@ -568,6 +588,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn manager(&self) -> Option<AccountId> {
         self._manager()
+    }
+
+    default fn pending_manager(&self) -> Option<AccountId> {
+        self._pending_manager()
     }
 
     default fn incentives_controller(&self) -> Option<AccountId> {
@@ -1463,11 +1487,39 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
 
+    default fn _assert_pending_manager(&self) -> Result<()> {
+        let pending_manager = self
+            ._pending_manager()
+            .ok_or(Error::PendingManagerIsNotSet)?;
+        if Self::env().caller() != pending_manager {
+            return Err(Error::CallerIsNotPendingManager)
+        }
+
+        Ok(())
+    }
+
     default fn _set_incentives_controller(
         &mut self,
         incentives_controller: AccountId,
     ) -> Result<()> {
         self.data::<Data>().incentives_controller = Some(incentives_controller);
+        Ok(())
+    }
+
+    default fn _set_manager(&mut self, manager: AccountId) -> Result<()> {
+        self.data::<Data>().pending_manager = Some(manager);
+        Ok(())
+    }
+
+    default fn _accept_manager(&mut self) -> Result<()> {
+        let manager = self._manager().ok_or(Error::ManagerIsNotSet)?;
+        let pending_manager = self
+            ._pending_manager()
+            .ok_or(Error::PendingManagerIsNotSet)?;
+        self.data::<Data>().manager = Some(pending_manager);
+        self.data::<Data>().pending_manager = None;
+
+        self._emit_manager_updated_event(manager, pending_manager);
         Ok(())
     }
 
@@ -1482,6 +1534,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn _manager(&self) -> Option<AccountId> {
         self.data::<Data>().manager
+    }
+
+    default fn _pending_manager(&self) -> Option<AccountId> {
+        self.data::<Data>().pending_manager
     }
 
     default fn _incentives_controller(&self) -> Option<AccountId> {
@@ -1738,6 +1794,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn _emit_reserve_used_as_collateral_enabled_event(&self, _user: AccountId) {}
     default fn _emit_reserve_used_as_collateral_disabled_event(&self, _user: AccountId) {}
+    default fn _emit_manager_updated_event(&self, _old: AccountId, _new: AccountId) {}
 }
 
 pub fn to_psp22_error(e: PSP22Error) -> Error {
@@ -1761,10 +1818,12 @@ impl From<controller::Error> for PSP22Error {
             controller::Error::InsufficientLiquidity => convert("InsufficientLiquidity"),
             controller::Error::InsufficientShortfall => convert("InsufficientShortfall"),
             controller::Error::CallerIsNotManager => convert("CallerIsNotManager"),
+            controller::Error::CallerIsNotPendingManager => convert("CallerIsNotPendingManager"),
             controller::Error::InvalidCollateralFactor => convert("InvalidCollateralFactor"),
             controller::Error::UnderlyingIsNotSet => convert("UnderlyingIsNotSet"),
             controller::Error::PoolIsNotSet => convert("PoolIsNotSet"),
             controller::Error::ManagerIsNotSet => convert("ManagerIsNotSet"),
+            controller::Error::PendingManagerIsNotSet => convert("PendingManagerIsNotSet"),
             controller::Error::OracleIsNotSet => convert("OracleIsNotSet"),
             controller::Error::BalanceDecreaseNotAllowed => convert("BalanceDecreaseNotAllowed"),
         }
