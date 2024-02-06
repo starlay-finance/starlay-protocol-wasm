@@ -338,6 +338,15 @@ pub mod contract {
             if controller.is_zero() {
                 panic!("controller is zero address");
             }
+            if rate_model.is_zero() {
+                panic!("rate model is zero address");
+            }
+            if let Some(_incentives_controller) = incentives_controller {
+                if _incentives_controller.is_zero() {
+                    panic!("incentives controller is zero address");
+                }
+            }
+
             let mut instance = Self::default();
             instance._initialize(
                 incentives_controller,
@@ -370,6 +379,15 @@ pub mod contract {
             if controller.is_zero() {
                 panic!("controller is zero address");
             }
+            if rate_model.is_zero() {
+                panic!("rate model is zero address");
+            }
+            if let Some(_incentives_controller) = incentives_controller {
+                if _incentives_controller.is_zero() {
+                    panic!("incentives controller is zero address");
+                }
+            }
+
             let base_name = PSP22MetadataRef::token_name(&underlying);
             let base_symbol = PSP22MetadataRef::token_symbol(&underlying);
             let decimals = PSP22MetadataRef::token_decimals(&underlying);
