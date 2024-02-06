@@ -729,6 +729,10 @@ impl<T: Storage<Data>> Internal for T {
         redeem_amount: Balance,
         pool_attributes: Option<PoolAttributes>,
     ) -> Result<()> {
+        if !self._is_listed(pool) {
+            return Err(Error::MarketNotListed)
+        }
+
         let (
             AccountCollateralData {
                 total_collateral_in_base_currency,
@@ -794,6 +798,10 @@ impl<T: Storage<Data>> Internal for T {
         borrow_amount: Balance,
         pool_attribute: Option<PoolAttributes>,
     ) -> Result<()> {
+        if !self._is_listed(pool) {
+            return Err(Error::MarketNotListed)
+        }
+
         if let Some(true) | None = self._borrow_guardian_paused(pool) {
             return Err(Error::BorrowIsPaused)
         }
