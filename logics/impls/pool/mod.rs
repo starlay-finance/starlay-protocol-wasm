@@ -1174,13 +1174,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
 
-        let seizer_controller: AccountId =
-            PoolRef::controller(&seizer_token).ok_or(Error::ControllerIsNotSet)?;
-
-        if seizer_controller != controller {
-            return Err(Error::from(ControllerError::ControllerMismatch))
-        }
-
         ControllerRef::seize_allowed(
             &controller,
             contract_addr,
@@ -1189,6 +1182,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             borrower,
             seize_tokens,
         )?;
+
+        let seizer_controller: AccountId =
+            PoolRef::controller(&seizer_token).ok_or(Error::ControllerIsNotSet)?;
+
+        if seizer_controller != controller {
+            return Err(Error::from(ControllerError::ControllerMismatch))
+        }
 
         if liquidator == borrower {
             return Err(Error::LiquidateSeizeLiquidatorIsBorrower)
