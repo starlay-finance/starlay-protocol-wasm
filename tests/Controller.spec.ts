@@ -82,8 +82,9 @@ describe('Controller spec', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      signer: deployer,
       incentivesController,
+      manager: deployer.address,
     })
 
     // initialize
@@ -156,9 +157,10 @@ describe('Controller spec', () => {
         api,
         controller,
         rateModel,
-        manager: deployer,
+        signer: deployer,
         metadata: TEST_METADATAS.usdc,
         incentivesController,
+        manager: deployer.address,
       })
       await priceOracle.tx.setFixedPrice(usdc.token.address, ONE_ETHER)
       await controller.tx.supportMarketWithCollateralFactorMantissa(
@@ -204,13 +206,14 @@ describe('Controller spec', () => {
         api,
         controller,
         rateModel,
-        manager: deployer,
+        signer: deployer,
         metadata: {
           name: 'Sample',
           symbol: 'SAMPLE',
           decimals: 6,
         },
         incentivesController,
+        manager: deployer.address,
       })
       await controller.tx.supportMarket(
         sampleCoin.pool.address,
@@ -413,7 +416,8 @@ describe('Controller spec', () => {
       controller,
       rateModel,
       incentivesController,
-      manager: deployer,
+      signer: deployer,
+      manager: deployer.address,
     })
     const [sender, receiver] = users
 
@@ -497,8 +501,9 @@ describe('Controller spec', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      signer: deployer,
       incentivesController,
+      manager: deployer.address,
     })
 
     await controller.tx.supportMarket(
@@ -524,8 +529,9 @@ describe('Controller spec', () => {
         api,
         controller,
         rateModel,
-        manager: deployer,
+        signer: deployer,
         incentivesController,
+        manager: deployer.address,
       })
 
       // prepares
@@ -554,7 +560,8 @@ describe('Controller spec', () => {
           api,
           controller,
           rateModel,
-          manager: deployer,
+          signer: deployer,
+          manager: deployer.address,
           metadata: TEST_METADATAS.dai,
           incentivesController,
         })
@@ -601,8 +608,9 @@ describe('Controller spec', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      signer: deployer,
       incentivesController,
+      manager: deployer.address,
     })
     const { dai, usdc, usdt } = pools
 
@@ -701,8 +709,9 @@ describe('Controller spec', () => {
           api,
           controller,
           rateModel,
-          manager: deployer,
+          signer: deployer,
           incentivesController,
+          manager: deployer.address,
         })
         const [daiUser, usdcUser] = users
 
@@ -801,8 +810,9 @@ describe('Controller spec', () => {
           api,
           controller,
           rateModel,
-          manager: deployer,
+          signer: deployer,
           incentivesController,
+          manager: deployer.address,
         })
         const user = users[0]
 
@@ -913,8 +923,9 @@ describe('Controller spec', () => {
           api,
           controller,
           rateModel,
-          manager: deployer,
+          signer: deployer,
           incentivesController,
+          manager: deployer.address,
         })
         const user = users[0]
 

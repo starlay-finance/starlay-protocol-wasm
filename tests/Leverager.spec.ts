@@ -13,9 +13,7 @@ import {
 } from '../scripts/helper/deploy_helper'
 import { getGasLimit } from '../scripts/helper/utils'
 
-import Controller from '../types/contracts/controller'
 import Leverager from '../types/contracts/leverager'
-import WETH from '../types/contracts/weth'
 
 import {
   PoolContracts,
@@ -29,13 +27,11 @@ const PROOFSIZE = new BN(2_000_000)
 describe('Leverager spec', () => {
   let api: ApiPromise
   let deployer: KeyringPair
-  let users: KeyringPair[]
-  let controller: Controller
   let pools: Pools
   let dai: PoolContracts
   let gasLimit: WeightV2
   let leverager: Leverager
-  let weth: WETH
+
   const setup = async () => {
     const { api, alice: deployer, bob, charlie, django } = globalThis.setup
 
@@ -67,8 +63,9 @@ describe('Leverager spec', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      signer: deployer,
       wethToken: weth,
+      manager: deployer.address,
     })
 
     const users = [bob, charlie, django]
@@ -112,8 +109,7 @@ describe('Leverager spec', () => {
   }
 
   beforeAll(async () => {
-    ;({ api, deployer, gasLimit, users, controller, pools, leverager } =
-      await setup())
+    ;({ api, deployer, gasLimit, pools, leverager } = await setup())
     ;({ dai } = pools)
   })
 

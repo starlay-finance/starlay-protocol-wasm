@@ -68,8 +68,9 @@ describe('Pool spec 2', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      signer: deployer,
       incentivesController,
+      manager: deployer.address,
     })
 
     const users = [bob, charlie, django]
@@ -130,8 +131,9 @@ describe('Pool spec 2', () => {
         api,
         controller,
         rateModel,
-        manager: deployer,
+        signer: deployer,
         incentivesController,
+        manager: deployer.address,
       })
       const [userA, userB] = users
 
@@ -278,8 +280,9 @@ describe('Pool spec 2', () => {
         api,
         controller,
         rateModel,
-        manager: deployer,
+        signer: deployer,
         incentivesController,
+        manager: deployer.address,
       })
       const [userA, userB] = users
 
@@ -358,8 +361,9 @@ describe('Pool spec 2', () => {
         api,
         controller,
         rateModel,
-        manager: deployer,
+        signer: deployer,
         incentivesController,
+        manager: deployer.address,
       })
       const [userA, userB] = users
       const spender = deployer
@@ -469,8 +473,9 @@ describe('Pool spec 2', () => {
         api,
         controller,
         rateModel,
-        manager: deployer,
+        signer: deployer,
         incentivesController,
+        manager: deployer.address,
       })
       const [userA, userB] = users
       const spender = deployer
@@ -577,6 +582,7 @@ describe('Pool spec 2', () => {
             newToken.address,
             controller.address,
             rateModel.address,
+            deployer.address,
             [initialExchangeRate.toString()],
             10000,
           ],
@@ -639,6 +645,7 @@ describe('Pool spec 2', () => {
           token.address,
           controller.address,
           rateModel.address,
+          deployer.address,
           [ONE_ETHER.toString()],
           10000,
         ],

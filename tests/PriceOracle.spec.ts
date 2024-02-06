@@ -45,8 +45,9 @@ describe('PriceOracle spec', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      signer: deployer,
       incentivesController,
+      manager: deployer.address,
     })
 
     const users = [bob, charlie, django]

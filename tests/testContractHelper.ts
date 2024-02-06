@@ -74,28 +74,31 @@ export const preparePoolWithMockToken = async ({
   rateModel,
   manager,
   incentivesController,
+  signer,
 }: {
   api: ApiPromise
   metadata: Metadata
   controller: Controller
   rateModel: DefaultInterestRateModel
-  manager: KeyringPair
+  signer: KeyringPair
+  manager: string
   incentivesController?: IncentivesController
 }): Promise<PoolContracts> => {
   const token = await deployPSP22Token({
     api,
-    signer: manager,
+    signer,
     args: [0, metadata.name, metadata.symbol, metadata.decimals],
   })
 
   const pool = await deployPoolFromAsset({
     api,
-    signer: manager,
+    signer,
     args: [
       incentivesController ? incentivesController.address : null,
       token.address,
       controller.address,
       rateModel.address,
+      manager,
       [ONE_ETHER.toString()],
       10000,
     ],
@@ -112,6 +115,7 @@ export const preparePoolWithWETH = async ({
   controller,
   rateModel,
   manager,
+  signer,
   incentivesController,
   token,
 }: {
@@ -119,18 +123,20 @@ export const preparePoolWithWETH = async ({
   metadata: Metadata
   controller: Controller
   rateModel: DefaultInterestRateModel
-  manager: KeyringPair
+  signer: KeyringPair
+  manager: string
   incentivesController?: IncentivesController
   token: WETH
 }): Promise<WrappedPoolContracts> => {
   const pool = await deployPoolFromAsset({
     api,
-    signer: manager,
+    signer,
     args: [
       incentivesController ? incentivesController.address : null,
       token.address,
       controller.address,
       rateModel.address,
+      manager,
       [ONE_ETHER.toString()],
       10000,
     ],
@@ -145,6 +151,7 @@ export const preparePoolsWithPreparedTokens = async ({
   controller,
   rateModel,
   manager,
+  signer,
   incentivesController,
   wethToken = undefined,
 }: {
@@ -152,7 +159,8 @@ export const preparePoolsWithPreparedTokens = async ({
   controller: Controller
   rateModel: DefaultInterestRateModel
   incentivesController?: IncentivesController
-  manager: KeyringPair
+  signer: KeyringPair
+  manager: string
   wethToken?: WETH
 }): Promise<Pools> => {
   const dai = await preparePoolWithMockToken({
@@ -160,6 +168,7 @@ export const preparePoolsWithPreparedTokens = async ({
     controller,
     rateModel,
     manager,
+    signer,
     incentivesController,
     metadata: TEST_METADATAS.dai,
   })
@@ -168,6 +177,7 @@ export const preparePoolsWithPreparedTokens = async ({
     controller,
     rateModel,
     manager,
+    signer,
     incentivesController,
     metadata: TEST_METADATAS.usdc,
   })
@@ -176,6 +186,7 @@ export const preparePoolsWithPreparedTokens = async ({
     controller,
     rateModel,
     manager,
+    signer,
     incentivesController,
     metadata: TEST_METADATAS.usdt,
   })
@@ -189,6 +200,7 @@ export const preparePoolsWithPreparedTokens = async ({
     controller,
     rateModel,
     manager,
+    signer,
     incentivesController,
     token: wethToken,
   })
