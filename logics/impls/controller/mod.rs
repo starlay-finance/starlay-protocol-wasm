@@ -46,6 +46,8 @@ pub use self::utils::{
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 
+pub const MAXIMUM_MARKETS: usize = 8;
+
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
@@ -1078,7 +1080,12 @@ impl<T: Storage<Data>> Internal for T {
         underlying: &AccountId,
         collateral_factor_mantissa: Option<WrappedU256>,
     ) -> Result<()> {
-        for market in self._markets() {
+        let markets = self._markets();
+        if markets.len() >= MAXIMUM_MARKETS {
+            return Err(Error::MarketCountReachedToMaximum)
+        }
+
+        for market in markets {
             if pool == &market {
                 return Err(Error::MarketAlreadyListed)
             }

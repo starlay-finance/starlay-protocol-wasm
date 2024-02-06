@@ -1767,6 +1767,9 @@ impl From<controller::Error> for PSP22Error {
             controller::Error::ManagerIsNotSet => convert("ManagerIsNotSet"),
             controller::Error::OracleIsNotSet => convert("OracleIsNotSet"),
             controller::Error::BalanceDecreaseNotAllowed => convert("BalanceDecreaseNotAllowed"),
+            controller::Error::MarketCountReachedToMaximum => {
+                convert("MarketCountReachedToMaximum")
+            }
         }
     }
 }

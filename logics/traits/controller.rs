@@ -407,6 +407,7 @@ pub enum Error {
     ManagerIsNotSet,
     OracleIsNotSet,
     BalanceDecreaseNotAllowed,
+    MarketCountReachedToMaximum,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;
