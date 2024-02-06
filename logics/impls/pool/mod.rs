@@ -1142,6 +1142,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
                 }),
             )?;
 
+            // Check if controller to prevent cross-contract calling (Callee Trapped Error.)
+            let seizer_controller: AccountId =
+                PoolRef::controller(&collateral).ok_or(Error::ControllerIsNotSet)?;
+
+            if seizer_controller != controller {
+                return Err(Error::from(ControllerError::ControllerMismatch))
+            }
             PoolRef::seize(&collateral, liquidator, borrower, seize_tokens)?;
 
             seize_tokens
@@ -1173,7 +1180,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let contract_addr = Self::env().account_id();
 
         let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
-
         ControllerRef::seize_allowed(
             &controller,
             contract_addr,
@@ -1182,15 +1188,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             borrower,
             seize_tokens,
         )?;
-
-        if seizer_token != contract_addr {
-            let seizer_controller: AccountId =
-                PoolRef::controller(&seizer_token).ok_or(Error::ControllerIsNotSet)?;
-
-            if seizer_controller != controller {
-                return Err(Error::from(ControllerError::ControllerMismatch))
-            }
-        }
 
         if liquidator == borrower {
             return Err(Error::LiquidateSeizeLiquidatorIsBorrower)
