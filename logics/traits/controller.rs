@@ -29,16 +29,6 @@ pub trait Controller {
     #[ink(message)]
     fn mint_allowed(&self, pool: AccountId, minter: AccountId, mint_amount: Balance) -> Result<()>;
 
-    /// Validates mint and reverts on rejection. May emit logs.
-    #[ink(message)]
-    fn mint_verify(
-        &self,
-        pool: AccountId,
-        minter: AccountId,
-        mint_amount: Balance,
-        mint_tokens: Balance,
-    ) -> Result<()>;
-
     /// Checks if the account should be allowed to redeem tokens in the given market
     #[ink(message)]
     fn redeem_allowed(
@@ -49,15 +39,6 @@ pub trait Controller {
         pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
 
-    /// Validates redeem and reverts on rejection. May emit logs.
-    #[ink(message)]
-    fn redeem_verify(
-        &self,
-        pool: AccountId,
-        redeemer: AccountId,
-        redeem_amount: Balance,
-    ) -> Result<()>;
-
     /// Checks if the account should be allowed to borrow the underlying asset of the given market
     #[ink(message)]
     fn borrow_allowed(
@@ -66,36 +47,6 @@ pub trait Controller {
         borrower: AccountId,
         borrow_amount: Balance,
         pool_attribute: Option<PoolAttributes>,
-    ) -> Result<()>;
-
-    /// Validates borrow and reverts on rejection. May emit logs.
-    #[ink(message)]
-    fn borrow_verify(
-        &self,
-        pool: AccountId,
-        borrower: AccountId,
-        borrow_amount: Balance,
-    ) -> Result<()>;
-
-    /// Checks if the account should be allowed to repay a borrow in the given market
-    #[ink(message)]
-    fn repay_borrow_allowed(
-        &self,
-        pool: AccountId,
-        payer: AccountId,
-        borrower: AccountId,
-        repay_amount: Balance,
-    ) -> Result<()>;
-
-    /// Validates repayBorrow and reverts on rejection. May emit logs.
-    #[ink(message)]
-    fn repay_borrow_verify(
-        &self,
-        pool: AccountId,
-        payer: AccountId,
-        borrower: AccountId,
-        repay_amount: Balance,
-        borrower_index: u128,
     ) -> Result<()>;
 
     /// Checks if the liquidation should be allowed to occur
@@ -110,32 +61,9 @@ pub trait Controller {
         pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
 
-    /// Validates liquidateBorrow and reverts on rejection. May emit logs.
-    #[ink(message)]
-    fn liquidate_borrow_verify(
-        &self,
-        pool_borrowed: AccountId,
-        pool_collateral: AccountId,
-        liquidator: AccountId,
-        borrower: AccountId,
-        repay_amount: Balance,
-        seize_tokens: Balance,
-    ) -> Result<()>;
-
     /// Checks if the seizing of assets should be allowed to occur
     #[ink(message)]
     fn seize_allowed(
-        &self,
-        pool_collateral: AccountId,
-        pool_borrowed: AccountId,
-        liquidator: AccountId,
-        borrower: AccountId,
-        seize_tokens: Balance,
-    ) -> Result<()>;
-
-    /// Validates seize and reverts on rejection. May emit logs.
-    #[ink(message)]
-    fn seize_verify(
         &self,
         pool_collateral: AccountId,
         pool_borrowed: AccountId,
@@ -153,16 +81,6 @@ pub trait Controller {
         dst: AccountId,
         transfer_tokens: Balance,
         pool_attribute: Option<PoolAttributes>,
-    ) -> Result<()>;
-
-    /// Validates transfer and reverts on rejection. May emit logs.
-    #[ink(message)]
-    fn transfer_verify(
-        &self,
-        pool: AccountId,
-        src: AccountId,
-        dst: AccountId,
-        transfer_tokens: Balance,
     ) -> Result<()>;
 
     /// Checks if the account should be allowed to transfer tokens in the given market
