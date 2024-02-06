@@ -1110,6 +1110,13 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::InvalidCollateralFactor)
         }
 
+        let liquidation_threshold: u128 = PoolRef::liquidation_threshold(pool);
+        let liquidation_threshold_u256 = U256::from(liquidation_threshold);
+
+        if new_collateral_factor_mantissa_u256.gt(&liquidation_threshold_u256) {
+            return Err(Error::InvalidCollateralFactor)
+        }
+
         let oracle = self._oracle().ok_or(Error::OracleIsNotSet)?;
         if let None | Some(0) = PriceOracleRef::get_underlying_price(&oracle, *pool) {
             return Err(Error::PriceError)
