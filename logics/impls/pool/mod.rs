@@ -1183,11 +1183,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             seize_tokens,
         )?;
 
-        let seizer_controller: AccountId =
-            PoolRef::controller(&seizer_token).ok_or(Error::ControllerIsNotSet)?;
+        if seizer_token != contract_addr {
+            let seizer_controller: AccountId =
+                PoolRef::controller(&seizer_token).ok_or(Error::ControllerIsNotSet)?;
 
-        if seizer_controller != controller {
-            return Err(Error::from(ControllerError::ControllerMismatch))
+            if seizer_controller != controller {
+                return Err(Error::from(ControllerError::ControllerMismatch))
+            }
         }
 
         if liquidator == borrower {
