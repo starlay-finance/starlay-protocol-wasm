@@ -24,7 +24,10 @@ pub mod contract {
         },
         traits::types::WrappedU256,
     };
-    use openbrush::traits::Storage;
+    use openbrush::traits::{
+        Storage,
+        String,
+    };
 
     /// Contract's Storage
     #[ink(storage)]
