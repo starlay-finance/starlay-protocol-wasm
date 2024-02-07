@@ -251,6 +251,10 @@ pub trait Controller {
     #[ink(message)]
     fn market_of_underlying(&self, underlying: AccountId) -> Option<AccountId>;
 
+    /// Returns the underlying based on market
+    #[ink(message)]
+    fn underlying_of_market(&self, pool: AccountId) -> Option<AccountId>;
+
     /// Returns the collateral factor for a given pool
     #[ink(message)]
     fn collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256>;

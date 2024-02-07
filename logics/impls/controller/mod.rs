@@ -53,8 +53,10 @@ pub const MAXIMUM_MARKETS: usize = 8;
 pub struct Data {
     /// AccountId of managed Pools
     pub markets: Vec<AccountId>,
+    /// Pair of underlying and pool
+    pub underlying_market_pair: Mapping<AccountId, AccountId>,
     /// Pair of pool and underlying
-    pub markets_pair: Mapping<AccountId, AccountId>,
+    pub market_underlying_pair: Mapping<AccountId, AccountId>,
     /// Mapping of Pool and Collateral Factors (Decimals: 18)
     pub collateral_factor_mantissa: Mapping<AccountId, WrappedU256>,
     /// Whether Pool has paused `Mint` Action
@@ -83,7 +85,8 @@ impl Default for Data {
     fn default() -> Self {
         Self {
             markets: Default::default(),
-            markets_pair: Default::default(),
+            underlying_market_pair: Default::default(),
+            market_underlying_pair: Default::default(),
             collateral_factor_mantissa: Default::default(),
             mint_guardian_paused: Default::default(),
             borrow_guardian_paused: Default::default(),
@@ -238,6 +241,7 @@ pub trait Internal {
     // view function
     fn _markets(&self) -> Vec<AccountId>;
     fn _market_of_underlying(&self, underlying: AccountId) -> Option<AccountId>;
+    fn _underlying_of_market(&self, pool: AccountId) -> Option<AccountId>;
     fn _flashloan_gateway(&self) -> Option<AccountId>;
     fn _collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256>;
     fn _is_listed(&self, pool: AccountId) -> bool;
@@ -598,6 +602,10 @@ impl<T: Storage<Data>> Controller for T {
 
     default fn market_of_underlying(&self, underlying: AccountId) -> Option<AccountId> {
         self._market_of_underlying(underlying)
+    }
+
+    default fn underlying_of_market(&self, pool: AccountId) -> Option<AccountId> {
+        self._underlying_of_market(pool)
     }
 
     default fn flashloan_gateway(&self) -> Option<AccountId> {
@@ -1080,19 +1088,18 @@ impl<T: Storage<Data>> Internal for T {
         underlying: &AccountId,
         collateral_factor_mantissa: Option<WrappedU256>,
     ) -> Result<()> {
-        let markets = self._markets();
-        if markets.len() >= MAXIMUM_MARKETS {
+        // Prevent clone to reduce gas
+        if self.data().markets.len() >= MAXIMUM_MARKETS {
             return Err(Error::MarketCountReachedToMaximum)
         }
 
-        for market in markets {
-            if pool == &market {
-                return Err(Error::MarketAlreadyListed)
-            }
+        if self._is_listed(*pool) {
+            return Err(Error::MarketAlreadyListed)
         }
 
         self.data().markets.push(*pool);
-        self.data().markets_pair.insert(underlying, pool);
+        self.data().underlying_market_pair.insert(underlying, pool);
+        self.data().market_underlying_pair.insert(pool, underlying);
 
         // set default states
         self._set_mint_guardian_paused(pool, false)?;
@@ -1179,7 +1186,11 @@ impl<T: Storage<Data>> Internal for T {
     }
 
     default fn _market_of_underlying(&self, underlying: AccountId) -> Option<AccountId> {
-        self.data().markets_pair.get(&underlying)
+        self.data().underlying_market_pair.get(&underlying)
+    }
+
+    default fn _underlying_of_market(&self, pool: AccountId) -> Option<AccountId> {
+        self.data().market_underlying_pair.get(&pool)
     }
 
     default fn _flashloan_gateway(&self) -> Option<AccountId> {
@@ -1187,11 +1198,10 @@ impl<T: Storage<Data>> Internal for T {
     }
 
     default fn _is_listed(&self, pool: AccountId) -> bool {
-        for market in self._markets() {
-            if market == pool {
-                return true
-            }
+        if let Some(_underlying) = self.data().market_underlying_pair.get(&pool) {
+            return true
         }
+
         return false
     }
 
