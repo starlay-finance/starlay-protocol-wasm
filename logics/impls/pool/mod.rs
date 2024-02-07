@@ -1172,6 +1172,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._accrue_reward(liquidator)?;
         let contract_addr = Self::env().account_id();
 
+        let collateral_enabled = self._using_reserve_as_collateral(borrower).unwrap_or(false);
+        if !collateral_enabled {
+            return Err(Error::ReserveIsNotEnabledAsCollateral)
+        }
+
         let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
         ControllerRef::seize_allowed(
             &controller,
