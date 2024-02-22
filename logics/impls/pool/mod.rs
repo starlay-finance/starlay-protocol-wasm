@@ -1189,7 +1189,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let exchange_rate = Exp {
             mantissa: WrappedU256::from(self._exchange_rate_stored()),
         };
-        let (liquidator_seize_tokens, protocol_seize_amount, protocol_seize_tokens) =
+        let (liquidator_seize_tokens, protocol_seize_amount, _) =
             protocol_seize_amount(exchange_rate, seize_tokens, protocol_seize_share_mantissa());
         let total_reserves_new = self._total_reserves() + protocol_seize_amount;
 
@@ -1200,7 +1200,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
                 mantissa: self._borrow_index(),
             },
         );
-        self.data::<PSP22Data>().supply -= protocol_seize_tokens;
         self._burn_from(borrower, seize_tokens)?;
         self._mint_to(liquidator, liquidator_seize_tokens)?;
 
