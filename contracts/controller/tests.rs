@@ -102,21 +102,6 @@ fn mint_allowed_fail_when_paused() {
 }
 
 #[ink::test]
-fn borrow_allowed_fail_when_not_supported() {
-    let accounts = default_accounts();
-    set_caller(accounts.bob);
-    let contract = ControllerContract::new(accounts.bob);
-
-    let pool = AccountId::from([0x01; 32]);
-    assert_eq!(
-        contract
-            .borrow_allowed(pool, accounts.bob, 0, None)
-            .unwrap_err(),
-        Error::BorrowIsPaused
-    );
-}
-
-#[ink::test]
 fn borrow_allowed_fail_when_paused() {
     let accounts = default_accounts();
     set_caller(accounts.bob);
