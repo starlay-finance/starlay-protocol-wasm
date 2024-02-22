@@ -935,14 +935,14 @@ describe('Pool spec 1', () => {
       users[0].address,
       toDec18(100),
     )
-    expect(val1.ok.err).toEqual({ controller: 'MarketNotListed' })
+    expect(val1.ok.err).toEqual({ reserveIsNotEnabledAsCollateral: null })
     // call usdc pool from user
     const { value: val2 } = await usdc.pool.query.seize(
       deployer.address,
       users[0].address,
       toDec6(100),
     )
-    expect(val2.ok.err).toEqual({ controller: 'MarketNotListed' })
+    expect(val2.ok.err).toEqual({ reserveIsNotEnabledAsCollateral: null })
   })
 
   describe('repay_borrow_behalf overflow', () => {
