@@ -1084,6 +1084,10 @@ impl<T: Storage<Data>> Internal for T {
             }
         }
 
+        if let Some(_existing) = self.data().markets_pair.get(underlying) {
+            return Err(Error::MarketAlreadyListed)
+        }
+
         self.data().markets.push(*pool);
         self.data().markets_pair.insert(underlying, pool);
 
