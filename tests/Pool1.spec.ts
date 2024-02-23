@@ -67,7 +67,8 @@ describe('Pool spec 1', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      signer: deployer,
+      manager: deployer.address,
       incentivesController,
     })
 
@@ -149,6 +150,7 @@ describe('Pool spec 1', () => {
           token.address,
           controller.address,
           rateModel.address,
+          deployer.address,
           [ONE_ETHER.div(new BN(2)).toString()], // pool = underlying * 2
           10000,
         ],
@@ -916,8 +918,9 @@ describe('Pool spec 1', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      signer: deployer,
       incentivesController,
+      manager: deployer.address,
     })
     const toParam = (m: BN) => [m.toString()]
     for (const sym of [dai, usdc]) {

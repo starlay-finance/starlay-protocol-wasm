@@ -93,6 +93,10 @@ pub trait Internal {
         pool: AccountId,
         incentives_controller: AccountId,
     ) -> Result<()>;
+    fn _set_controller_manager(&mut self, manager: AccountId) -> Result<()>;
+    fn _accept_controller_manager(&mut self) -> Result<()>;
+    fn _set_pool_manager(&mut self, pool: AccountId, manager: AccountId) -> Result<()>;
+    fn _accept_pool_manager(&mut self, pool: AccountId) -> Result<()>;
     fn _set_interest_rate_model(
         &mut self,
         pool: AccountId,
@@ -167,6 +171,16 @@ impl<T: Storage<Data> + Storage<access_control::Data>> Manager for T {
         self._set_liquidation_incentive_mantissa(new_liquidation_incentive_mantissa)
     }
 
+    #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
+    default fn set_controller_manager(&mut self, manager: AccountId) -> Result<()> {
+        self._set_controller_manager(manager)
+    }
+
+    #[modifiers(access_control::only_role(CONTROLLER_ADMIN))]
+    default fn accept_controller_manager(&mut self) -> Result<()> {
+        self._accept_controller_manager()
+    }
+
     // For Borrow Cap Admin
     #[modifiers(access_control::only_role(BORROW_CAP_GUARDIAN))]
     default fn set_borrow_cap(&mut self, pool: AccountId, new_cap: Balance) -> Result<()> {
@@ -238,6 +252,16 @@ impl<T: Storage<Data> + Storage<access_control::Data>> Manager for T {
     }
 
     #[modifiers(access_control::only_role(TOKEN_ADMIN))]
+    default fn set_pool_manager(&mut self, pool: AccountId, manager: AccountId) -> Result<()> {
+        self._set_pool_manager(pool, manager)
+    }
+
+    #[modifiers(access_control::only_role(TOKEN_ADMIN))]
+    default fn accept_pool_manager(&mut self, pool: AccountId) -> Result<()> {
+        self._accept_pool_manager(pool)
+    }
+
+    #[modifiers(access_control::only_role(TOKEN_ADMIN))]
     default fn set_interest_rate_model(
         &mut self,
         pool: AccountId,
@@ -272,6 +296,16 @@ impl<T: Storage<Data>> Internal for T {
         ControllerRef::support_market(&self._controller(), pool, underlying)?;
         Ok(())
     }
+    default fn _set_controller_manager(&mut self, manager: AccountId) -> Result<()> {
+        ControllerRef::set_manager(&self._controller(), manager)?;
+        Ok(())
+    }
+
+    default fn _accept_controller_manager(&mut self) -> Result<()> {
+        ControllerRef::accept_manager(&self._controller())?;
+        Ok(())
+    }
+
     default fn _support_market_with_collateral_factor_mantissa(
         &mut self,
         pool: AccountId,
@@ -440,6 +474,7 @@ impl<T: Storage<Data>> Internal for T {
         PoolRef::set_incentives_controller(&pool, incentives_controller)?;
         Ok(())
     }
+
     default fn _set_interest_rate_model(
         &mut self,
         pool: AccountId,
@@ -452,6 +487,28 @@ impl<T: Storage<Data>> Internal for T {
         }
 
         PoolRef::set_interest_rate_model(&pool, new_interest_rate_model)?;
+        Ok(())
+    }
+
+    default fn _set_pool_manager(&mut self, pool: AccountId, manager: AccountId) -> Result<()> {
+        let controller = self.data().controller;
+        let is_listed: bool = ControllerRef::is_listed(&controller, pool);
+        if !is_listed {
+            return Err(Error::from(ControllerError::MarketNotListed))
+        }
+
+        PoolRef::set_manager(&pool, manager)?;
+        Ok(())
+    }
+
+    default fn _accept_pool_manager(&mut self, pool: AccountId) -> Result<()> {
+        let controller = self.data().controller;
+        let is_listed: bool = ControllerRef::is_listed(&controller, pool);
+        if !is_listed {
+            return Err(Error::from(ControllerError::MarketNotListed))
+        }
+
+        PoolRef::accept_manager(&pool)?;
         Ok(())
     }
 }

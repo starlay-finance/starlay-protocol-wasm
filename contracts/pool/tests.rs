@@ -49,6 +49,7 @@ fn new_works() {
         underlying,
         controller,
         rate_model,
+        accounts.bob,
         initial_exchange_rate_mantissa,
         liquidation_threshold,
         String::from("Token Name"),
@@ -89,6 +90,7 @@ fn transfer_works_overridden() {
         dummy_id,
         dummy_id,
         dummy_id,
+        accounts.bob,
         WrappedU256::from(U256::from(0)),
         liquidation_threshold,
         String::from("Token Name"),
@@ -114,6 +116,7 @@ fn transfer_from_works_overridden() {
         dummy_id,
         dummy_id,
         dummy_id,
+        accounts.bob,
         WrappedU256::from(U256::from(0)),
         liquidation_threshold,
         String::from("Token Name"),
@@ -139,6 +142,7 @@ fn set_controller_works() {
         dummy_id,
         dummy_id,
         dummy_id,
+        accounts.bob,
         WrappedU256::from(U256::from(0)),
         liquidation_threshold,
         String::from("Token Name"),
@@ -165,6 +169,7 @@ fn add_reserves_works() {
         dummy_id,
         dummy_id,
         dummy_id,
+        accounts.bob,
         WrappedU256::from(U256::from(0)),
         liquidation_threshold,
         String::from("Token Name"),
@@ -186,6 +191,7 @@ fn set_reserve_factor_works() {
         dummy_id,
         dummy_id,
         dummy_id,
+        accounts.bob,
         WrappedU256::from(U256::from(0)),
         liquidation_threshold,
         String::from("Token Name"),
@@ -222,6 +228,7 @@ fn assert_manager_works() {
         dummy_id,
         dummy_id,
         dummy_id,
+        accounts.bob,
         WrappedU256::from(U256::from(0)),
         liquidation_threshold,
         String::from("Token Name"),
@@ -255,6 +262,7 @@ fn set_liquidation_threshold_works() {
         dummy_id,
         dummy_id,
         dummy_id,
+        accounts.bob,
         WrappedU256::from(U256::from(0)),
         liquidation_threshold,
         String::from("Token Name"),
@@ -265,4 +273,79 @@ fn set_liquidation_threshold_works() {
     liquidation_threshold = 8000;
     let _ = contract.set_liquidation_threshold(liquidation_threshold);
     assert_eq!(contract.liquidation_threshold(), liquidation_threshold);
+}
+
+#[ink::test]
+fn set_manager_works() {
+    let accounts = default_accounts();
+    set_caller(accounts.bob);
+    let dummy_id = AccountId::from([0x01; 32]);
+    let liquidation_threshold = 10000;
+    let mut contract = PoolContract::new(
+        Some(dummy_id),
+        dummy_id,
+        dummy_id,
+        dummy_id,
+        accounts.bob,
+        WrappedU256::from(U256::from(0)),
+        liquidation_threshold,
+        String::from("Token Name"),
+        String::from("symbol"),
+        8,
+    );
+
+    contract.set_manager(accounts.alice).unwrap();
+    assert_eq!(contract.pending_manager().unwrap(), accounts.alice);
+}
+
+#[ink::test]
+fn accept_manager_not_works() {
+    let accounts = default_accounts();
+    set_caller(accounts.bob);
+    let dummy_id = AccountId::from([0x01; 32]);
+    let liquidation_threshold = 10000;
+    let mut contract = PoolContract::new(
+        Some(dummy_id),
+        dummy_id,
+        dummy_id,
+        dummy_id,
+        accounts.bob,
+        WrappedU256::from(U256::from(0)),
+        liquidation_threshold,
+        String::from("Token Name"),
+        String::from("symbol"),
+        8,
+    );
+
+    assert_eq!(
+        contract.accept_manager().unwrap_err(),
+        Error::PendingManagerIsNotSet
+    );
+}
+
+#[ink::test]
+fn accept_manager_works() {
+    let accounts = default_accounts();
+    set_caller(accounts.bob);
+    let dummy_id = AccountId::from([0x01; 32]);
+    let liquidation_threshold = 10000;
+    let mut contract = PoolContract::new(
+        Some(dummy_id),
+        dummy_id,
+        dummy_id,
+        dummy_id,
+        accounts.bob,
+        WrappedU256::from(U256::from(0)),
+        liquidation_threshold,
+        String::from("Token Name"),
+        String::from("symbol"),
+        8,
+    );
+    contract.set_manager(accounts.alice).unwrap();
+
+    set_caller(accounts.alice);
+    contract.accept_manager().unwrap();
+
+    assert_eq!(contract.pending_manager(), None);
+    assert_eq!(contract.manager().unwrap(), accounts.alice);
 }

@@ -138,16 +138,27 @@ pub mod contract {
         pub amount: Balance,
     }
 
+    /// Event: User has enabled Reserve as Collateral
     #[ink(event)]
     pub struct ReserveUsedAsCollateralEnabled {
         #[ink(topic)]
         pub user: AccountId,
     }
 
+    /// Event: User has disabled Reserve as Collateral
     #[ink(event)]
     pub struct ReserveUsedAsCollateralDisabled {
         #[ink(topic)]
         pub user: AccountId,
+    }
+
+    /// Event: Pool Manager changed
+    #[ink(event)]
+    pub struct ManagerAddressUpdated {
+        #[ink(topic)]
+        pub old: AccountId,
+        #[ink(topic)]
+        pub new: AccountId,
     }
 
     impl Pool for PoolContract {}
@@ -246,6 +257,10 @@ pub mod contract {
             self.env()
                 .emit_event(ReserveUsedAsCollateralDisabled { user })
         }
+
+        fn _emit_manager_updated_event(&self, old: AccountId, new: AccountId) {
+            self.env().emit_event(ManagerAddressUpdated { old, new })
+        }
     }
 
     impl psp22::PSP22 for PoolContract {
@@ -311,6 +326,7 @@ pub mod contract {
             underlying: AccountId,
             controller: AccountId,
             rate_model: AccountId,
+            manager: AccountId,
             initial_exchange_rate_mantissa: WrappedU256,
             liquidation_threshold: u128,
             name: String,
@@ -337,7 +353,7 @@ pub mod contract {
                 incentives_controller,
                 underlying,
                 controller,
-                Self::env().caller(),
+                manager,
                 rate_model,
                 initial_exchange_rate_mantissa,
                 liquidation_threshold,
@@ -355,6 +371,7 @@ pub mod contract {
             underlying: AccountId,
             controller: AccountId,
             rate_model: AccountId,
+            manager: AccountId,
             initial_exchange_rate_mantissa: WrappedU256,
             liquidation_threshold: u128,
         ) -> Self {
@@ -385,7 +402,7 @@ pub mod contract {
                 incentives_controller,
                 underlying,
                 controller,
-                Self::env().caller(),
+                manager,
                 rate_model,
                 initial_exchange_rate_mantissa,
                 liquidation_threshold,

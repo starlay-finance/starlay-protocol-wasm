@@ -136,7 +136,23 @@ pub trait Manager {
     #[ink(message)]
     fn set_transfer_guardian_paused(&mut self, paused: bool) -> Result<()>;
 
+    /// A public function to Set Controller Manager
+    #[ink(message)]
+    fn set_controller_manager(&mut self, manager: AccountId) -> Result<()>;
+
+    /// A public function to Accept Controller Manager
+    #[ink(message)]
+    fn accept_controller_manager(&mut self) -> Result<()>;
+
+    /// A public function to Set Pool Manager
+    #[ink(message)]
+    fn set_pool_manager(&mut self, pool: AccountId, manager: AccountId) -> Result<()>;
+
+    /// A public function to Accept Pool Manager
+    #[ink(message)]
+    fn accept_pool_manager(&mut self, pool: AccountId) -> Result<()>;
     /// Updates the interest rate model for pool
+
     #[ink(message)]
     fn set_interest_rate_model(
         &mut self,

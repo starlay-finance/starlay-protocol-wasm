@@ -377,6 +377,7 @@ fn assert_manager_works() {
     let admin_funcs: Vec<Result<()>> = vec![
         contract.set_price_oracle(dummy_id),
         contract.support_market(dummy_id, underlying),
+        contract.set_manager(dummy_id),
         contract.support_market_with_collateral_factor_mantissa(
             dummy_id,
             underlying,
@@ -394,4 +395,40 @@ fn assert_manager_works() {
     for func in admin_funcs {
         assert_eq!(func.unwrap_err(), Error::CallerIsNotManager);
     }
+}
+
+#[ink::test]
+fn set_manager_works() {
+    let accounts = default_accounts();
+    set_caller(accounts.bob);
+    let mut contract = ControllerContract::new(accounts.bob);
+
+    contract.set_manager(accounts.alice).unwrap();
+    assert_eq!(contract.pending_manager().unwrap(), accounts.alice);
+}
+
+#[ink::test]
+fn accept_manager_not_works() {
+    let accounts = default_accounts();
+    set_caller(accounts.bob);
+    let mut contract = ControllerContract::new(accounts.bob);
+
+    assert_eq!(
+        contract.accept_manager().unwrap_err(),
+        Error::PendingManagerIsNotSet
+    );
+}
+
+#[ink::test]
+fn accept_manager_works() {
+    let accounts = default_accounts();
+    set_caller(accounts.bob);
+    let mut contract = ControllerContract::new(accounts.bob);
+    contract.set_manager(accounts.alice).unwrap();
+
+    set_caller(accounts.alice);
+    contract.accept_manager().unwrap();
+
+    assert_eq!(contract.pending_manager(), None);
+    assert_eq!(contract.manager().unwrap(), accounts.alice);
 }

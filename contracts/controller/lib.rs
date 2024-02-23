@@ -43,6 +43,15 @@ pub mod contract {
         pub pool: AccountId,
     }
 
+    /// Event: Controller Manager changed
+    #[ink(event)]
+    pub struct ManagerAddressUpdated {
+        #[ink(topic)]
+        pub old: AccountId,
+        #[ink(topic)]
+        pub new: AccountId,
+    }
+
     #[ink(event)]
     pub struct NewCollateralFactor {
         #[ink(topic)]
@@ -109,6 +118,10 @@ pub mod contract {
     impl Internal for ControllerContract {
         fn _emit_market_listed_event(&self, pool: AccountId) {
             self.env().emit_event(MarketListed { pool });
+        }
+
+        fn _emit_manager_updated_event(&self, old: AccountId, new: AccountId) {
+            self.env().emit_event(ManagerAddressUpdated { old, new })
         }
 
         fn _emit_new_collateral_factor_event(

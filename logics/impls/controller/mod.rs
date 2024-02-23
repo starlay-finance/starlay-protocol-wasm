@@ -77,6 +77,8 @@ pub struct Data {
     pub borrow_caps: Mapping<AccountId, Balance>,
     /// Manager's AccountId associated with this contract
     pub manager: Option<AccountId>,
+    /// AccountId of Pending Manager use for transfer manager role
+    pub pending_manager: Option<AccountId>,
     /// Flashloan Gateway's AccountId associated with this contract
     pub flashloan_gateway: Option<AccountId>,
 }
@@ -97,6 +99,7 @@ impl Default for Data {
             liquidation_incentive_mantissa: WrappedU256::from(U256::zero()),
             borrow_caps: Default::default(),
             manager: None,
+            pending_manager: None,
             flashloan_gateway: None,
         }
     }
@@ -212,6 +215,7 @@ pub trait Internal {
         pool_collateral_attributes: Option<PoolAttributesForSeizeCalculation>,
     ) -> Result<Balance>;
     fn _assert_manager(&self) -> Result<()>;
+    fn _assert_pending_manager(&self) -> Result<()>;
 
     // admin functions
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
@@ -237,6 +241,8 @@ pub trait Internal {
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()>;
     fn _set_borrow_cap(&mut self, pool: &AccountId, new_cap: Balance) -> Result<()>;
+    fn _set_manager(&mut self, manager: AccountId) -> Result<()>;
+    fn _accept_manager(&mut self) -> Result<()>;
 
     // view function
     fn _markets(&self) -> Vec<AccountId>;
@@ -254,6 +260,7 @@ pub trait Internal {
     fn _liquidation_incentive_mantissa(&self) -> WrappedU256;
     fn _borrow_cap(&self, pool: AccountId) -> Option<Balance>;
     fn _manager(&self) -> Option<AccountId>;
+    fn _pending_manager(&self) -> Option<AccountId>;
     fn _account_assets(
         &self,
         account: AccountId,
@@ -299,6 +306,7 @@ pub trait Internal {
     fn _emit_new_close_factor_event(&self, old: WrappedU256, new: WrappedU256);
     fn _emit_new_liquidation_incentive_event(&self, old: WrappedU256, new: WrappedU256);
     fn _emit_new_borrow_cap_event(&self, pool: AccountId, new: Balance);
+    fn _emit_manager_updated_event(&self, old: AccountId, new: AccountId);
 }
 
 impl<T: Storage<Data>> Controller for T {
@@ -596,6 +604,18 @@ impl<T: Storage<Data>> Controller for T {
         Ok(())
     }
 
+    default fn set_manager(&mut self, manager: AccountId) -> Result<()> {
+        self._assert_manager()?;
+        self._set_manager(manager)?;
+        Ok(())
+    }
+
+    default fn accept_manager(&mut self) -> Result<()> {
+        self._assert_pending_manager()?;
+        self._accept_manager()?;
+        Ok(())
+    }
+
     default fn markets(&self) -> Vec<AccountId> {
         self._markets()
     }
@@ -650,6 +670,10 @@ impl<T: Storage<Data>> Controller for T {
 
     default fn manager(&self) -> Option<AccountId> {
         self._manager()
+    }
+
+    default fn pending_manager(&self) -> Option<AccountId> {
+        self._pending_manager()
     }
 
     default fn is_listed(&self, pool: AccountId) -> bool {
@@ -1072,6 +1096,17 @@ impl<T: Storage<Data>> Internal for T {
         Ok(())
     }
 
+    default fn _assert_pending_manager(&self) -> Result<()> {
+        let pending_manager = self
+            ._pending_manager()
+            .ok_or(Error::PendingManagerIsNotSet)?;
+        if Self::env().caller() != pending_manager {
+            return Err(Error::CallerIsNotPendingManager)
+        }
+
+        Ok(())
+    }
+
     default fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
         self.data().oracle = Some(new_oracle);
         Ok(())
@@ -1097,7 +1132,7 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::MarketAlreadyListed)
         }
 
-        if let Some(_existing) = self.data().markets_pair.get(underlying) {
+        if let Some(_existing) = self.data().underlying_market_pair.get(underlying) {
             return Err(Error::MarketAlreadyListed)
         }
 
@@ -1185,6 +1220,23 @@ impl<T: Storage<Data>> Internal for T {
         Ok(())
     }
 
+    default fn _set_manager(&mut self, manager: AccountId) -> Result<()> {
+        self.data().pending_manager = Some(manager);
+        Ok(())
+    }
+
+    default fn _accept_manager(&mut self) -> Result<()> {
+        let manager = self._manager().ok_or(Error::ManagerIsNotSet)?;
+        let pending_manager = self
+            ._pending_manager()
+            .ok_or(Error::PendingManagerIsNotSet)?;
+        self.data().manager = Some(pending_manager);
+        self.data().pending_manager = None;
+
+        self._emit_manager_updated_event(manager, pending_manager);
+        Ok(())
+    }
+
     default fn _markets(&self) -> Vec<AccountId> {
         self.data().markets.clone()
     }
@@ -1247,6 +1299,10 @@ impl<T: Storage<Data>> Internal for T {
 
     default fn _manager(&self) -> Option<AccountId> {
         self.data().manager
+    }
+
+    default fn _pending_manager(&self) -> Option<AccountId> {
+        self.data().pending_manager
     }
 
     default fn _account_assets(
@@ -1574,4 +1630,6 @@ impl<T: Storage<Data>> Internal for T {
     default fn _emit_new_liquidation_incentive_event(&self, _old: WrappedU256, _new: WrappedU256) {}
 
     default fn _emit_new_borrow_cap_event(&self, _pool: AccountId, _new: Balance) {}
+
+    default fn _emit_manager_updated_event(&self, _old: AccountId, _new: AccountId) {}
 }
