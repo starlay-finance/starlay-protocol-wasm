@@ -65,6 +65,10 @@ impl<T: Storage<Data>> FlashloanGateway for T {
             return Err(Error::InconsistentFlashloanParams)
         }
 
+        if assets.len() != mods.len() {
+            return Err(Error::InconsistentFlashloanParams)
+        }
+
         let mut deduplicated = assets.clone();
         deduplicated.sort_unstable();
         deduplicated.dedup();

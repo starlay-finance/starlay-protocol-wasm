@@ -11,14 +11,21 @@ use crate::traits::{
         ControllerRef,
         Error as ControllerError,
     },
-    pool::PoolRef,
+    pool::{
+        Error as PoolError,
+        PoolRef,
+    },
     types::WrappedU256,
 };
+use ink::prelude::vec::Vec;
 use openbrush::{
-    contracts::access_control::{
-        self,
-        RoleType,
-        DEFAULT_ADMIN_ROLE,
+    contracts::{
+        access_control::{
+            self,
+            RoleType,
+            DEFAULT_ADMIN_ROLE,
+        },
+        psp22::PSP22Ref,
     },
     modifiers,
     traits::{
@@ -27,7 +34,6 @@ use openbrush::{
         Storage,
     },
 };
-
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 
 #[derive(Debug)]
@@ -72,6 +78,7 @@ pub trait Internal {
         pool: AccountId,
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()>;
+    fn _add_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
     fn _reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
     fn _sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()>;
     fn _set_seize_guardian_paused(&mut self, paused: bool) -> Result<()>;
@@ -90,6 +97,11 @@ pub trait Internal {
     fn _accept_controller_manager(&mut self) -> Result<()>;
     fn _set_pool_manager(&mut self, pool: AccountId, manager: AccountId) -> Result<()>;
     fn _accept_pool_manager(&mut self, pool: AccountId) -> Result<()>;
+    fn _set_interest_rate_model(
+        &mut self,
+        pool: AccountId,
+        new_interest_rate_model: AccountId,
+    ) -> Result<()>;
 }
 
 impl<T: Storage<Data> + Storage<access_control::Data>> Manager for T {
@@ -198,6 +210,11 @@ impl<T: Storage<Data> + Storage<access_control::Data>> Manager for T {
 
     // For Pool Admin
     #[modifiers(access_control::only_role(TOKEN_ADMIN))]
+    default fn add_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
+        self._add_reserves(pool, amount)
+    }
+
+    #[modifiers(access_control::only_role(TOKEN_ADMIN))]
     default fn reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
         self._reduce_reserves(pool, amount)
     }
@@ -243,6 +260,15 @@ impl<T: Storage<Data> + Storage<access_control::Data>> Manager for T {
     default fn accept_pool_manager(&mut self, pool: AccountId) -> Result<()> {
         self._accept_pool_manager(pool)
     }
+
+    #[modifiers(access_control::only_role(TOKEN_ADMIN))]
+    default fn set_interest_rate_model(
+        &mut self,
+        pool: AccountId,
+        new_interest_rate_model: AccountId,
+    ) -> Result<()> {
+        self._set_interest_rate_model(pool, new_interest_rate_model)
+    }
 }
 
 impl<T: Storage<Data>> Internal for T {
@@ -251,6 +277,11 @@ impl<T: Storage<Data>> Internal for T {
     }
     default fn _set_controller(&mut self, id: AccountId) -> Result<()> {
         self.data().controller = id;
+
+        let markets: Vec<AccountId> = ControllerRef::markets(&id);
+        for market in markets {
+            PoolRef::set_controller(&market, id)?;
+        }
         Ok(())
     }
     default fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
@@ -335,15 +366,76 @@ impl<T: Storage<Data>> Internal for T {
         pool: AccountId,
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()> {
+        let controller = self.data().controller;
+        let is_listed: bool = ControllerRef::is_listed(&controller, pool);
+        if !is_listed {
+            return Err(Error::from(ControllerError::MarketNotListed))
+        }
+
         PoolRef::set_reserve_factor_mantissa(&pool, new_reserve_factor_mantissa)?;
         Ok(())
     }
+    default fn _add_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
+        let controller = self.data().controller;
+        let is_listed: bool = ControllerRef::is_listed(&controller, pool);
+        if !is_listed {
+            return Err(Error::from(ControllerError::MarketNotListed))
+        }
+
+        let underlying: Option<AccountId> = PoolRef::underlying(&pool);
+        let underlying_asset = underlying.ok_or(Error::from(PoolError::UnderlyingIsNotSet))?;
+
+        let contract_addr = Self::env().account_id();
+        PSP22Ref::transfer_from(
+            &underlying_asset,
+            Self::env().caller(),
+            contract_addr,
+            amount,
+            Vec::<u8>::new(),
+        )?;
+        PSP22Ref::approve(&underlying_asset, pool, amount)?;
+
+        PoolRef::add_reserves(&pool, amount)?;
+        Ok(())
+    }
     default fn _reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()> {
+        let controller = self.data().controller;
+        let is_listed: bool = ControllerRef::is_listed(&controller, pool);
+        if !is_listed {
+            return Err(Error::from(ControllerError::MarketNotListed))
+        }
+
         PoolRef::reduce_reserves(&pool, amount)?;
+
+        let underlying: Option<AccountId> = PoolRef::underlying(&pool);
+        let underlying_asset = underlying.ok_or(Error::from(PoolError::UnderlyingIsNotSet))?;
+        let balance = PSP22Ref::balance_of(&underlying_asset, Self::env().account_id());
+        PSP22Ref::transfer(
+            &underlying_asset,
+            Self::env().caller(),
+            balance,
+            Vec::<u8>::new(),
+        )?;
         Ok(())
     }
     default fn _sweep_token(&mut self, pool: AccountId, asset: AccountId) -> Result<()> {
+        let controller = self.data().controller;
+        let is_listed: bool = ControllerRef::is_listed(&controller, pool);
+        if !is_listed {
+            return Err(Error::from(ControllerError::MarketNotListed))
+        }
+
         PoolRef::sweep_token(&pool, asset)?;
+
+        let underlying: Option<AccountId> = PoolRef::underlying(&pool);
+        let underlying_asset = underlying.ok_or(Error::from(PoolError::UnderlyingIsNotSet))?;
+        let balance = PSP22Ref::balance_of(&underlying_asset, Self::env().account_id());
+        PSP22Ref::transfer(
+            &underlying_asset,
+            Self::env().caller(),
+            balance,
+            Vec::<u8>::new(),
+        )?;
         Ok(())
     }
     default fn _set_seize_guardian_paused(&mut self, paused: bool) -> Result<()> {
@@ -359,6 +451,12 @@ impl<T: Storage<Data>> Internal for T {
         pool: AccountId,
         liquidation_threshold: u128,
     ) -> Result<()> {
+        let controller = self.data().controller;
+        let is_listed: bool = ControllerRef::is_listed(&controller, pool);
+        if !is_listed {
+            return Err(Error::from(ControllerError::MarketNotListed))
+        }
+
         PoolRef::set_liquidation_threshold(&pool, liquidation_threshold)?;
         Ok(())
     }
@@ -367,9 +465,31 @@ impl<T: Storage<Data>> Internal for T {
         pool: AccountId,
         incentives_controller: AccountId,
     ) -> Result<()> {
+        let controller = self.data().controller;
+        let is_listed: bool = ControllerRef::is_listed(&controller, pool);
+        if !is_listed {
+            return Err(Error::from(ControllerError::MarketNotListed))
+        }
+
         PoolRef::set_incentives_controller(&pool, incentives_controller)?;
         Ok(())
     }
+
+    default fn _set_interest_rate_model(
+        &mut self,
+        pool: AccountId,
+        new_interest_rate_model: AccountId,
+    ) -> Result<()> {
+        let controller = self.data().controller;
+        let is_listed: bool = ControllerRef::is_listed(&controller, pool);
+        if !is_listed {
+            return Err(Error::from(ControllerError::MarketNotListed))
+        }
+
+        PoolRef::set_interest_rate_model(&pool, new_interest_rate_model)?;
+        Ok(())
+    }
+
     default fn _set_pool_manager(&mut self, pool: AccountId, manager: AccountId) -> Result<()> {
         let controller = self.data().controller;
         let is_listed: bool = ControllerRef::is_listed(&controller, pool);
@@ -380,6 +500,7 @@ impl<T: Storage<Data>> Internal for T {
         PoolRef::set_manager(&pool, manager)?;
         Ok(())
     }
+
     default fn _accept_pool_manager(&mut self, pool: AccountId) -> Result<()> {
         let controller = self.data().controller;
         let is_listed: bool = ControllerRef::is_listed(&controller, pool);

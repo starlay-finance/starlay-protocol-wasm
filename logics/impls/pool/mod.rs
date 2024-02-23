@@ -481,6 +481,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()> {
         self._assert_manager()?;
+        self._accrue_interest()?;
         let old = self._reserve_factor_mantissa();
         self._set_reserve_factor_mantissa(new_reserve_factor_mantissa)?;
         self._emit_new_reserve_factor_event(old, new_reserve_factor_mantissa);
@@ -492,6 +493,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         new_interest_rate_model: AccountId,
     ) -> Result<()> {
         self._assert_manager()?;
+        self._accrue_interest()?;
         let old = self._rate_model();
         self._set_interest_rate_model(new_interest_rate_model)?;
         self._emit_new_interest_rate_model_event(old, Some(new_interest_rate_model));
@@ -850,7 +852,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             .as_u128();
 
         // Check if it is first deposit.
-        let lp_balance = self._principal_balance_of(&caller);
+        let lp_balance = self._principal_balance_of(&minter);
         if lp_balance == 0 {
             self._set_use_reserve_as_collateral(minter, true);
         }
@@ -1196,6 +1198,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._accrue_reward(liquidator)?;
         let contract_addr = Self::env().account_id();
 
+        let collateral_enabled = self._using_reserve_as_collateral(borrower).unwrap_or(false);
+        if !collateral_enabled {
+            return Err(Error::ReserveIsNotEnabledAsCollateral)
+        }
+
         let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
         ControllerRef::seize_allowed(
             &controller,
@@ -1213,7 +1220,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let exchange_rate = Exp {
             mantissa: WrappedU256::from(self._exchange_rate_stored()),
         };
-        let (liquidator_seize_tokens, protocol_seize_amount, protocol_seize_tokens) =
+        let (liquidator_seize_tokens, protocol_seize_amount, _) =
             protocol_seize_amount(exchange_rate, seize_tokens, protocol_seize_share_mantissa());
         let total_reserves_new = self._total_reserves() + protocol_seize_amount;
 
@@ -1224,7 +1231,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
                 mantissa: self._borrow_index(),
             },
         );
-        self.data::<PSP22Data>().supply -= protocol_seize_tokens;
         self._burn_from(borrower, seize_tokens)?;
         self._mint_to(liquidator, liquidator_seize_tokens)?;
 
@@ -1826,6 +1832,9 @@ impl From<controller::Error> for PSP22Error {
             controller::Error::PendingManagerIsNotSet => convert("PendingManagerIsNotSet"),
             controller::Error::OracleIsNotSet => convert("OracleIsNotSet"),
             controller::Error::BalanceDecreaseNotAllowed => convert("BalanceDecreaseNotAllowed"),
+            controller::Error::MarketCountReachedToMaximum => {
+                convert("MarketCountReachedToMaximum")
+            }
         }
     }
 }

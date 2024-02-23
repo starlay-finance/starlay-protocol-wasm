@@ -10,7 +10,10 @@ use super::{
     pool::Error as PoolError,
 };
 use openbrush::{
-    contracts::traits::access_control::AccessControlError,
+    contracts::{
+        psp22::PSP22Error,
+        traits::access_control::AccessControlError,
+    },
     traits::{
         AccountId,
         Balance,
@@ -97,6 +100,10 @@ pub trait Manager {
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()>;
 
+    /// Accrues interest and add reserves by transferring from admin (call Pool)
+    #[ink(message)]
+    fn add_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
+
     /// Accrues interest and reduces reserves by transferring to admin (call Pool)
     #[ink(message)]
     fn reduce_reserves(&mut self, pool: AccountId, amount: Balance) -> Result<()>;
@@ -144,6 +151,14 @@ pub trait Manager {
     /// A public function to Accept Pool Manager
     #[ink(message)]
     fn accept_pool_manager(&mut self, pool: AccountId) -> Result<()>;
+    /// Updates the interest rate model for pool
+
+    #[ink(message)]
+    fn set_interest_rate_model(
+        &mut self,
+        pool: AccountId,
+        new_interest_rate_model: AccountId,
+    ) -> Result<()>;
 }
 
 /// Custom error definitions for Manager
@@ -153,6 +168,7 @@ pub enum Error {
     AccessControl(AccessControlError),
     Controller(ControllerError),
     Pool(PoolError),
+    PSP22(PSP22Error),
 }
 
 impl From<AccessControlError> for Error {
@@ -170,6 +186,12 @@ impl From<ControllerError> for Error {
 impl From<PoolError> for Error {
     fn from(error: PoolError) -> Self {
         Error::Pool(error)
+    }
+}
+
+impl From<PSP22Error> for Error {
+    fn from(error: PSP22Error) -> Self {
+        Error::PSP22(error)
     }
 }
 

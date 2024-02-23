@@ -161,22 +161,7 @@ pub mod contract {
         pub new: AccountId,
     }
 
-    impl Pool for PoolContract {
-        #[ink(message)]
-        fn set_controller(&mut self, _new_controller: AccountId) -> Result<()> {
-            Err(Error::NotImplemented)
-        }
-
-        #[ink(message)]
-        fn add_reserves(&mut self, _amount: Balance) -> Result<()> {
-            Err(Error::NotImplemented)
-        }
-
-        #[ink(message)]
-        fn set_interest_rate_model(&mut self, _new_interest_rate_model: AccountId) -> Result<()> {
-            Err(Error::NotImplemented)
-        }
-    }
+    impl Pool for PoolContract {}
     impl Internal for PoolContract {
         fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance) {
             self.env().emit_event(Mint {
@@ -354,6 +339,15 @@ pub mod contract {
             if controller.is_zero() {
                 panic!("controller is zero address");
             }
+            if rate_model.is_zero() {
+                panic!("rate model is zero address");
+            }
+            if let Some(_incentives_controller) = incentives_controller {
+                if _incentives_controller.is_zero() {
+                    panic!("incentives controller is zero address");
+                }
+            }
+
             let mut instance = Self::default();
             instance._initialize(
                 incentives_controller,
@@ -387,6 +381,15 @@ pub mod contract {
             if controller.is_zero() {
                 panic!("controller is zero address");
             }
+            if rate_model.is_zero() {
+                panic!("rate model is zero address");
+            }
+            if let Some(_incentives_controller) = incentives_controller {
+                if _incentives_controller.is_zero() {
+                    panic!("incentives controller is zero address");
+                }
+            }
+
             let base_name = PSP22MetadataRef::token_name(&underlying);
             let base_symbol = PSP22MetadataRef::token_symbol(&underlying);
             let decimals = PSP22MetadataRef::token_decimals(&underlying);

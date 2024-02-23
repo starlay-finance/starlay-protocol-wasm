@@ -294,6 +294,7 @@ pub enum Error {
     IncentivesControllerIsNotSet,
     AccrueRewardFailed,
     InvalidLiquidationThreshold,
+    ReserveIsNotEnabledAsCollateral,
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),

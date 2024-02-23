@@ -1165,4 +1165,41 @@ describe('Controller spec', () => {
       ).toEqual(1)
     })
   })
+
+  it('.support_market_same_underlying', async () => {
+    /*
+    reproduced in `tests/Controller.spec.ts`
+    command: `yarn test:typechain --testNamePattern
+    "support_market_same_underlying"`
+    */
+    const { api, deployer, rateModel, controller, incentivesController } =
+      await setup()
+    const pools = await preparePoolsWithPreparedTokens({
+      api,
+      controller,
+      rateModel,
+      manager: deployer,
+      incentivesController,
+    })
+    await shouldNotRevert(controller, 'supportMarket', [
+      pools.dai.pool.address,
+      pools.dai.token.address,
+    ])
+
+    const result = (
+      await controller.query.supportMarket(
+        pools.usdc.pool.address,
+        pools.dai.token.address,
+      )
+    ).value.ok
+
+    expect(result.err).toStrictEqual('MarketAlreadyListed')
+
+    const markets = (await controller.query.markets()).value.ok
+    expect(markets.length).toBe(1)
+    const market = await controller.query.marketOfUnderlying(
+      pools.dai.token.address,
+    )
+    expect(market.value.ok).toBe(pools.dai.pool.address)
+  })
 })
