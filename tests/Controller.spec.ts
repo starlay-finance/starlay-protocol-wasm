@@ -1178,8 +1178,9 @@ describe('Controller spec', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      manager: deployer.address,
       incentivesController,
+      signer: deployer,
     })
     await shouldNotRevert(controller, 'supportMarket', [
       pools.dai.pool.address,
