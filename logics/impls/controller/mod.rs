@@ -1,4 +1,10 @@
-use super::exp_no_err::Exp;
+use super::{
+    exp_no_err::Exp,
+    pool::{
+        COLLATERAL_FACTOR_MANTISSA_DECIMALS,
+        LIQUIDATION_THRESHOLD_DECIMALS,
+    },
+};
 pub use crate::traits::{
     controller::*,
     pool::{
@@ -935,6 +941,15 @@ impl<T: Storage<Data>> Internal for T {
         if new_collateral_factor_mantissa_u256.is_zero()
             || new_collateral_factor_mantissa_u256.gt(&collateral_factor_max_mantissa())
         {
+            return Err(Error::InvalidCollateralFactor)
+        }
+
+        let liquidation_threshold: u128 = PoolRef::liquidation_threshold(pool);
+        let liquidation_threshold_u256 = U256::from(liquidation_threshold).mul(U256::from(
+            10_u128.pow(COLLATERAL_FACTOR_MANTISSA_DECIMALS - LIQUIDATION_THRESHOLD_DECIMALS),
+        ));
+
+        if new_collateral_factor_mantissa_u256.ge(&liquidation_threshold_u256) {
             return Err(Error::InvalidCollateralFactor)
         }
 
