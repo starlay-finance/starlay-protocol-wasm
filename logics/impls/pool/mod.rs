@@ -860,9 +860,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._mint_to(minter, minted_tokens)?;
         self._emit_mint_event(minter, mint_amount, minted_tokens);
 
-        // skip post-process because nothing is done
-        // ControllerRef::mint_verify(&self._controller(), contract_addr, minter, minted_amount, mint_amount)?;
-
         Ok(())
     }
 
@@ -924,9 +921,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._transfer_underlying(redeemer, redeem_amount)?;
 
         self._emit_redeem_event(redeemer, redeem_amount);
-
-        // skip post-process because nothing is done
-        // ControllerRef::redeem_verify(&self._controller(), contract_addr, redeemer, redeem_tokens, redeem_amount)?;
 
         Ok(())
     }
@@ -1025,9 +1019,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             total_borrows_new,
         );
 
-        // skip post-process because nothing is done
-        // ControllerRef::borrow_verify(&self._controller(), contract_addr, borrower, borrow_amount)?;
-
         Ok(())
     }
 
@@ -1040,15 +1031,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._accrue_reward(borrower)?;
         self._accrue_reward(payer)?;
         let contract_addr = Self::env().account_id();
-
-        let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
-        ControllerRef::repay_borrow_allowed(
-            &controller,
-            contract_addr,
-            payer,
-            borrower,
-            repay_amount,
-        )?;
 
         let current_timestamp = Self::env().block_timestamp();
         if self._accrual_block_timestamp() != current_timestamp {
@@ -1076,9 +1058,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             account_borrows_new,
             total_borrows_new,
         );
-
-        // skip post-process because nothing is done
-        // ControllerRef::repay_borrow_verify(&self._controller(), contract_addr, payer, borrower, repay_amount_final, 0)?; // temp: index is zero (type difference)
 
         Ok(repay_amount_final)
     }
@@ -1188,9 +1167,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             seize_tokens,
         );
 
-        // skip post-process because nothing is done
-        // ControllerRef::liquidate_borrow_verify(&self._controller(), contract_addr, collateral, liquidator, borrower, actual_repay_amount, seize_tokens)?;
-
         Ok(())
     }
 
@@ -1242,9 +1218,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._mint_to(liquidator, liquidator_seize_tokens)?;
 
         self._emit_reserves_added_event(contract_addr, protocol_seize_amount, total_reserves_new);
-
-        // skip post-process because nothing is done
-        // ControllerRef::seize_verify(&self._controller(), contract_addr, seizer_token, liquidator, borrower, seize_tokens)?;
 
         Ok(())
     }
