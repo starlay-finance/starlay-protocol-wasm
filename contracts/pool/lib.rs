@@ -169,6 +169,34 @@ pub mod contract {
         pub new_total_borrows: Balance,
     }
 
+    #[ink(event)]
+    pub struct ReservesReduced {
+        pub reduce_amount: Balance,
+        pub total_reserves_new: Balance,
+    }
+
+    #[ink(event)]
+    pub struct NewController {
+        #[ink(topic)]
+        pub old: Option<AccountId>,
+        #[ink(topic)]
+        pub new: Option<AccountId>,
+    }
+
+    #[ink(event)]
+    pub struct NewInterestRateModel {
+        #[ink(topic)]
+        pub old: Option<AccountId>,
+        #[ink(topic)]
+        pub new: Option<AccountId>,
+    }
+
+    #[ink(event)]
+    pub struct NewReserveFactor {
+        pub old: WrappedU256,
+        pub new: WrappedU256,
+    }
+
     impl Pool for PoolContract {}
     impl Internal for PoolContract {
         fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance) {
@@ -283,6 +311,33 @@ pub mod contract {
                 new_index,
                 new_total_borrows,
             })
+        }
+
+        fn _emit_reserves_reduced_event(
+            &self,
+            reduce_amount: Balance,
+            total_reserves_new: Balance,
+        ) {
+            self.env().emit_event(ReservesReduced {
+                reduce_amount,
+                total_reserves_new,
+            })
+        }
+
+        fn _emit_new_controller_event(&self, old: Option<AccountId>, new: Option<AccountId>) {
+            self.env().emit_event(NewController { old, new })
+        }
+
+        fn _emit_new_interest_rate_model_event(
+            &self,
+            old: Option<AccountId>,
+            new: Option<AccountId>,
+        ) {
+            self.env().emit_event(NewInterestRateModel { old, new })
+        }
+
+        fn _emit_new_reserve_factor_event(&self, old: WrappedU256, new: WrappedU256) {
+            self.env().emit_event(NewReserveFactor { old, new })
         }
     }
 
