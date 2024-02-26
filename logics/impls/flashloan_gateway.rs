@@ -65,6 +65,10 @@ impl<T: Storage<Data>> FlashloanGateway for T {
             return Err(Error::InconsistentFlashloanParams)
         }
 
+        if assets.len() != mods.len() {
+            return Err(Error::InconsistentFlashloanParams)
+        }
+
         let mut deduplicated = assets.clone();
         deduplicated.sort_unstable();
         deduplicated.dedup();
@@ -73,8 +77,8 @@ impl<T: Storage<Data>> FlashloanGateway for T {
             return Err(Error::DuplicatedFlashloanAssets)
         }
 
-        let mut lp_token_addresses: Vec<AccountId> = Default::default();
-        let mut premiums: Vec<Balance> = Default::default();
+        let mut lp_token_addresses: Vec<AccountId> = Vec::with_capacity(assets.len());
+        let mut premiums: Vec<Balance> = Vec::with_capacity(assets.len());
 
         let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
         let flashloan_premium_total = self._flashloan_premium_total();

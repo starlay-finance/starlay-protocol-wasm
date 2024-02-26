@@ -152,9 +152,18 @@ pub trait Pool: PSP22 + PSP22Metadata {
     /// Set whether user's asset to use as collateral or not
     #[ink(message)]
     fn set_use_reserve_as_collateral(&mut self, use_as_collateral: bool) -> Result<()>;
+
     /// Set incentives Controller AccountId for reward
     #[ink(message)]
     fn set_incentives_controller(&mut self, incentives_controller: AccountId) -> Result<()>;
+
+    /// Set Manager
+    #[ink(message)]
+    fn set_manager(&mut self, manager: AccountId) -> Result<()>;
+
+    /// Accept Manager
+    #[ink(message)]
+    fn accept_manager(&mut self) -> Result<()>;
 
     // view functions
     /// AccountId of underlying token
@@ -163,9 +172,12 @@ pub trait Pool: PSP22 + PSP22Metadata {
     /// Accountid of controller
     #[ink(message)]
     fn controller(&self) -> Option<AccountId>;
-    #[ink(message)]
     /// AccountId of manager
+    #[ink(message)]
     fn manager(&self) -> Option<AccountId>;
+    /// AccountId of pending manager
+    #[ink(message)]
+    fn pending_manager(&self) -> Option<AccountId>;
     #[ink(message)]
     /// AccountId of incentives controller
     fn incentives_controller(&self) -> Option<AccountId>;
@@ -269,6 +281,7 @@ pub enum Error {
     SetReserveFactorBoundsCheck,
     CannotSweepUnderlyingToken,
     CallerIsNotManager,
+    CallerIsNotPendingManager,
     ZeroOwnerAddress,
     ZeroDelegateeAddress,
     InsufficientDelegateAllowance,
@@ -277,9 +290,11 @@ pub enum Error {
     InterestRateModelIsNotSet,
     UnderlyingIsNotSet,
     ManagerIsNotSet,
+    PendingManagerIsNotSet,
     IncentivesControllerIsNotSet,
     AccrueRewardFailed,
     InvalidLiquidationThreshold,
+    ReserveIsNotEnabledAsCollateral,
     Controller(ControllerError),
     PSP22(PSP22Error),
     Lang(LangError),

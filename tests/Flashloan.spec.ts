@@ -64,7 +64,8 @@ describe('Controller spec', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      signer: deployer,
+      manager: deployer.address,
       incentivesController,
     })
 

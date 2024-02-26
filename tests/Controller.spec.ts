@@ -82,8 +82,9 @@ describe('Controller spec', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      signer: deployer,
       incentivesController,
+      manager: deployer.address,
     })
 
     // initialize
@@ -156,9 +157,10 @@ describe('Controller spec', () => {
         api,
         controller,
         rateModel,
-        manager: deployer,
+        signer: deployer,
         metadata: TEST_METADATAS.usdc,
         incentivesController,
+        manager: deployer.address,
       })
       await priceOracle.tx.setFixedPrice(usdc.token.address, ONE_ETHER)
       await controller.tx.supportMarketWithCollateralFactorMantissa(
@@ -204,13 +206,14 @@ describe('Controller spec', () => {
         api,
         controller,
         rateModel,
-        manager: deployer,
+        signer: deployer,
         metadata: {
           name: 'Sample',
           symbol: 'SAMPLE',
           decimals: 6,
         },
         incentivesController,
+        manager: deployer.address,
       })
       await controller.tx.supportMarket(
         sampleCoin.pool.address,
@@ -262,19 +265,6 @@ describe('Controller spec', () => {
         null,
       )
       expect(value.ok.err).toBe('InsufficientLiquidity')
-    })
-  })
-
-  describe('.repay_borrow_allowed', () => {
-    it('do nothing', async () => {
-      const { controller } = await setup()
-      const { value } = await controller.query.repayBorrowAllowed(
-        ZERO_ADDRESS,
-        ZERO_ADDRESS,
-        ZERO_ADDRESS,
-        0,
-      )
-      expect(value.ok.ok).toBeNull()
     })
   })
 
@@ -413,7 +403,8 @@ describe('Controller spec', () => {
       controller,
       rateModel,
       incentivesController,
-      manager: deployer,
+      signer: deployer,
+      manager: deployer.address,
     })
     const [sender, receiver] = users
 
@@ -497,8 +488,9 @@ describe('Controller spec', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      signer: deployer,
       incentivesController,
+      manager: deployer.address,
     })
 
     await controller.tx.supportMarket(
@@ -524,8 +516,9 @@ describe('Controller spec', () => {
         api,
         controller,
         rateModel,
-        manager: deployer,
+        signer: deployer,
         incentivesController,
+        manager: deployer.address,
       })
 
       // prepares
@@ -554,7 +547,8 @@ describe('Controller spec', () => {
           api,
           controller,
           rateModel,
-          manager: deployer,
+          signer: deployer,
+          manager: deployer.address,
           metadata: TEST_METADATAS.dai,
           incentivesController,
         })
@@ -601,8 +595,9 @@ describe('Controller spec', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      signer: deployer,
       incentivesController,
+      manager: deployer.address,
     })
     const { dai, usdc, usdt } = pools
 
@@ -701,8 +696,9 @@ describe('Controller spec', () => {
           api,
           controller,
           rateModel,
-          manager: deployer,
+          signer: deployer,
           incentivesController,
+          manager: deployer.address,
         })
         const [daiUser, usdcUser] = users
 
@@ -801,8 +797,9 @@ describe('Controller spec', () => {
           api,
           controller,
           rateModel,
-          manager: deployer,
+          signer: deployer,
           incentivesController,
+          manager: deployer.address,
         })
         const user = users[0]
 
@@ -913,8 +910,9 @@ describe('Controller spec', () => {
           api,
           controller,
           rateModel,
-          manager: deployer,
+          signer: deployer,
           incentivesController,
+          manager: deployer.address,
         })
         const user = users[0]
 
@@ -1153,5 +1151,43 @@ describe('Controller spec', () => {
           .length,
       ).toEqual(1)
     })
+  })
+
+  it('.support_market_same_underlying', async () => {
+    /*
+    reproduced in `tests/Controller.spec.ts`
+    command: `yarn test:typechain --testNamePattern
+    "support_market_same_underlying"`
+    */
+    const { api, deployer, rateModel, controller, incentivesController } =
+      await setup()
+    const pools = await preparePoolsWithPreparedTokens({
+      api,
+      controller,
+      rateModel,
+      manager: deployer.address,
+      incentivesController,
+      signer: deployer,
+    })
+    await shouldNotRevert(controller, 'supportMarket', [
+      pools.dai.pool.address,
+      pools.dai.token.address,
+    ])
+
+    const result = (
+      await controller.query.supportMarket(
+        pools.usdc.pool.address,
+        pools.dai.token.address,
+      )
+    ).value.ok
+
+    expect(result.err).toStrictEqual('MarketAlreadyListed')
+
+    const markets = (await controller.query.markets()).value.ok
+    expect(markets.length).toBe(1)
+    const market = await controller.query.marketOfUnderlying(
+      pools.dai.token.address,
+    )
+    expect(market.value.ok).toBe(pools.dai.pool.address)
   })
 })

@@ -52,13 +52,17 @@ pub use self::utils::{
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 
+pub const MAXIMUM_MARKETS: usize = 8;
+
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
 pub struct Data {
     /// AccountId of managed Pools
     pub markets: Vec<AccountId>,
+    /// Pair of underlying and pool
+    pub underlying_market_pair: Mapping<AccountId, AccountId>,
     /// Pair of pool and underlying
-    pub markets_pair: Mapping<AccountId, AccountId>,
+    pub market_underlying_pair: Mapping<AccountId, AccountId>,
     /// Mapping of Pool and Collateral Factors (Decimals: 18)
     pub collateral_factor_mantissa: Mapping<AccountId, WrappedU256>,
     /// Whether Pool has paused `Mint` Action
@@ -79,6 +83,8 @@ pub struct Data {
     pub borrow_caps: Mapping<AccountId, Balance>,
     /// Manager's AccountId associated with this contract
     pub manager: Option<AccountId>,
+    /// AccountId of Pending Manager use for transfer manager role
+    pub pending_manager: Option<AccountId>,
     /// Flashloan Gateway's AccountId associated with this contract
     pub flashloan_gateway: Option<AccountId>,
 }
@@ -87,7 +93,8 @@ impl Default for Data {
     fn default() -> Self {
         Self {
             markets: Default::default(),
-            markets_pair: Default::default(),
+            underlying_market_pair: Default::default(),
+            market_underlying_pair: Default::default(),
             collateral_factor_mantissa: Default::default(),
             mint_guardian_paused: Default::default(),
             borrow_guardian_paused: Default::default(),
@@ -98,6 +105,7 @@ impl Default for Data {
             liquidation_incentive_mantissa: WrappedU256::from(U256::zero()),
             borrow_caps: Default::default(),
             manager: None,
+            pending_manager: None,
             flashloan_gateway: None,
         }
     }
@@ -106,13 +114,7 @@ impl Default for Data {
 pub trait Internal {
     fn _mint_allowed(&self, pool: AccountId, minter: AccountId, mint_amount: Balance)
         -> Result<()>;
-    fn _mint_verify(
-        &self,
-        pool: AccountId,
-        minter: AccountId,
-        mint_amount: Balance,
-        mint_tokens: Balance,
-    ) -> Result<()>;
+
     fn _redeem_allowed(
         &self,
         pool: AccountId,
@@ -120,12 +122,7 @@ pub trait Internal {
         amount: Balance,
         pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
-    fn _redeem_verify(
-        &self,
-        pool: AccountId,
-        redeemer: AccountId,
-        redeem_amount: Balance,
-    ) -> Result<()>;
+
     fn _borrow_allowed(
         &self,
         pool: AccountId,
@@ -133,27 +130,7 @@ pub trait Internal {
         borrow_amount: Balance,
         pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
-    fn _borrow_verify(
-        &self,
-        pool: AccountId,
-        borrower: AccountId,
-        borrow_amount: Balance,
-    ) -> Result<()>;
-    fn _repay_borrow_allowed(
-        &self,
-        pool: AccountId,
-        payer: AccountId,
-        borrower: AccountId,
-        repay_amount: Balance,
-    ) -> Result<()>;
-    fn _repay_borrow_verify(
-        &self,
-        pool: AccountId,
-        payer: AccountId,
-        borrower: AccountId,
-        repay_amount: Balance,
-        borrower_index: u128,
-    ) -> Result<()>;
+
     fn _liquidate_borrow_allowed(
         &self,
         pool_borrowed: AccountId,
@@ -163,15 +140,7 @@ pub trait Internal {
         repay_amount: Balance,
         pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
-    fn _liquidate_borrow_verify(
-        &self,
-        pool_borrowed: AccountId,
-        pool_collateral: AccountId,
-        liquidator: AccountId,
-        borrower: AccountId,
-        repay_amount: Balance,
-        seize_tokens: Balance,
-    ) -> Result<()>;
+
     fn _seize_allowed(
         &self,
         pool_collateral: AccountId,
@@ -180,14 +149,7 @@ pub trait Internal {
         borrower: AccountId,
         seize_tokens: Balance,
     ) -> Result<()>;
-    fn _seize_verify(
-        &self,
-        pool_collateral: AccountId,
-        pool_borrowed: AccountId,
-        liquidator: AccountId,
-        borrower: AccountId,
-        seize_tokens: Balance,
-    ) -> Result<()>;
+
     fn _transfer_allowed(
         &self,
         pool: AccountId,
@@ -196,13 +158,7 @@ pub trait Internal {
         transfer_tokens: Balance,
         pool_attribute: Option<PoolAttributes>,
     ) -> Result<()>;
-    fn _transfer_verify(
-        &self,
-        pool: AccountId,
-        src: AccountId,
-        dst: AccountId,
-        transfer_tokens: Balance,
-    ) -> Result<()>;
+
     fn _liquidate_calculate_seize_tokens(
         &self,
         pool_borrowed: AccountId,
@@ -213,6 +169,7 @@ pub trait Internal {
         pool_collateral_attributes: Option<PoolAttributesForSeizeCalculation>,
     ) -> Result<Balance>;
     fn _assert_manager(&self) -> Result<()>;
+    fn _assert_pending_manager(&self) -> Result<()>;
 
     // admin functions
     fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()>;
@@ -238,10 +195,13 @@ pub trait Internal {
         new_liquidation_incentive_mantissa: WrappedU256,
     ) -> Result<()>;
     fn _set_borrow_cap(&mut self, pool: &AccountId, new_cap: Balance) -> Result<()>;
+    fn _set_manager(&mut self, manager: AccountId) -> Result<()>;
+    fn _accept_manager(&mut self) -> Result<()>;
 
     // view function
     fn _markets(&self) -> Vec<AccountId>;
     fn _market_of_underlying(&self, underlying: AccountId) -> Option<AccountId>;
+    fn _underlying_of_market(&self, pool: AccountId) -> Option<AccountId>;
     fn _flashloan_gateway(&self) -> Option<AccountId>;
     fn _collateral_factor_mantissa(&self, pool: AccountId) -> Option<WrappedU256>;
     fn _is_listed(&self, pool: AccountId) -> bool;
@@ -254,6 +214,7 @@ pub trait Internal {
     fn _liquidation_incentive_mantissa(&self) -> WrappedU256;
     fn _borrow_cap(&self, pool: AccountId) -> Option<Balance>;
     fn _manager(&self) -> Option<AccountId>;
+    fn _pending_manager(&self) -> Option<AccountId>;
     fn _account_assets(
         &self,
         account: AccountId,
@@ -299,6 +260,7 @@ pub trait Internal {
     fn _emit_new_close_factor_event(&self, old: WrappedU256, new: WrappedU256);
     fn _emit_new_liquidation_incentive_event(&self, old: WrappedU256, new: WrappedU256);
     fn _emit_new_borrow_cap_event(&self, pool: AccountId, new: Balance);
+    fn _emit_manager_updated_event(&self, old: AccountId, new: AccountId);
 }
 
 impl<T: Storage<Data>> Controller for T {
@@ -311,16 +273,6 @@ impl<T: Storage<Data>> Controller for T {
         self._mint_allowed(pool, minter, mint_amount)
     }
 
-    default fn mint_verify(
-        &self,
-        pool: AccountId,
-        minter: AccountId,
-        mint_amount: Balance,
-        mint_tokens: Balance,
-    ) -> Result<()> {
-        self._mint_verify(pool, minter, mint_amount, mint_tokens)
-    }
-
     default fn redeem_allowed(
         &self,
         pool: AccountId,
@@ -331,15 +283,6 @@ impl<T: Storage<Data>> Controller for T {
         self._redeem_allowed(pool, redeemer, redeem_amount, pool_attribute)
     }
 
-    default fn redeem_verify(
-        &self,
-        pool: AccountId,
-        redeemer: AccountId,
-        redeem_amount: Balance,
-    ) -> Result<()> {
-        self._redeem_verify(pool, redeemer, redeem_amount)
-    }
-
     default fn borrow_allowed(
         &self,
         pool: AccountId,
@@ -348,36 +291,6 @@ impl<T: Storage<Data>> Controller for T {
         pool_attribute: Option<PoolAttributes>,
     ) -> Result<()> {
         self._borrow_allowed(pool, borrower, borrow_amount, pool_attribute)
-    }
-
-    default fn borrow_verify(
-        &self,
-        pool: AccountId,
-        borrower: AccountId,
-        borrow_amount: Balance,
-    ) -> Result<()> {
-        self._borrow_verify(pool, borrower, borrow_amount)
-    }
-
-    default fn repay_borrow_allowed(
-        &self,
-        pool: AccountId,
-        payer: AccountId,
-        borrower: AccountId,
-        repay_amount: Balance,
-    ) -> Result<()> {
-        self._repay_borrow_allowed(pool, payer, borrower, repay_amount)
-    }
-
-    default fn repay_borrow_verify(
-        &self,
-        pool: AccountId,
-        payer: AccountId,
-        borrower: AccountId,
-        repay_amount: Balance,
-        borrower_index: u128,
-    ) -> Result<()> {
-        self._repay_borrow_verify(pool, payer, borrower, repay_amount, borrower_index)
     }
 
     default fn liquidate_borrow_allowed(
@@ -399,25 +312,6 @@ impl<T: Storage<Data>> Controller for T {
         )
     }
 
-    default fn liquidate_borrow_verify(
-        &self,
-        pool_borrowed: AccountId,
-        pool_collateral: AccountId,
-        liquidator: AccountId,
-        borrower: AccountId,
-        repay_amount: Balance,
-        seize_tokens: Balance,
-    ) -> Result<()> {
-        self._liquidate_borrow_verify(
-            pool_borrowed,
-            pool_collateral,
-            liquidator,
-            borrower,
-            repay_amount,
-            seize_tokens,
-        )
-    }
-
     default fn seize_allowed(
         &self,
         pool_collateral: AccountId,
@@ -435,23 +329,6 @@ impl<T: Storage<Data>> Controller for T {
         )
     }
 
-    default fn seize_verify(
-        &self,
-        pool_collateral: AccountId,
-        pool_borrowed: AccountId,
-        liquidator: AccountId,
-        borrower: AccountId,
-        seize_tokens: Balance,
-    ) -> Result<()> {
-        self._seize_verify(
-            pool_collateral,
-            pool_borrowed,
-            liquidator,
-            borrower,
-            seize_tokens,
-        )
-    }
-
     default fn transfer_allowed(
         &self,
         pool: AccountId,
@@ -461,16 +338,6 @@ impl<T: Storage<Data>> Controller for T {
         pool_attribute: Option<PoolAttributes>,
     ) -> Result<()> {
         self._transfer_allowed(pool, src, dst, transfer_tokens, pool_attribute)
-    }
-
-    default fn transfer_verify(
-        &self,
-        pool: AccountId,
-        src: AccountId,
-        dst: AccountId,
-        transfer_tokens: Balance,
-    ) -> Result<()> {
-        self._transfer_verify(pool, src, dst, transfer_tokens)
     }
 
     default fn liquidate_calculate_seize_tokens(
@@ -596,12 +463,28 @@ impl<T: Storage<Data>> Controller for T {
         Ok(())
     }
 
+    default fn set_manager(&mut self, manager: AccountId) -> Result<()> {
+        self._assert_manager()?;
+        self._set_manager(manager)?;
+        Ok(())
+    }
+
+    default fn accept_manager(&mut self) -> Result<()> {
+        self._assert_pending_manager()?;
+        self._accept_manager()?;
+        Ok(())
+    }
+
     default fn markets(&self) -> Vec<AccountId> {
         self._markets()
     }
 
     default fn market_of_underlying(&self, underlying: AccountId) -> Option<AccountId> {
         self._market_of_underlying(underlying)
+    }
+
+    default fn underlying_of_market(&self, pool: AccountId) -> Option<AccountId> {
+        self._underlying_of_market(pool)
     }
 
     default fn flashloan_gateway(&self) -> Option<AccountId> {
@@ -646,6 +529,10 @@ impl<T: Storage<Data>> Controller for T {
 
     default fn manager(&self) -> Option<AccountId> {
         self._manager()
+    }
+
+    default fn pending_manager(&self) -> Option<AccountId> {
+        self._pending_manager()
     }
 
     default fn is_listed(&self, pool: AccountId) -> bool {
@@ -718,16 +605,6 @@ impl<T: Storage<Data>> Internal for T {
         Ok(())
     }
 
-    default fn _mint_verify(
-        &self,
-        _pool: AccountId,
-        _minter: AccountId,
-        _mint_amount: Balance,
-        _mint_tokens: Balance,
-    ) -> Result<()> {
-        Ok(()) // do nothing
-    }
-
     default fn _redeem_allowed(
         &self,
         pool: AccountId,
@@ -735,6 +612,10 @@ impl<T: Storage<Data>> Internal for T {
         redeem_amount: Balance,
         pool_attributes: Option<PoolAttributes>,
     ) -> Result<()> {
+        if !self._is_listed(pool) {
+            return Err(Error::MarketNotListed)
+        }
+
         let (
             AccountCollateralData {
                 total_collateral_in_base_currency,
@@ -784,15 +665,6 @@ impl<T: Storage<Data>> Internal for T {
         Ok(())
     }
 
-    default fn _redeem_verify(
-        &self,
-        _pool: AccountId,
-        _redeemer: AccountId,
-        _amount: Balance,
-    ) -> Result<()> {
-        Ok(()) // do nothing
-    }
-
     default fn _borrow_allowed(
         &self,
         pool: AccountId,
@@ -800,6 +672,10 @@ impl<T: Storage<Data>> Internal for T {
         borrow_amount: Balance,
         pool_attribute: Option<PoolAttributes>,
     ) -> Result<()> {
+        if !self._is_listed(pool) {
+            return Err(Error::MarketNotListed)
+        }
+
         if let Some(true) | None = self._borrow_guardian_paused(pool) {
             return Err(Error::BorrowIsPaused)
         }
@@ -846,38 +722,6 @@ impl<T: Storage<Data>> Internal for T {
         Ok(())
     }
 
-    default fn _borrow_verify(
-        &self,
-        _pool: AccountId,
-        _borrower: AccountId,
-        _borrow_amount: Balance,
-    ) -> Result<()> {
-        Ok(()) // do nothing
-    }
-
-    default fn _repay_borrow_allowed(
-        &self,
-        _pool: AccountId,
-        _payer: AccountId,
-        _borrower: AccountId,
-        _repay_amount: Balance,
-    ) -> Result<()> {
-        // FEATURE: update governance token borrow index & distribute
-
-        Ok(())
-    }
-
-    default fn _repay_borrow_verify(
-        &self,
-        _pool: AccountId,
-        _payer: AccountId,
-        _borrower: AccountId,
-        _repay_amount: Balance,
-        _borrower_index: u128,
-    ) -> Result<()> {
-        Ok(()) // do nothing
-    }
-
     default fn _liquidate_borrow_allowed(
         &self,
         pool_borrowed: AccountId,
@@ -919,18 +763,6 @@ impl<T: Storage<Data>> Internal for T {
         Ok(())
     }
 
-    default fn _liquidate_borrow_verify(
-        &self,
-        _pool_borrowed: AccountId,
-        _pool_collateral: AccountId,
-        _liquidator: AccountId,
-        _borrower: AccountId,
-        _repay_amount: Balance,
-        _seize_tokens: Balance,
-    ) -> Result<()> {
-        Ok(()) // do nothing
-    }
-
     default fn _seize_allowed(
         &self,
         pool_collateral: AccountId,
@@ -960,17 +792,6 @@ impl<T: Storage<Data>> Internal for T {
         Ok(())
     }
 
-    default fn _seize_verify(
-        &self,
-        _pool_collateral: AccountId,
-        _pool_borrowed: AccountId,
-        _liquidator: AccountId,
-        _borrower: AccountId,
-        _seize_tokens: Balance,
-    ) -> Result<()> {
-        Ok(()) // do nothing
-    }
-
     default fn _transfer_allowed(
         &self,
         pool: AccountId,
@@ -985,19 +806,7 @@ impl<T: Storage<Data>> Internal for T {
 
         self._redeem_allowed(pool, src, transfer_tokens, pool_attribute)?;
 
-        // FEATURE: update governance token supply index & distribute
-
         Ok(())
-    }
-
-    default fn _transfer_verify(
-        &self,
-        _pool: AccountId,
-        _src: AccountId,
-        _dst: AccountId,
-        _transfer_tokens: Balance,
-    ) -> Result<()> {
-        Ok(()) // do nothing
     }
 
     default fn _liquidate_calculate_seize_tokens(
@@ -1068,6 +877,17 @@ impl<T: Storage<Data>> Internal for T {
         Ok(())
     }
 
+    default fn _assert_pending_manager(&self) -> Result<()> {
+        let pending_manager = self
+            ._pending_manager()
+            .ok_or(Error::PendingManagerIsNotSet)?;
+        if Self::env().caller() != pending_manager {
+            return Err(Error::CallerIsNotPendingManager)
+        }
+
+        Ok(())
+    }
+
     default fn _set_price_oracle(&mut self, new_oracle: AccountId) -> Result<()> {
         self.data().oracle = Some(new_oracle);
         Ok(())
@@ -1084,14 +904,22 @@ impl<T: Storage<Data>> Internal for T {
         underlying: &AccountId,
         collateral_factor_mantissa: Option<WrappedU256>,
     ) -> Result<()> {
-        for market in self._markets() {
-            if pool == &market {
-                return Err(Error::MarketAlreadyListed)
-            }
+        // Prevent clone to reduce gas
+        if self.data().markets.len() >= MAXIMUM_MARKETS {
+            return Err(Error::MarketCountReachedToMaximum)
+        }
+
+        if self._is_listed(*pool) {
+            return Err(Error::MarketAlreadyListed)
+        }
+
+        if let Some(_existing) = self.data().underlying_market_pair.get(underlying) {
+            return Err(Error::MarketAlreadyListed)
         }
 
         self.data().markets.push(*pool);
-        self.data().markets_pair.insert(underlying, pool);
+        self.data().underlying_market_pair.insert(underlying, pool);
+        self.data().market_underlying_pair.insert(pool, underlying);
 
         // set default states
         self._set_mint_guardian_paused(pool, false)?;
@@ -1182,12 +1010,33 @@ impl<T: Storage<Data>> Internal for T {
         Ok(())
     }
 
+    default fn _set_manager(&mut self, manager: AccountId) -> Result<()> {
+        self.data().pending_manager = Some(manager);
+        Ok(())
+    }
+
+    default fn _accept_manager(&mut self) -> Result<()> {
+        let manager = self._manager().ok_or(Error::ManagerIsNotSet)?;
+        let pending_manager = self
+            ._pending_manager()
+            .ok_or(Error::PendingManagerIsNotSet)?;
+        self.data().manager = Some(pending_manager);
+        self.data().pending_manager = None;
+
+        self._emit_manager_updated_event(manager, pending_manager);
+        Ok(())
+    }
+
     default fn _markets(&self) -> Vec<AccountId> {
         self.data().markets.clone()
     }
 
     default fn _market_of_underlying(&self, underlying: AccountId) -> Option<AccountId> {
-        self.data().markets_pair.get(&underlying)
+        self.data().underlying_market_pair.get(&underlying)
+    }
+
+    default fn _underlying_of_market(&self, pool: AccountId) -> Option<AccountId> {
+        self.data().market_underlying_pair.get(&pool)
     }
 
     default fn _flashloan_gateway(&self) -> Option<AccountId> {
@@ -1195,11 +1044,10 @@ impl<T: Storage<Data>> Internal for T {
     }
 
     default fn _is_listed(&self, pool: AccountId) -> bool {
-        for market in self._markets() {
-            if market == pool {
-                return true
-            }
+        if let Some(_underlying) = self.data().market_underlying_pair.get(&pool) {
+            return true
         }
+
         return false
     }
 
@@ -1241,6 +1089,10 @@ impl<T: Storage<Data>> Internal for T {
 
     default fn _manager(&self) -> Option<AccountId> {
         self.data().manager
+    }
+
+    default fn _pending_manager(&self) -> Option<AccountId> {
+        self.data().pending_manager
     }
 
     default fn _account_assets(
@@ -1568,4 +1420,6 @@ impl<T: Storage<Data>> Internal for T {
     default fn _emit_new_liquidation_incentive_event(&self, _old: WrappedU256, _new: WrappedU256) {}
 
     default fn _emit_new_borrow_cap_event(&self, _pool: AccountId, _new: Balance) {}
+
+    default fn _emit_manager_updated_event(&self, _old: AccountId, _new: AccountId) {}
 }

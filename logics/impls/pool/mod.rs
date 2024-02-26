@@ -87,6 +87,8 @@ pub struct Data {
     pub controller: Option<AccountId>,
     /// AccountId of Manager, the administrator of this pool
     pub manager: Option<AccountId>,
+    /// AccountId of Pending Manager use for transfer manager role
+    pub pending_manager: Option<AccountId>,
     /// AccountId of incentives conroller
     pub incentives_controller: Option<AccountId>,
     /// AccountId of Rate Model
@@ -125,6 +127,7 @@ impl Default for Data {
             underlying: None,
             controller: None,
             manager: None,
+            pending_manager: None,
             rate_model: None,
             incentives_controller: None,
             borrows_scaled: Default::default(),
@@ -213,6 +216,7 @@ pub trait Internal {
     ) -> Result<()>;
     fn _transfer_underlying(&self, to: AccountId, value: Balance) -> Result<()>;
     fn _assert_manager(&self) -> Result<()>;
+    fn _assert_pending_manager(&self) -> Result<()>;
     fn _validate_set_use_reserve_as_collateral(
         &self,
         user: AccountId,
@@ -220,10 +224,13 @@ pub trait Internal {
     ) -> Result<()>;
     fn _accrue_reward(&self, user: AccountId) -> Result<()>;
     fn _set_incentives_controller(&mut self, incentives_controller: AccountId) -> Result<()>;
+    fn _set_manager(&mut self, manager: AccountId) -> Result<()>;
+    fn _accept_manager(&mut self) -> Result<()>;
     // view functions
     fn _underlying(&self) -> Option<AccountId>;
     fn _controller(&self) -> Option<AccountId>;
     fn _manager(&self) -> Option<AccountId>;
+    fn _pending_manager(&self) -> Option<AccountId>;
     fn _incentives_controller(&self) -> Option<AccountId>;
     fn _get_cash_prior(&self) -> Balance;
     fn _total_borrows(&self) -> Balance;
@@ -308,6 +315,7 @@ pub trait Internal {
     );
     fn _emit_reserve_used_as_collateral_enabled_event(&self, user: AccountId);
     fn _emit_reserve_used_as_collateral_disabled_event(&self, user: AccountId);
+    fn _emit_manager_updated_event(&self, old: AccountId, new: AccountId);
 }
 
 #[modifier_definition]
@@ -473,6 +481,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         new_reserve_factor_mantissa: WrappedU256,
     ) -> Result<()> {
         self._assert_manager()?;
+        self._accrue_interest()?;
         let old = self._reserve_factor_mantissa();
         self._set_reserve_factor_mantissa(new_reserve_factor_mantissa)?;
         self._emit_new_reserve_factor_event(old, new_reserve_factor_mantissa);
@@ -484,6 +493,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         new_interest_rate_model: AccountId,
     ) -> Result<()> {
         self._assert_manager()?;
+        self._accrue_interest()?;
         let old = self._rate_model();
         self._set_interest_rate_model(new_interest_rate_model)?;
         self._emit_new_interest_rate_model_event(old, Some(new_interest_rate_model));
@@ -558,6 +568,18 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._set_incentives_controller(incentives_controller)
     }
 
+    default fn set_manager(&mut self, manager: AccountId) -> Result<()> {
+        self._assert_manager()?;
+        self._set_manager(manager)?;
+        Ok(())
+    }
+
+    default fn accept_manager(&mut self) -> Result<()> {
+        self._assert_pending_manager()?;
+        self._accept_manager()?;
+        Ok(())
+    }
+
     default fn underlying(&self) -> Option<AccountId> {
         self._underlying()
     }
@@ -568,6 +590,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn manager(&self) -> Option<AccountId> {
         self._manager()
+    }
+
+    default fn pending_manager(&self) -> Option<AccountId> {
+        self._pending_manager()
     }
 
     default fn incentives_controller(&self) -> Option<AccountId> {
@@ -743,6 +769,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Err(PSP22Error::Custom(String::from("AccrueRewardFailed")))
         }
 
+        if src == dst {
+            return Err(PSP22Error::Custom(String::from("TransferNotAllowed")))
+        }
+
         let contract_addr = Self::env().account_id();
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(src);
@@ -769,9 +799,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             Some(pool_attribute),
         )?;
 
-        if src == dst {
-            return Err(PSP22Error::Custom(String::from("TransferNotAllowed")))
-        }
         let exchange_rate = self._exchange_rate_stored();
         let psp22_transfer_amount = from_scaled_amount(
             value,
@@ -826,16 +853,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             .as_u128();
 
         // Check if it is first deposit.
-        let lp_balance = self._principal_balance_of(&caller);
+        let lp_balance = self._principal_balance_of(&minter);
         if lp_balance == 0 {
             self._set_use_reserve_as_collateral(minter, true);
         }
 
         self._mint_to(minter, minted_tokens)?;
         self._emit_mint_event(minter, mint_amount, minted_tokens);
-
-        // skip post-process because nothing is done
-        // ControllerRef::mint_verify(&self._controller(), contract_addr, minter, minted_amount, mint_amount)?;
 
         Ok(())
     }
@@ -898,9 +922,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._transfer_underlying(redeemer, redeem_amount)?;
 
         self._emit_redeem_event(redeemer, redeem_amount);
-
-        // skip post-process because nothing is done
-        // ControllerRef::redeem_verify(&self._controller(), contract_addr, redeemer, redeem_tokens, redeem_amount)?;
 
         Ok(())
     }
@@ -999,9 +1020,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             total_borrows_new,
         );
 
-        // skip post-process because nothing is done
-        // ControllerRef::borrow_verify(&self._controller(), contract_addr, borrower, borrow_amount)?;
-
         Ok(())
     }
 
@@ -1014,15 +1032,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._accrue_reward(borrower)?;
         self._accrue_reward(payer)?;
         let contract_addr = Self::env().account_id();
-
-        let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
-        ControllerRef::repay_borrow_allowed(
-            &controller,
-            contract_addr,
-            payer,
-            borrower,
-            repay_amount,
-        )?;
 
         let current_timestamp = Self::env().block_timestamp();
         if self._accrual_block_timestamp() != current_timestamp {
@@ -1050,9 +1059,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             account_borrows_new,
             total_borrows_new,
         );
-
-        // skip post-process because nothing is done
-        // ControllerRef::repay_borrow_verify(&self._controller(), contract_addr, payer, borrower, repay_amount_final, 0)?; // temp: index is zero (type difference)
 
         Ok(repay_amount_final)
     }
@@ -1082,16 +1088,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             liquidation_threshold: self._liquidation_threshold(),
         };
 
-        ControllerRef::liquidate_borrow_allowed(
-            &controller,
-            contract_addr,
-            collateral,
-            liquidator,
-            borrower,
-            repay_amount,
-            Some(pool_attribute),
-        )?;
-
         let current_timestamp = Self::env().block_timestamp();
         if self._accrual_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
@@ -1107,6 +1103,16 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         if repay_amount == 0 {
             return Err(Error::LiquidateCloseAmountIsZero)
         }
+
+        ControllerRef::liquidate_borrow_allowed(
+            &controller,
+            contract_addr,
+            collateral,
+            liquidator,
+            borrower,
+            repay_amount,
+            Some(pool_attribute),
+        )?;
 
         let actual_repay_amount = self._repay_borrow(liquidator, borrower, repay_amount)?;
         let pool_borrowed_attributes = Some(PoolAttributesForSeizeCalculation {
@@ -1142,6 +1148,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
                 }),
             )?;
 
+            // Check if controller to prevent cross-contract calling (Callee Trapped Error.)
+            let seizer_controller: AccountId =
+                PoolRef::controller(&collateral).ok_or(Error::ControllerIsNotSet)?;
+
+            if seizer_controller != controller {
+                return Err(Error::from(ControllerError::ControllerMismatch))
+            }
             PoolRef::seize(&collateral, liquidator, borrower, seize_tokens)?;
 
             seize_tokens
@@ -1155,9 +1168,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             seize_tokens,
         );
 
-        // skip post-process because nothing is done
-        // ControllerRef::liquidate_borrow_verify(&self._controller(), contract_addr, collateral, liquidator, borrower, actual_repay_amount, seize_tokens)?;
-
         Ok(())
     }
 
@@ -1168,9 +1178,18 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         borrower: AccountId,
         seize_tokens: Balance,
     ) -> Result<()> {
+        if liquidator == borrower {
+            return Err(Error::LiquidateSeizeLiquidatorIsBorrower)
+        }
         self._accrue_reward(borrower)?;
         self._accrue_reward(liquidator)?;
+
         let contract_addr = Self::env().account_id();
+
+        let collateral_enabled = self._using_reserve_as_collateral(borrower).unwrap_or(false);
+        if !collateral_enabled {
+            return Err(Error::ReserveIsNotEnabledAsCollateral)
+        }
 
         let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
         ControllerRef::seize_allowed(
@@ -1182,14 +1201,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             seize_tokens,
         )?;
 
-        if liquidator == borrower {
-            return Err(Error::LiquidateSeizeLiquidatorIsBorrower)
-        }
         // calculate the new borrower and liquidator token balances
         let exchange_rate = Exp {
             mantissa: WrappedU256::from(self._exchange_rate_stored()),
         };
-        let (liquidator_seize_tokens, protocol_seize_amount, protocol_seize_tokens) =
+        let (liquidator_seize_tokens, protocol_seize_amount, _) =
             protocol_seize_amount(exchange_rate, seize_tokens, protocol_seize_share_mantissa());
         let total_reserves_new = self._total_reserves() + protocol_seize_amount;
 
@@ -1200,14 +1216,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
                 mantissa: self._borrow_index(),
             },
         );
-        self.data::<PSP22Data>().supply -= protocol_seize_tokens;
         self._burn_from(borrower, seize_tokens)?;
         self._mint_to(liquidator, liquidator_seize_tokens)?;
 
         self._emit_reserves_added_event(contract_addr, protocol_seize_amount, total_reserves_new);
-
-        // skip post-process because nothing is done
-        // ControllerRef::seize_verify(&self._controller(), contract_addr, seizer_token, liquidator, borrower, seize_tokens)?;
 
         Ok(())
     }
@@ -1463,11 +1475,39 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         Ok(())
     }
 
+    default fn _assert_pending_manager(&self) -> Result<()> {
+        let pending_manager = self
+            ._pending_manager()
+            .ok_or(Error::PendingManagerIsNotSet)?;
+        if Self::env().caller() != pending_manager {
+            return Err(Error::CallerIsNotPendingManager)
+        }
+
+        Ok(())
+    }
+
     default fn _set_incentives_controller(
         &mut self,
         incentives_controller: AccountId,
     ) -> Result<()> {
         self.data::<Data>().incentives_controller = Some(incentives_controller);
+        Ok(())
+    }
+
+    default fn _set_manager(&mut self, manager: AccountId) -> Result<()> {
+        self.data::<Data>().pending_manager = Some(manager);
+        Ok(())
+    }
+
+    default fn _accept_manager(&mut self) -> Result<()> {
+        let manager = self._manager().ok_or(Error::ManagerIsNotSet)?;
+        let pending_manager = self
+            ._pending_manager()
+            .ok_or(Error::PendingManagerIsNotSet)?;
+        self.data::<Data>().manager = Some(pending_manager);
+        self.data::<Data>().pending_manager = None;
+
+        self._emit_manager_updated_event(manager, pending_manager);
         Ok(())
     }
 
@@ -1482,6 +1522,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn _manager(&self) -> Option<AccountId> {
         self.data::<Data>().manager
+    }
+
+    default fn _pending_manager(&self) -> Option<AccountId> {
+        self.data::<Data>().pending_manager
     }
 
     default fn _incentives_controller(&self) -> Option<AccountId> {
@@ -1738,6 +1782,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn _emit_reserve_used_as_collateral_enabled_event(&self, _user: AccountId) {}
     default fn _emit_reserve_used_as_collateral_disabled_event(&self, _user: AccountId) {}
+    default fn _emit_manager_updated_event(&self, _old: AccountId, _new: AccountId) {}
 }
 
 pub fn to_psp22_error(e: PSP22Error) -> Error {
@@ -1761,12 +1806,17 @@ impl From<controller::Error> for PSP22Error {
             controller::Error::InsufficientLiquidity => convert("InsufficientLiquidity"),
             controller::Error::InsufficientShortfall => convert("InsufficientShortfall"),
             controller::Error::CallerIsNotManager => convert("CallerIsNotManager"),
+            controller::Error::CallerIsNotPendingManager => convert("CallerIsNotPendingManager"),
             controller::Error::InvalidCollateralFactor => convert("InvalidCollateralFactor"),
             controller::Error::UnderlyingIsNotSet => convert("UnderlyingIsNotSet"),
             controller::Error::PoolIsNotSet => convert("PoolIsNotSet"),
             controller::Error::ManagerIsNotSet => convert("ManagerIsNotSet"),
+            controller::Error::PendingManagerIsNotSet => convert("PendingManagerIsNotSet"),
             controller::Error::OracleIsNotSet => convert("OracleIsNotSet"),
             controller::Error::BalanceDecreaseNotAllowed => convert("BalanceDecreaseNotAllowed"),
+            controller::Error::MarketCountReachedToMaximum => {
+                convert("MarketCountReachedToMaximum")
+            }
         }
     }
 }

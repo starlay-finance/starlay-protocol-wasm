@@ -138,34 +138,30 @@ pub mod contract {
         pub amount: Balance,
     }
 
+    /// Event: User has enabled Reserve as Collateral
     #[ink(event)]
     pub struct ReserveUsedAsCollateralEnabled {
         #[ink(topic)]
         pub user: AccountId,
     }
 
+    /// Event: User has disabled Reserve as Collateral
     #[ink(event)]
     pub struct ReserveUsedAsCollateralDisabled {
         #[ink(topic)]
         pub user: AccountId,
     }
 
-    impl Pool for PoolContract {
-        #[ink(message)]
-        fn set_controller(&mut self, _new_controller: AccountId) -> Result<()> {
-            Err(Error::NotImplemented)
-        }
-
-        #[ink(message)]
-        fn add_reserves(&mut self, _amount: Balance) -> Result<()> {
-            Err(Error::NotImplemented)
-        }
-
-        #[ink(message)]
-        fn set_interest_rate_model(&mut self, _new_interest_rate_model: AccountId) -> Result<()> {
-            Err(Error::NotImplemented)
-        }
+    /// Event: Pool Manager changed
+    #[ink(event)]
+    pub struct ManagerAddressUpdated {
+        #[ink(topic)]
+        pub old: AccountId,
+        #[ink(topic)]
+        pub new: AccountId,
     }
+
+    impl Pool for PoolContract {}
     impl Internal for PoolContract {
         fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance) {
             self.env().emit_event(Mint {
@@ -261,6 +257,10 @@ pub mod contract {
             self.env()
                 .emit_event(ReserveUsedAsCollateralDisabled { user })
         }
+
+        fn _emit_manager_updated_event(&self, old: AccountId, new: AccountId) {
+            self.env().emit_event(ManagerAddressUpdated { old, new })
+        }
     }
 
     impl psp22::PSP22 for PoolContract {
@@ -326,6 +326,7 @@ pub mod contract {
             underlying: AccountId,
             controller: AccountId,
             rate_model: AccountId,
+            manager: AccountId,
             initial_exchange_rate_mantissa: WrappedU256,
             liquidation_threshold: u128,
             name: String,
@@ -338,12 +339,21 @@ pub mod contract {
             if controller.is_zero() {
                 panic!("controller is zero address");
             }
+            if rate_model.is_zero() {
+                panic!("rate model is zero address");
+            }
+            if let Some(_incentives_controller) = incentives_controller {
+                if _incentives_controller.is_zero() {
+                    panic!("incentives controller is zero address");
+                }
+            }
+
             let mut instance = Self::default();
             instance._initialize(
                 incentives_controller,
                 underlying,
                 controller,
-                Self::env().caller(),
+                manager,
                 rate_model,
                 initial_exchange_rate_mantissa,
                 liquidation_threshold,
@@ -361,6 +371,7 @@ pub mod contract {
             underlying: AccountId,
             controller: AccountId,
             rate_model: AccountId,
+            manager: AccountId,
             initial_exchange_rate_mantissa: WrappedU256,
             liquidation_threshold: u128,
         ) -> Self {
@@ -370,6 +381,15 @@ pub mod contract {
             if controller.is_zero() {
                 panic!("controller is zero address");
             }
+            if rate_model.is_zero() {
+                panic!("rate model is zero address");
+            }
+            if let Some(_incentives_controller) = incentives_controller {
+                if _incentives_controller.is_zero() {
+                    panic!("incentives controller is zero address");
+                }
+            }
+
             let base_name = PSP22MetadataRef::token_name(&underlying);
             let base_symbol = PSP22MetadataRef::token_symbol(&underlying);
             let decimals = PSP22MetadataRef::token_decimals(&underlying);
@@ -382,7 +402,7 @@ pub mod contract {
                 incentives_controller,
                 underlying,
                 controller,
-                Self::env().caller(),
+                manager,
                 rate_model,
                 initial_exchange_rate_mantissa,
                 liquidation_threshold,

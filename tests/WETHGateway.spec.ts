@@ -72,9 +72,10 @@ describe('WETHGateway spec', () => {
       api,
       controller,
       rateModel,
-      manager: deployer,
+      signer: deployer,
       wethToken: weth,
       incentivesController,
+      manager: deployer.address,
     })
 
     const wethGateway = await deployWETHGateway({
