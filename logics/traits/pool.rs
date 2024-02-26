@@ -187,9 +187,12 @@ pub trait Pool: PSP22 + PSP22Metadata {
     /// Total reserves in pool
     #[ink(message)]
     fn total_reserves(&self) -> Balance;
+    /// Get the underlying balance of the account
+    #[ink(message)]
+    fn balance_of_underlying(&self, account: AccountId) -> Balance;
     /// Get collateral detail of an account
     #[ink(message)]
-    fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256);
+    fn get_account_snapshot(&mut self, account: AccountId) -> Result<(Balance, Balance, U256)>;
     /// Get user's borrow without interest
     #[ink(message)]
     fn borrow_balance_stored(&self, account: AccountId) -> Balance;

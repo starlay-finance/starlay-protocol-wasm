@@ -613,7 +613,7 @@ describe('Controller spec', () => {
 
     const getAccountAssets = async (address: string) =>
       (await controller.query.accountAssets(address)).value.ok
-    expect(await getAccountAssets(user.address)).toEqual([])
+    expect((await getAccountAssets(user.address)).ok).toEqual([])
 
     for (const sym of [dai, usdc, usdt]) {
       const { token, pool } = sym
@@ -1128,6 +1128,8 @@ describe('Controller spec', () => {
         await controller.query.calculateUserAccountData(deployer.address, null)
       ).value.ok.ok
 
+      console.log('deployerAccountData', deployerAccountData)
+
       // Total Collateral In Eth
       expect(
         new BN(
@@ -1147,7 +1149,7 @@ describe('Controller spec', () => {
       ).toEqual(new BN(daiBorrowed).toString())
 
       expect(
-        (await controller.query.accountAssets(users[0].address)).value.ok
+        (await controller.query.accountAssets(users[0].address)).value.ok.ok
           .length,
       ).toEqual(1)
     })

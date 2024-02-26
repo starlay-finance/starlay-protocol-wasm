@@ -219,7 +219,7 @@ pub trait Internal {
         &self,
         account: AccountId,
         token_modify: Option<AccountId>,
-    ) -> Vec<AccountId>;
+    ) -> Result<Vec<AccountId>>;
     fn _get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)>;
     fn _get_hypothetical_account_liquidity(
         &self,
@@ -539,7 +539,7 @@ impl<T: Storage<Data>> Controller for T {
         self._is_listed(pool)
     }
 
-    default fn account_assets(&self, account: AccountId) -> Vec<AccountId> {
+    default fn account_assets(&self, account: AccountId) -> Result<Vec<AccountId>> {
         self._account_assets(account, None)
     }
 
@@ -1099,7 +1099,7 @@ impl<T: Storage<Data>> Internal for T {
         &self,
         account: AccountId,
         token_modify: Option<AccountId>,
-    ) -> Vec<AccountId> {
+    ) -> Result<Vec<AccountId>> {
         let mut account_assets = Vec::<AccountId>::new();
         for pool in self._markets() {
             if pool == Self::env().caller() {
@@ -1109,14 +1109,20 @@ impl<T: Storage<Data>> Internal for T {
                 account_assets.push(pool); // NOTE: add unconditionally even if balance, borrowed is not already there
                 continue
             }
-            let (balance, borrowed, _) = PoolRef::get_account_snapshot(&pool, account);
+
+            let account_snapshot = PoolRef::get_account_snapshot(&pool, account);
+            if account_snapshot.is_err() {
+                return Err(Error::PoolError)
+            }
+
+            let (balance, borrowed, _) = account_snapshot.unwrap();
 
             // whether deposits or loans exist
             if balance > 0 || borrowed > 0 {
                 account_assets.push(pool);
             }
         }
-        return account_assets
+        return Ok(account_assets)
     }
 
     default fn _get_account_liquidity(&self, account: AccountId) -> Result<(U256, U256)> {
@@ -1242,8 +1248,13 @@ impl<T: Storage<Data>> Internal for T {
                 continue
             }
             // Read the balances and exchange rate from the pool
+            let account_snapshot = PoolRef::get_account_snapshot(&asset, account);
+            if account_snapshot.is_err() {
+                return Err(Error::PoolError)
+            }
+
             let (compounded_liquidity_balance, borrow_balance_stored, exchange_rate_mantissa) =
-                PoolRef::get_account_snapshot(&asset, account);
+                account_snapshot.unwrap();
 
             // If user didn't make any action.
             if compounded_liquidity_balance == 0 && borrow_balance_stored == 0 {

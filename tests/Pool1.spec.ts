@@ -187,12 +187,12 @@ describe('Pool spec 1', () => {
         (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
       ).toBe(depositAmount)
       expect(
-        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
+        (
+          await pool.query.balanceOfUnderlying(deployer.address)
+        ).value.ok.toNumber(),
       ).toBe(depositAmount) // NOTE: because balanceOf is converted to underlying value
       expect(
-        (
-          await pool.query.principalBalanceOf(deployer.address)
-        ).value.ok.toNumber(),
+        (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toBe(mintAmount)
 
       expect(events).toHaveLength(3)

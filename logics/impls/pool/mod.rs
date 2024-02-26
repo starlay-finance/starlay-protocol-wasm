@@ -224,7 +224,7 @@ pub trait Internal {
     fn _assert_manager(&self) -> Result<()>;
     fn _assert_pending_manager(&self) -> Result<()>;
     fn _validate_set_use_reserve_as_collateral(
-        &self,
+        &mut self,
         user: AccountId,
         use_as_collateral: bool,
     ) -> Result<()>;
@@ -386,7 +386,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     default fn redeem_all(&mut self) -> Result<()> {
         self._accrue_interest()?;
         let caller = Self::env().caller();
-        let all_tokens_redeemed = self._balance_of_underlying(caller);
+        let all_tokens_redeemed = self._balance_of(&caller);
         self._redeem(caller, all_tokens_redeemed)
     }
 
@@ -620,16 +620,24 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._total_reserves()
     }
 
-    default fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256) {
+    default fn balance_of_underlying(&self, account: AccountId) -> Balance {
+        self._balance_of_underlying(account)
+    }
+
+    default fn get_account_snapshot(
+        &mut self,
+        account: AccountId,
+    ) -> Result<(Balance, Balance, U256)> {
+        self._accrue_interest()?;
         let using_as_collateral = self._using_reserve_as_collateral(account);
         if using_as_collateral.unwrap_or(false) {
-            return (
+            return Ok((
                 self._balance_of(&account),
                 self._borrow_balance_stored(account),
                 self._exchange_rate_stored(),
-            )
+            ))
         }
-        (0, self._balance_of(&account), self._exchange_rate_stored())
+        Ok((0, self._balance_of(&account), self._exchange_rate_stored()))
     }
 
     default fn borrow_balance_stored(&self, account: AccountId) -> Balance {
@@ -766,8 +774,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         }
 
         let contract_addr = Self::env().account_id();
+
+        // No need to check the error because interest has already updated.
+        let account_snapshot_result = self.get_account_snapshot(src);
         let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(src);
+            account_snapshot_result.unwrap();
         let pool_attribute = PoolAttributes {
             pool: Some(contract_addr),
             underlying: self._underlying(),
@@ -859,8 +870,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         }
 
         let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
-        let (_, account_borrow_balance, exchange_rate) = self.get_account_snapshot(redeemer);
-        let account_balance = self._balance_of_underlying(redeemer);
+        let (_, account_borrow_balance, exchange_rate) = self.get_account_snapshot(redeemer)?;
+        let account_balance = self._balance_of(&redeemer);
         let contract_addr = Self::env().account_id();
 
         let pool_attribute = PoolAttributes {
@@ -889,7 +900,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Err(Error::RedeemTransferOutNotPossible)
         }
 
-        let lp_balance = self._balance_of_underlying(redeemer);
+        let lp_balance = self._balance_of(&redeemer);
         if lp_balance == redeem_amount {
             self._set_use_reserve_as_collateral(redeemer, false);
         }
@@ -914,7 +925,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let contract_addr = Self::env().account_id();
         let caller: ink_primitives::AccountId = Self::env().caller();
         let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(borrower);
+            self.get_account_snapshot(borrower)?;
 
         let pool_attribute = PoolAttributes {
             pool: Some(contract_addr),
@@ -1034,7 +1045,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
         let contract_addr = Self::env().account_id();
         let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(borrower);
+            self.get_account_snapshot(borrower)?;
         let pool_attribute = PoolAttributes {
             pool: Some(contract_addr),
             underlying: self._underlying(),
@@ -1330,7 +1341,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _validate_set_use_reserve_as_collateral(
-        &self,
+        &mut self,
         user: AccountId,
         use_as_collateral: bool,
     ) -> Result<()> {
@@ -1339,7 +1350,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         }
 
         let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(user);
+            self.get_account_snapshot(user)?;
         if account_balance == 0 {
             return Err(Error::from(PSP22Error::InsufficientBalance))
         }
@@ -1708,6 +1719,7 @@ impl From<controller::Error> for PSP22Error {
             controller::Error::MarketCountReachedToMaximum => {
                 convert("MarketCountReachedToMaximum")
             }
+            controller::Error::PoolError => convert("PoolError"),
         }
     }
 }
