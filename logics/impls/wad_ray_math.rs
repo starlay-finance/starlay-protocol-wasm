@@ -42,6 +42,7 @@ fn half_ray() -> U256 {
 pub fn exp_ray_ratio() -> U256 {
     U256::from(10_u128.pow(9))
 }
+
 pub struct Ray {
     pub mantissa: WrappedU256,
 }
@@ -95,6 +96,17 @@ impl Ray {
     pub fn sub(&self, another: Ray) -> Ray {
         self._op(another, |o, v| o.sub(v))
     }
+
+    pub fn mul(&self, another: Ray) -> Ray {
+        if U256::from(self.mantissa).is_zero() || U256::from(another.mantissa).is_zero() {
+            return Ray {
+                mantissa: WrappedU256::from(U256::from(0)),
+            }
+        }
+
+        self._op(another, |o, v| o.mul(v).div(ray_scale()))
+    }
+
     fn _op(&self, a: Ray, op: fn(one: U256, another: U256) -> U256) -> Ray {
         Ray {
             mantissa: WrappedU256::from(op(U256::from(self.mantissa), U256::from(a.mantissa))),
@@ -129,6 +141,7 @@ impl Ray {
                 .into(),
         })
     }
+
     pub fn ray_div(&self, another: Ray) -> Result<Ray, Error> {
         if U256::from(another.mantissa).is_zero() {
             return Err(Error::MathDivisionByZero)

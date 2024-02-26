@@ -17,7 +17,7 @@ use openbrush::{
     traits::{
         AccountId,
         Balance,
-        Timestamp,
+        BlockNumber,
     },
 };
 use primitive_types::U256;
@@ -79,9 +79,6 @@ pub trait Pool: PSP22 + PSP22Metadata {
     /// Sender repays a borrow belonging to borrower
     #[ink(message)]
     fn repay_borrow_behalf(&mut self, borrower: AccountId, repay_amount: Balance) -> Result<()>;
-
-    #[ink(message)]
-    fn borrows_scaled(&self) -> Balance;
 
     /// The sender liquidates the borrowers collateral.
     #[ink(message)]
@@ -201,7 +198,7 @@ pub trait Pool: PSP22 + PSP22Metadata {
     fn borrow_balance_current(&mut self, account: AccountId) -> Result<Balance>;
     /// Get last block stamp of interest calculation process execution
     #[ink(message)]
-    fn get_accrual_block_timestamp(&self) -> Timestamp;
+    fn get_accrual_block_number(&self) -> BlockNumber;
     /// Calculates the current borrow interest rate per milliseconds
     #[ink(message)]
     fn borrow_rate_per_msec(&self) -> WrappedU256;
@@ -214,12 +211,6 @@ pub trait Pool: PSP22 + PSP22Metadata {
     /// Calculate the current exchange rate
     #[ink(message)]
     fn exchange_rate_current(&mut self) -> Result<WrappedU256>;
-    /// PSP22::balance_of
-    #[ink(message)]
-    fn principal_balance_of(&self, account: AccountId) -> Balance;
-    /// PSP22::total_supply
-    #[ink(message)]
-    fn principal_total_supply(&self) -> Balance;
     /// Get Initial Exchange rate.
     #[ink(message)]
     fn initial_exchange_rate_mantissa(&self) -> WrappedU256;

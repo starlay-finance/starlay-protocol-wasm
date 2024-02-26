@@ -161,6 +161,14 @@ pub mod contract {
         pub new: AccountId,
     }
 
+    #[ink(event)]
+    pub struct AccrueInterest {
+        pub cash_prior: Balance,
+        pub interest_accumulated: Balance,
+        pub new_index: WrappedU256,
+        pub new_total_borrows: Balance,
+    }
+
     impl Pool for PoolContract {}
     impl Internal for PoolContract {
         fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance) {
@@ -261,6 +269,21 @@ pub mod contract {
         fn _emit_manager_updated_event(&self, old: AccountId, new: AccountId) {
             self.env().emit_event(ManagerAddressUpdated { old, new })
         }
+
+        fn _emit_accrue_interest_event(
+            &self,
+            cash_prior: Balance,
+            interest_accumulated: Balance,
+            new_index: WrappedU256,
+            new_total_borrows: Balance,
+        ) {
+            self.env().emit_event(AccrueInterest {
+                cash_prior,
+                interest_accumulated,
+                new_index,
+                new_total_borrows,
+            })
+        }
     }
 
     impl psp22::PSP22 for PoolContract {
@@ -284,16 +307,6 @@ pub mod contract {
             data: Vec<u8>,
         ) -> core::result::Result<(), PSP22Error> {
             self._transfer_tokens(self.env().caller(), from, to, value, data)
-        }
-
-        #[ink(message)]
-        fn balance_of(&self, owner: AccountId) -> Balance {
-            Internal::_balance_of(self, &owner)
-        }
-
-        #[ink(message)]
-        fn total_supply(&self) -> Balance {
-            Internal::_total_supply(self)
         }
     }
     impl psp22::Internal for PoolContract {
@@ -434,7 +447,7 @@ pub mod contract {
             self.pool.rate_model = Some(rate_model);
             self.pool.initial_exchange_rate_mantissa = initial_exchange_rate_mantissa;
             self.pool.liquidation_threshold = liquidation_threshold;
-            self.pool.accrual_block_timestamp = Self::env().block_timestamp();
+            self.pool.accrual_block_number = Self::env().block_number();
             self.metadata.name = Some(name);
             self.metadata.symbol = Some(symbol);
             self.metadata.decimals = decimals;
