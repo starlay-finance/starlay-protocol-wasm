@@ -27,6 +27,7 @@ import {
   expectToEmit,
   mantissa,
   shouldNotRevert,
+  shouldNotRevertWithNetworkGas,
   toDec18,
   toDec6,
 } from './testHelpers'
@@ -195,20 +196,20 @@ describe('Pool spec 1', () => {
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toBe(mintAmount)
 
-      expect(events).toHaveLength(3)
+      expect(events).toHaveLength(4)
       expectToEmit<ReserveUsedAsCollateralEnabled>(
-        events[0],
+        events[1],
         'ReserveUsedAsCollateralEnabled',
         {
           user: deployer.address,
         },
       )
-      expectToEmit<Transfer>(events[1], 'Transfer', {
+      expectToEmit<Transfer>(events[2], 'Transfer', {
         from: null,
         to: deployer.address,
         value: mintAmount,
       })
-      expectToEmit<Mint>(events[2], 'Mint', {
+      expectToEmit<Mint>(events[3], 'Mint', {
         minter: deployer.address,
         mintAmount: depositAmount,
         mintTokens: mintAmount,
@@ -263,13 +264,13 @@ describe('Pool spec 1', () => {
         (await pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toBe(minted - redeemAmount)
 
-      expect(events).toHaveLength(2)
-      expectToEmit<Transfer>(events[0], 'Transfer', {
+      expect(events).toHaveLength(3)
+      expectToEmit<Transfer>(events[1], 'Transfer', {
         from: deployer.address,
         to: null,
         value: redeemAmount,
       })
-      expectToEmit<Redeem>(events[1], 'Redeem', {
+      expectToEmit<Redeem>(events[2], 'Redeem', {
         redeemer: deployer.address,
         redeemAmount,
       })
@@ -392,7 +393,7 @@ describe('Pool spec 1', () => {
       expect(
         (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
       ).toEqual(7_000)
-      const event1 = events1[0]
+      const event1 = events1[1]
       expect(event1.name).toEqual('Borrow')
       expect(event1.args.borrower).toEqual(user1.address)
       expect(event1.args.borrowAmount.toNumber()).toEqual(3_000)
@@ -412,7 +413,7 @@ describe('Pool spec 1', () => {
       expect(
         (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
       ).toEqual(4_500)
-      const event2 = events2[0]
+      const event2 = events2[1]
       expect(event2.name).toEqual('Borrow')
       expect(event2.args.borrower).toEqual(user2.address)
       expect(event2.args.borrowAmount.toNumber()).toEqual(2_500)
@@ -481,7 +482,7 @@ describe('Pool spec 1', () => {
       expect(
         (await token.query.balanceOf(pool.address)).value.ok.toNumber(),
       ).toEqual(2_000)
-      const event1 = events[0]
+      const event1 = events[1]
       expect(event1.name).toEqual('Borrow')
       expect(event1.args.borrower).toEqual(user1.address)
       expect(event1.args.borrowAmount.toNumber()).toEqual(3_000)
@@ -511,19 +512,26 @@ describe('Pool spec 1', () => {
     let deployer: KeyringPair
     let pools: Pools
     let users: KeyringPair[]
-    let gasLimit: WeightV2
+    let api
 
     beforeAll(async () => {
-      ;({ deployer, users, pools } = await setup())
+      ;({ deployer, users, pools, api } = await setup())
     })
 
     it('preparations', async () => {
       const { dai, usdc } = pools
 
       // add liquidity to usdc pool
-      await usdc.token.tx.mint(deployer.address, toDec6(10_000))
-      await usdc.token.tx.approve(usdc.pool.address, toDec6(10_000))
-      await usdc.pool.tx.mint(toDec6(10_000), { gasLimit })
+      await shouldNotRevert(usdc.token, 'mint', [
+        deployer.address,
+        toDec6(10_000),
+      ])
+      await shouldNotRevert(usdc.token, 'approve', [
+        usdc.pool.address,
+        toDec6(10_000),
+      ])
+      await shouldNotRevert(usdc.pool, 'mint', [toDec6(10_000)])
+
       expect(
         BigInt(
           (
@@ -534,11 +542,14 @@ describe('Pool spec 1', () => {
 
       // mint to dai pool for collateral
       const [user1] = users
-      await dai.token.tx.mint(user1.address, toDec18(20_000))
-      await dai.token
-        .withSigner(user1)
-        .tx.approve(dai.pool.address, toDec18(20_000))
-      await dai.pool.withSigner(user1).tx.mint(toDec18(20_000), { gasLimit })
+      await shouldNotRevert(dai.token, 'mint', [user1.address, toDec18(20_000)])
+      await shouldNotRevert(dai.token.withSigner(user1), 'approve', [
+        dai.pool.address,
+        toDec18(20_000),
+      ])
+      await shouldNotRevert(dai.pool.withSigner(user1), 'mint', [
+        toDec18(20_000),
+      ])
       expect(
         BigInt(
           (await dai.pool.query.balanceOf(user1.address)).value.ok.toString(),
@@ -546,7 +557,12 @@ describe('Pool spec 1', () => {
       ).toEqual(toDec18(20_000).toString())
 
       // borrow usdc
-      await usdc.pool.withSigner(user1).tx.borrow(toDec6(10_000), { gasLimit })
+      await shouldNotRevertWithNetworkGas(
+        api,
+        usdc.pool.withSigner(user1),
+        'borrow',
+        [toDec6(10_000)],
+      )
       expect(
         BigInt(
           (await usdc.token.query.balanceOf(user1.address)).value.ok.toString(),
@@ -558,9 +574,12 @@ describe('Pool spec 1', () => {
       const { token, pool } = pools.usdc
       const [user1] = users
       await token.withSigner(user1).tx.approve(pool.address, toDec6(4_500))
-      const { events } = await pool
-        .withSigner(user1)
-        .tx.repayBorrow(toDec6(4_500), { gasLimit })
+      const { events } = await shouldNotRevertWithNetworkGas(
+        api,
+        pool.withSigner(user1),
+        'repayBorrow',
+        [toDec6(4_500)],
+      )
 
       expect(
         BigInt(
@@ -573,7 +592,7 @@ describe('Pool spec 1', () => {
         ).toString(),
       ).toEqual(toDec6(4_500).toString())
 
-      const event = events[0]
+      const event = events[1]
       expect(event.name).toEqual('RepayBorrow')
       expect(event.args.payer).toEqual(user1.address)
       expect(event.args.borrower).toEqual(user1.address)
@@ -593,9 +612,10 @@ describe('Pool spec 1', () => {
     let deployer: KeyringPair
     let pools: Pools
     let users: KeyringPair[]
+    let api
 
     beforeAll(async () => {
-      ;({ deployer, users, pools } = await setup())
+      ;({ api, deployer, users, pools } = await setup())
     })
 
     it('preparations', async () => {
@@ -627,7 +647,12 @@ describe('Pool spec 1', () => {
       ).toEqual(toDec18(20_000).toString())
 
       // borrow usdc
-      await usdc.pool.withSigner(user1).tx.borrow(toDec6(10_000))
+      await shouldNotRevertWithNetworkGas(
+        api,
+        usdc.pool.withSigner(user1),
+        'borrow',
+        [toDec6(10_000)],
+      )
       expect(
         BigInt(
           (await usdc.token.query.balanceOf(user1.address)).value.ok.toString(),
@@ -639,9 +664,12 @@ describe('Pool spec 1', () => {
       const { token, pool } = pools.usdc
       const [user1] = users
       await token.withSigner(user1).tx.approve(pool.address, toDec6(4_500))
-      const { events } = await pool
-        .withSigner(user1)
-        .tx.repayBorrowBehalf(user1.address, toDec6(4_500))
+      const { events } = await shouldNotRevertWithNetworkGas(
+        api,
+        pool.withSigner(user1),
+        'repayBorrowBehalf',
+        [user1.address, toDec6(4_500)],
+      )
 
       expect(
         BigInt(
@@ -654,7 +682,7 @@ describe('Pool spec 1', () => {
         ).toString(),
       ).toEqual(toDec6(4_500).toString())
 
-      const event = events[0]
+      const event = events[1]
       expect(event.name).toEqual('RepayBorrow')
       expect(event.args.payer).toEqual(user1.address)
       expect(event.args.borrower).toEqual(user1.address)
@@ -677,6 +705,7 @@ describe('Pool spec 1', () => {
         pools: { usdc, usdt },
         users,
         gasLimit,
+        api,
       } = await setup()
       const [borrower] = users
 
@@ -694,15 +723,26 @@ describe('Pool spec 1', () => {
         .withSigner(borrower)
         .tx.mint(toDec6(100_000), { gasLimit })
       //// borrow usdc
-      await usdc.pool
-        .withSigner(borrower)
-        .tx.borrow(toDec6(10_000), { gasLimit })
-      await usdc.pool
-        .withSigner(borrower)
-        .tx.borrow(toDec6(20_000), { gasLimit })
-      await usdc.pool
-        .withSigner(borrower)
-        .tx.borrow(toDec6(30_000), { gasLimit })
+      await shouldNotRevertWithNetworkGas(
+        api,
+        usdc.pool.withSigner(borrower),
+        'borrow',
+        [toDec6(10_000)],
+      )
+
+      await shouldNotRevertWithNetworkGas(
+        api,
+        usdc.pool.withSigner(borrower),
+        'borrow',
+        [toDec6(20_000)],
+      )
+
+      await shouldNotRevertWithNetworkGas(
+        api,
+        usdc.pool.withSigner(borrower),
+        'borrow',
+        [toDec6(30_000)],
+      )
       expect(
         BigInt(
           (
@@ -726,7 +766,7 @@ describe('Pool spec 1', () => {
 
   describe('.liquidate_borrow', () => {
     const setupForShortage = async () => {
-      const { deployer, controller, pools, users } = await setup()
+      const { deployer, controller, pools, users, api } = await setup()
       const { dai, usdc } = pools
 
       // add liquidity to usdc pool
@@ -753,7 +793,12 @@ describe('Pool spec 1', () => {
       ).toEqual(toDec18(20_000).toString())
 
       // borrow usdc
-      await usdc.pool.withSigner(borrower).tx.borrow(toDec6(10_000))
+      await shouldNotRevertWithNetworkGas(
+        api,
+        usdc.pool.withSigner(borrower),
+        'borrow',
+        [toDec6(10_000)],
+      )
       expect(
         (
           await usdc.token.query.balanceOf(borrower.address)
@@ -823,9 +868,9 @@ describe('Pool spec 1', () => {
         ).value.ok.toNumber(),
       ).toEqual(toDec6(5_000).toNumber())
 
-      expect(Object.keys(res.events).length).toBe(2)
-      expect(res.events[0].name).toBe('RepayBorrow')
-      const liquidateBorrowEvent = res.events[1]
+      expect(Object.keys(res.events).length).toBe(3)
+      expect(res.events[1].name).toBe('RepayBorrow')
+      const liquidateBorrowEvent = res.events[2]
       expect(liquidateBorrowEvent.name).toBe('LiquidateBorrow')
       expect(liquidateBorrowEvent.args.liquidator).toBe(liquidator.address)
       expect(liquidateBorrowEvent.args.borrower).toBe(borrower.address)
@@ -956,8 +1001,9 @@ describe('Pool spec 1', () => {
     let deployer: KeyringPair
     let pools: Pools
     let users: KeyringPair[]
+    let api
     beforeAll(async () => {
-      ;({ deployer, users, pools } = await setup())
+      ;({ deployer, users, pools, api } = await setup())
     })
     it('prepare', async () => {
       const { dai, usdc } = pools
@@ -987,7 +1033,12 @@ describe('Pool spec 1', () => {
       ).toEqual(toDec18(20_000).toString())
       await usdc.token.tx.mint(user2.address, toDec6(20_000))
       // borrow usdc
-      await usdc.pool.withSigner(user1).tx.borrow(toDec6(10_000))
+      await shouldNotRevertWithNetworkGas(
+        api,
+        usdc.pool.withSigner(user1),
+        'borrow',
+        [toDec6(10_000)],
+      )
       expect(
         BigInt(
           (await usdc.token.query.balanceOf(user1.address)).value.ok.toString(),
@@ -1003,10 +1054,14 @@ describe('Pool spec 1', () => {
         pool.address,
         toDec6(20_000),
       ])
-      const { events } = await pool
-        .withSigner(user2)
-        .tx.repayBorrowBehalf(user1.address, toDec6(10_001))
-      const event = events[0]
+      const { events } = await shouldNotRevertWithNetworkGas(
+        api,
+        pool.withSigner(user2),
+        'repayBorrowBehalf',
+        [user1.address, toDec6(10_001)],
+      )
+
+      const event = events[1]
       console.log(event)
       console.log('repay amount: ', event.args.repayAmount.toString())
       console.log(
@@ -1018,6 +1073,7 @@ describe('Pool spec 1', () => {
         event.args.totalBorrows.toString(),
       )
       const data = (await pool.query.getAccountSnapshot(user1.address)).value.ok
+        .ok
       console.log('balanceOf: ', data[0].toString())
       console.log(
         'borrow balance stored (this overflowed): ',
