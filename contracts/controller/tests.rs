@@ -260,6 +260,7 @@ fn set_collateral_factor_mantissa_works() {
     let oracle_addr = AccountId::from([0x02; 32]);
     assert_eq!(contract.set_price_oracle(oracle_addr).unwrap(), ());
     let max = exp_scale().mul(U256::from(90)).div(U256::from(100));
+    contract.support_market(pool_addr, pool_addr).unwrap();
     contract
         .set_collateral_factor_mantissa(pool_addr, WrappedU256::from(max))
         .unwrap_err();
@@ -273,6 +274,7 @@ fn set_collateral_factor_mantissa_fail_when_invalid_value() {
     let pool_addr = AccountId::from([0x01; 32]);
     assert_eq!(contract.collateral_factor_mantissa(pool_addr), None);
 
+    contract.support_market(pool_addr, pool_addr).unwrap();
     let max = exp_scale().mul(U256::from(90)).div(U256::from(100));
 
     assert_eq!(
