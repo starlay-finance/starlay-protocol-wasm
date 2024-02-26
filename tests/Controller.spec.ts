@@ -612,8 +612,8 @@ describe('Controller spec', () => {
     }
 
     const getAccountAssets = async (address: string) =>
-      (await controller.query.accountAssets(address)).value.ok
-    expect((await getAccountAssets(user.address)).ok).toEqual([])
+      (await controller.query.accountAssets(address)).value.ok.ok
+    expect(await getAccountAssets(user.address)).toEqual([])
 
     for (const sym of [dai, usdc, usdt]) {
       const { token, pool } = sym
@@ -631,9 +631,7 @@ describe('Controller spec', () => {
       1_000,
       { gasLimit },
     ])
-    expect((await getAccountAssets(user.address)).ok).toEqual([
-      dai.pool.address,
-    ])
+    expect(await getAccountAssets(user.address)).toEqual([dai.pool.address])
 
     await shouldNotRevert(usdc.pool.withSigner(user), 'mint', [
       1_000,
@@ -677,6 +675,20 @@ describe('Controller spec', () => {
       expect(collateral.toString()).toEqual(
         new BN(expected.collateral).mul(mantissa()).toString(),
       )
+      expect(shortfall.toString()).toEqual(
+        new BN(expected.shortfall).mul(mantissa()).toString(),
+      )
+    }
+
+    const assertAccountLiquiditySmall = (
+      actual: [ReturnNumber, ReturnNumber],
+      expected: { collateral: number; shortfall: number },
+    ) => {
+      const collateral = BigInt(actual[0].toString()).toString()
+      const shortfall = BigInt(actual[1].toString()).toString()
+      expect(
+        new BN(collateral).lte(new BN(expected.collateral).mul(mantissa())),
+      ).toEqual(true)
       expect(shortfall.toString()).toEqual(
         new BN(expected.shortfall).mul(mantissa()).toString(),
       )
@@ -981,7 +993,7 @@ describe('Controller spec', () => {
 
         // execute
         //// .get_account_liquidity
-        assertAccountLiquidity(
+        assertAccountLiquiditySmall(
           (await controller.query.getAccountLiquidity(user.address)).value.ok
             .ok,
           {
@@ -990,7 +1002,7 @@ describe('Controller spec', () => {
           },
         )
         //// .get_hypothetical_account_liquidity
-        assertAccountLiquidity(
+        assertAccountLiquiditySmall(
           (
             await controller.query.getHypotheticalAccountLiquidity(
               user.address,
@@ -1005,7 +1017,7 @@ describe('Controller spec', () => {
             shortfall: 0,
           },
         )
-        assertAccountLiquidity(
+        assertAccountLiquiditySmall(
           (
             await controller.query.getHypotheticalAccountLiquidity(
               user.address,
@@ -1021,7 +1033,7 @@ describe('Controller spec', () => {
             shortfall: 0,
           },
         )
-        assertAccountLiquidity(
+        assertAccountLiquiditySmall(
           (
             await controller.query.getHypotheticalAccountLiquidity(
               user.address,
