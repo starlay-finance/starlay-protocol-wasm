@@ -552,6 +552,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn set_use_reserve_as_collateral(&mut self, use_as_collateral: bool) -> Result<()> {
+        self._accrue_interest()?;
         let user = Self::env().caller();
         self._validate_set_use_reserve_as_collateral(user, use_as_collateral)?;
         self._set_use_reserve_as_collateral(user, use_as_collateral);
@@ -623,16 +624,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let using_as_collateral = self._using_reserve_as_collateral(account);
         if using_as_collateral.unwrap_or(false) {
             return (
-                self._balance_of_underlying(account),
+                self._balance_of(&account),
                 self._borrow_balance_stored(account),
                 self._exchange_rate_stored(),
             )
         }
-        (
-            0,
-            self._borrow_balance_stored(account),
-            self._exchange_rate_stored(),
-        )
+        (0, self._balance_of(&account), self._exchange_rate_stored())
     }
 
     default fn borrow_balance_stored(&self, account: AccountId) -> Balance {
@@ -757,6 +754,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let reward_result = self._accrue_reward(dst);
         if reward_result.is_err() {
             return Err(PSP22Error::Custom(String::from("AccrueRewardFailed")))
+        }
+
+        let accure_result = self.accrue_interest();
+        if accure_result.is_err() {
+            return Err(PSP22Error::Custom(String::from("AccrueInterestFailed")))
         }
 
         if src == dst {
