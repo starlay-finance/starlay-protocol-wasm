@@ -949,7 +949,7 @@ impl<T: Storage<Data>> Internal for T {
             10_u128.pow(COLLATERAL_FACTOR_MANTISSA_DECIMALS - LIQUIDATION_THRESHOLD_DECIMALS),
         ));
 
-        if new_collateral_factor_mantissa_u256.gt(&liquidation_threshold_u256) {
+        if new_collateral_factor_mantissa_u256.ge(&liquidation_threshold_u256) {
             return Err(Error::InvalidCollateralFactor)
         }
 
