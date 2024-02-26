@@ -1168,6 +1168,13 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
                 }),
             )?;
 
+            // Check if controller to prevent cross-contract calling (Callee Trapped Error.)
+            let seizer_controller: AccountId =
+                PoolRef::controller(&collateral).ok_or(Error::ControllerIsNotSet)?;
+
+            if seizer_controller != controller {
+                return Err(Error::from(ControllerError::ControllerMismatch))
+            }
             PoolRef::seize(&collateral, liquidator, borrower, seize_tokens)?;
 
             seize_tokens
