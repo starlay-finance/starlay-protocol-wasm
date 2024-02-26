@@ -63,7 +63,6 @@ use primitive_types::U256;
 
 pub mod utils;
 use self::utils::{
-    borrow_rate_max_mantissa,
     calculate_interest,
     exchange_rate,
     protocol_seize_amount,
@@ -71,7 +70,6 @@ use self::utils::{
     reserve_factor_max_mantissa,
     underlying_balance,
     CalculateInterestInput,
-    CalculateInterestOutput,
 };
 
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
@@ -464,6 +462,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     #[modifiers(only_flashloan_gateway)]
     default fn transfer_underlying(&mut self, to: AccountId, amount: Balance) -> Result<()> {
+        self._accrue_interest()?;
         self._transfer_underlying(to, amount)
     }
 
@@ -728,11 +727,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         })?;
 
         let mut data = self.data::<Data>();
-        data.accural_block_number = at;
-        data.borrow_index = calculated_interest.borrow_index;
+        data.accrual_block_number = at;
+        data.borrow_index = calculated_interest.borrow_index.into();
         data.total_borrows = calculated_interest.total_borrows;
         data.total_reserves = calculated_interest.total_reserves;
-
 
         self._emit_accrue_interest_event(
             cash,
