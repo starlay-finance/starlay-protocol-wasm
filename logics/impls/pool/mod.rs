@@ -769,6 +769,10 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Err(PSP22Error::Custom(String::from("AccrueRewardFailed")))
         }
 
+        if src == dst {
+            return Err(PSP22Error::Custom(String::from("TransferNotAllowed")))
+        }
+
         let contract_addr = Self::env().account_id();
         let (account_balance, account_borrow_balance, exchange_rate) =
             self.get_account_snapshot(src);
@@ -795,9 +799,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             Some(pool_attribute),
         )?;
 
-        if src == dst {
-            return Err(PSP22Error::Custom(String::from("TransferNotAllowed")))
-        }
         let exchange_rate = self._exchange_rate_stored();
         let psp22_transfer_amount = from_scaled_amount(
             value,
@@ -1087,16 +1088,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             liquidation_threshold: self._liquidation_threshold(),
         };
 
-        ControllerRef::liquidate_borrow_allowed(
-            &controller,
-            contract_addr,
-            collateral,
-            liquidator,
-            borrower,
-            repay_amount,
-            Some(pool_attribute),
-        )?;
-
         let current_timestamp = Self::env().block_timestamp();
         if self._accrual_block_timestamp() != current_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
@@ -1112,6 +1103,16 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         if repay_amount == 0 {
             return Err(Error::LiquidateCloseAmountIsZero)
         }
+
+        ControllerRef::liquidate_borrow_allowed(
+            &controller,
+            contract_addr,
+            collateral,
+            liquidator,
+            borrower,
+            repay_amount,
+            Some(pool_attribute),
+        )?;
 
         let actual_repay_amount = self._repay_borrow(liquidator, borrower, repay_amount)?;
         let pool_borrowed_attributes = Some(PoolAttributesForSeizeCalculation {
@@ -1177,8 +1178,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         borrower: AccountId,
         seize_tokens: Balance,
     ) -> Result<()> {
+        if liquidator == borrower {
+            return Err(Error::LiquidateSeizeLiquidatorIsBorrower)
+        }
         self._accrue_reward(borrower)?;
         self._accrue_reward(liquidator)?;
+
         let contract_addr = Self::env().account_id();
 
         let collateral_enabled = self._using_reserve_as_collateral(borrower).unwrap_or(false);
@@ -1196,9 +1201,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             seize_tokens,
         )?;
 
-        if liquidator == borrower {
-            return Err(Error::LiquidateSeizeLiquidatorIsBorrower)
-        }
         // calculate the new borrower and liquidator token balances
         let exchange_rate = Exp {
             mantissa: WrappedU256::from(self._exchange_rate_stored()),
