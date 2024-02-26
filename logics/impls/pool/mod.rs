@@ -637,7 +637,11 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
                 self._exchange_rate_stored(),
             ))
         }
-        Ok((0, self._balance_of(&account), self._exchange_rate_stored()))
+        Ok((
+            0,
+            self._borrow_balance_stored(account),
+            self._exchange_rate_stored(),
+        ))
     }
 
     default fn borrow_balance_stored(&self, account: AccountId) -> Balance {

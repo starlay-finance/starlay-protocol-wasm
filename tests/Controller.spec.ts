@@ -631,7 +631,9 @@ describe('Controller spec', () => {
       1_000,
       { gasLimit },
     ])
-    expect(await getAccountAssets(user.address)).toEqual([dai.pool.address])
+    expect((await getAccountAssets(user.address)).ok).toEqual([
+      dai.pool.address,
+    ])
 
     await shouldNotRevert(usdc.pool.withSigner(user), 'mint', [
       1_000,
@@ -1124,6 +1126,17 @@ describe('Controller spec', () => {
     })
 
     it('check account data', async () => {
+      const { dai, usdc } = pools
+      const daiSnapshot = (
+        await dai.pool.query.getAccountSnapshot(deployer.address)
+      ).value.ok.ok
+      console.log('daiSnapshot', daiSnapshot)
+
+      const usdcSnapshot = (
+        await usdc.pool.query.getAccountSnapshot(deployer.address)
+      ).value.ok.ok
+      console.log('usdcSnapshot', usdcSnapshot)
+
       const deployerAccountData = (
         await controller.query.calculateUserAccountData(deployer.address, null)
       ).value.ok.ok
