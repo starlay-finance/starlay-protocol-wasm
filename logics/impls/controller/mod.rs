@@ -937,6 +937,10 @@ impl<T: Storage<Data>> Internal for T {
         pool: &AccountId,
         new_collateral_factor_mantissa: WrappedU256,
     ) -> Result<()> {
+        if !self._is_listed(*pool) {
+            return Err(Error::MarketNotListed)
+        }
+
         let new_collateral_factor_mantissa_u256 = U256::from(new_collateral_factor_mantissa);
         if new_collateral_factor_mantissa_u256.is_zero()
             || new_collateral_factor_mantissa_u256.gt(&collateral_factor_max_mantissa())
@@ -966,6 +970,9 @@ impl<T: Storage<Data>> Internal for T {
     }
 
     default fn _set_mint_guardian_paused(&mut self, pool: &AccountId, paused: bool) -> Result<()> {
+        if !self._is_listed(*pool) {
+            return Err(Error::MarketNotListed)
+        }
         self.data().mint_guardian_paused.insert(pool, &paused);
         Ok(())
     }
@@ -975,6 +982,9 @@ impl<T: Storage<Data>> Internal for T {
         pool: &AccountId,
         paused: bool,
     ) -> Result<()> {
+        if !self._is_listed(*pool) {
+            return Err(Error::MarketNotListed)
+        }
         self.data().borrow_guardian_paused.insert(pool, &paused);
         Ok(())
     }
@@ -1006,6 +1016,9 @@ impl<T: Storage<Data>> Internal for T {
     }
 
     default fn _set_borrow_cap(&mut self, pool: &AccountId, new_cap: Balance) -> Result<()> {
+        if !self._is_listed(*pool) {
+            return Err(Error::MarketNotListed)
+        }
         self.data().borrow_caps.insert(pool, &new_cap);
         Ok(())
     }
