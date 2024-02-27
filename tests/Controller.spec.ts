@@ -129,10 +129,13 @@ describe('Controller spec', () => {
 
   describe('.mint_allowed', () => {
     it('check pause status', async () => {
-      const { controller } = await setup()
+      const { controller, priceOracle } = await setup()
+
       const poolAddr = encodeAddress(
         '0x0000000000000000000000000000000000000000000000000000000000000001',
       )
+      await controller.tx.supportMarket(poolAddr, poolAddr)
+      await priceOracle.tx.setFixedPrice(poolAddr, ONE_ETHER)
       await controller.tx.setMintGuardianPaused(poolAddr, true)
       const { value } = await controller.query.mintAllowed(
         poolAddr,
