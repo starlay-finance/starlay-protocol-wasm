@@ -167,6 +167,17 @@ pub fn underlying_balance(exchange_rate: Exp, pool_token_balance: Balance) -> Ba
         .as_u128()
 }
 
+pub fn pool_balance(exchange_rate: Exp, underlying_token_balance: Balance) -> Balance {
+    U256::from(
+        exchange_rate
+            .div(Exp {
+                mantissa: U256::from(underlying_token_balance).into(),
+            })
+            .mantissa,
+    )
+    .as_u128()
+}
+
 #[cfg(test)]
 
 mod tests {

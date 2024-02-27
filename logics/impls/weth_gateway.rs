@@ -8,6 +8,7 @@
 pub use crate::traits::weth_gateway::*;
 use crate::traits::{
     pool::PoolRef,
+    types::WrappedU256,
     weth::*,
 };
 use ink::prelude::vec::Vec;
@@ -21,6 +22,11 @@ use openbrush::{
         Balance,
         Storage,
     },
+};
+
+use super::{
+    exp_no_err::Exp,
+    pool::utils::pool_balance,
 };
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 #[derive(Debug)]
@@ -70,7 +76,7 @@ impl<T: Storage<Data> + Storage<ownable::Data>> Internal for T {
     }
 
     default fn _withdraw_eth(&mut self, amount: Balance) -> Result<()> {
-        let caller = Self::env().caller();
+        let caller: ink_primitives::AccountId = Self::env().caller();
         let contract_address = Self::env().account_id();
         let pool = self._pool_address();
 
@@ -83,17 +89,31 @@ impl<T: Storage<Data> + Storage<ownable::Data>> Internal for T {
 
         let weth = self._weth_address();
         PoolRef::set_use_reserve_as_collateral(&pool, true)?;
+
+        let exchange_rate: WrappedU256 = PoolRef::exchange_rate_current(&pool)?;
+        let pool_token_amount = pool_balance(
+            Exp {
+                mantissa: exchange_rate,
+            },
+            amount_to_withdraw,
+        );
+
+        let balance_before = WETHRef::balance_of(&weth, contract_address);
         PoolRef::transfer_from(
             &pool,
             caller,
             contract_address,
-            amount_to_withdraw,
+            pool_token_amount,
             Vec::<u8>::new(),
         )?;
         PoolRef::redeem_underlying(&pool, amount_to_withdraw)?;
-        WETHRef::withdraw(&weth, amount_to_withdraw)?;
-        self._emit_withdraw_eth_event_(pool, caller, amount_to_withdraw);
-        self._safe_transfer_eth(caller, amount_to_withdraw)
+
+        let balance_after = WETHRef::balance_of(&weth, contract_address);
+        let actual_transferred = balance_after - balance_before;
+
+        WETHRef::withdraw(&weth, actual_transferred)?;
+        self._emit_withdraw_eth_event_(pool, caller, actual_transferred);
+        self._safe_transfer_eth(caller, actual_transferred)
     }
 
     default fn _repay_eth(&mut self, amount: Balance) -> Result<()> {
@@ -126,7 +146,7 @@ impl<T: Storage<Data> + Storage<ownable::Data>> Internal for T {
         let caller = Self::env().caller();
         let weth = self._weth_address();
         let pool = self._pool_address();
-        
+
         PoolRef::borrow_for(&pool, caller, amount)?;
         WETHRef::withdraw(&weth, amount)?;
         self._emit_borrow_eth_event_(pool, caller, amount);

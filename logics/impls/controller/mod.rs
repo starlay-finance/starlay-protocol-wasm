@@ -1,6 +1,7 @@
 use super::{
     exp_no_err::Exp,
     pool::{
+        utils::underlying_balance,
         COLLATERAL_FACTOR_MANTISSA_DECIMALS,
         LIQUIDATION_THRESHOLD_DECIMALS,
     },
@@ -804,7 +805,20 @@ impl<T: Storage<Data>> Internal for T {
             return Err(Error::TransferIsPaused)
         }
 
-        self._redeem_allowed(pool, src, transfer_tokens, pool_attribute)?;
+        let exchange_rate: WrappedU256 = if let Some(_pool_attribute) = pool_attribute.clone() {
+            _pool_attribute.exchange_rate.into()
+        } else {
+            PoolRef::exchange_rate_stored(&pool)
+        };
+
+        let transfer_tokens_in_underlying = underlying_balance(
+            Exp {
+                mantissa: exchange_rate,
+            },
+            transfer_tokens,
+        );
+
+        self._redeem_allowed(pool, src, transfer_tokens_in_underlying, pool_attribute)?;
 
         Ok(())
     }
