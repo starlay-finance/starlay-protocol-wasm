@@ -65,11 +65,10 @@ pub mod utils;
 use self::utils::{
     calculate_interest,
     exchange_rate,
-    from_scaled_amount,
     protocol_seize_amount,
     protocol_seize_share_mantissa,
     reserve_factor_max_mantissa,
-    scaled_amount_of,
+    underlying_balance,
     CalculateInterestInput,
     CalculateInterestOutput,
 };
@@ -77,6 +76,16 @@ use self::utils::{
 pub const STORAGE_KEY: u32 = openbrush::storage_unique_key!(Data);
 pub const COLLATERAL_FACTOR_MANTISSA_DECIMALS: u32 = 18;
 pub const LIQUIDATION_THRESHOLD_DECIMALS: u32 = 4;
+
+#[derive(Debug, scale::Decode, scale::Encode, Default)]
+#[cfg_attr(
+    feature = "std",
+    derive(scale_info::TypeInfo, ink::storage::traits::StorageLayout)
+)]
+pub struct BorrowSnapshot {
+    principal: Balance,
+    interest_index: WrappedU256,
+}
 
 #[derive(Debug)]
 #[openbrush::upgradeable_storage(STORAGE_KEY)]
@@ -94,12 +103,12 @@ pub struct Data {
     /// AccountId of Rate Model
     pub rate_model: Option<AccountId>,
     /// Total borrows
-    pub borrows_scaled: Balance,
+    pub total_borrows: Balance,
     /// Total reserves
-    pub reserves_scaled: Balance,
+    pub total_reserves: Balance,
     /// Borrow balance for accounts
-    pub account_borrows: Mapping<AccountId, Balance>,
-    /// Last block stamp of interest calculation process execution
+    pub account_borrows: Mapping<AccountId, BorrowSnapshot>,
+    /// Last block number of interest calculation process execution
     pub accrual_block_timestamp: Timestamp,
     /// Borrow index for interests
     pub borrow_index: WrappedU256,
@@ -130,8 +139,8 @@ impl Default for Data {
             pending_manager: None,
             rate_model: None,
             incentives_controller: None,
-            borrows_scaled: Default::default(),
-            reserves_scaled: Default::default(),
+            total_borrows: Default::default(),
+            total_reserves: Default::default(),
             account_borrows: Default::default(),
             delegate_allowance: Default::default(),
             accrual_block_timestamp: 0,
@@ -147,9 +156,7 @@ impl Default for Data {
 pub trait Internal {
     fn _accrue_interest(&mut self) -> Result<()>;
     fn _accrue_interest_at(&mut self, at: Timestamp) -> Result<()>;
-    fn _balance_of(&self, owner: &AccountId) -> Balance;
 
-    fn _total_supply(&self) -> Balance;
     // use in PSP22#transfer,transfer_from interface
     // return PSP22Error as Error for this
     fn _transfer_tokens(
@@ -218,7 +225,7 @@ pub trait Internal {
     fn _assert_manager(&self) -> Result<()>;
     fn _assert_pending_manager(&self) -> Result<()>;
     fn _validate_set_use_reserve_as_collateral(
-        &self,
+        &mut self,
         user: AccountId,
         use_as_collateral: bool,
     ) -> Result<()>;
@@ -234,9 +241,7 @@ pub trait Internal {
     fn _incentives_controller(&self) -> Option<AccountId>;
     fn _get_cash_prior(&self) -> Balance;
     fn _total_borrows(&self) -> Balance;
-    fn _borrows_scaled(&self) -> Balance;
     fn _total_reserves(&self) -> Balance;
-    fn _reserves_scaled(&self) -> Balance;
     fn _rate_model(&self) -> Option<AccountId>;
     fn _borrow_rate_per_msec(
         &self,
@@ -253,18 +258,16 @@ pub trait Internal {
     ) -> WrappedU256;
     fn _borrow_balance_stored(&self, account: AccountId) -> Balance;
     fn _balance_of_underlying(&self, account: AccountId) -> Balance;
-    fn _principal_balance_of(&self, account: &AccountId) -> Balance;
-    fn _principal_total_supply(&self) -> Balance;
     fn _accrual_block_timestamp(&self) -> Timestamp;
     fn _borrow_index(&self) -> WrappedU256;
     fn _initial_exchange_rate_mantissa(&self) -> WrappedU256;
     fn _reserve_factor_mantissa(&self) -> WrappedU256;
     fn _exchange_rate_stored(&self) -> U256;
-    fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput>;
-    fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool);
     fn _liquidation_threshold(&self) -> u128;
     fn _delegate_allowance(&self, owner: &AccountId, delegatee: &AccountId) -> Balance;
     fn _using_reserve_as_collateral(&self, user: AccountId) -> Option<bool>;
+    fn _get_interest_at(&self, at: Timestamp) -> Result<CalculateInterestOutput>;
+
     // event emission
     fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance);
     fn _emit_redeem_event(&self, redeemer: AccountId, redeem_amount: Balance);
@@ -359,10 +362,6 @@ where
 impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metadata::Data>> Pool
     for T
 {
-    default fn borrows_scaled(&self) -> Balance {
-        self._borrows_scaled()
-    }
-
     default fn accrue_interest(&mut self) -> Result<()> {
         self._accrue_interest()
     }
@@ -389,7 +388,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     default fn redeem_all(&mut self) -> Result<()> {
         self._accrue_interest()?;
         let caller = Self::env().caller();
-        let all_tokens_redeemed = Internal::_balance_of(self, &caller);
+        let all_tokens_redeemed = self._balance_of(&caller);
         self._redeem(caller, all_tokens_redeemed)
     }
 
@@ -465,6 +464,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     #[modifiers(only_flashloan_gateway)]
     default fn transfer_underlying(&mut self, to: AccountId, amount: Balance) -> Result<()> {
+        self._accrue_interest()?;
         self._transfer_underlying(to, amount)
     }
 
@@ -554,6 +554,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn set_use_reserve_as_collateral(&mut self, use_as_collateral: bool) -> Result<()> {
+        self._accrue_interest()?;
         let user = Self::env().caller();
         self._validate_set_use_reserve_as_collateral(user, use_as_collateral)?;
         self._set_use_reserve_as_collateral(user, use_as_collateral);
@@ -621,20 +622,28 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._total_reserves()
     }
 
-    default fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256) {
+    default fn balance_of_underlying(&self, account: AccountId) -> Balance {
+        self._balance_of_underlying(account)
+    }
+
+    default fn get_account_snapshot(
+        &mut self,
+        account: AccountId,
+    ) -> Result<(Balance, Balance, U256)> {
+        self._accrue_interest()?;
         let using_as_collateral = self._using_reserve_as_collateral(account);
         if using_as_collateral.unwrap_or(false) {
-            return (
-                Internal::_balance_of(self, &account),
+            return Ok((
+                self._balance_of(&account),
                 self._borrow_balance_stored(account),
                 self._exchange_rate_stored(),
-            )
+            ))
         }
-        (
+        Ok((
             0,
             self._borrow_balance_stored(account),
             self._exchange_rate_stored(),
-        )
+        ))
     }
 
     default fn borrow_balance_stored(&self, account: AccountId) -> Balance {
@@ -659,14 +668,6 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let reserves = self._total_reserves();
         let reserve_factor = self._reserve_factor_mantissa();
         self._supply_rate_per_msec(cash, borrows, reserves, reserve_factor)
-    }
-
-    default fn principal_balance_of(&self, account: AccountId) -> Balance {
-        self._principal_balance_of(&account)
-    }
-
-    default fn principal_total_supply(&self) -> Balance {
-        self._principal_total_supply()
     }
 
     default fn initial_exchange_rate_mantissa(&self) -> WrappedU256 {
@@ -699,7 +700,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
     default fn status(&self) -> PoolStatus {
         PoolStatus {
-            total_supply: self._principal_total_supply(),
+            total_supply: self._total_supply(),
             total_borrows: self._total_borrows(),
             exchange_rate: self._exchange_rate_stored(),
         }
@@ -712,6 +713,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     default fn _accrue_interest(&mut self) -> Result<()> {
         self._accrue_interest_at(Self::env().block_timestamp())
     }
+
     default fn _accrue_interest_at(&mut self, at: Timestamp) -> Result<()> {
         let accrual = self._accrual_block_timestamp();
         if accrual.eq(&at) {
@@ -722,6 +724,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let mut data = self.data::<Data>();
         data.accrual_block_timestamp = at;
         data.borrow_index = out.borrow_index.into();
+        data.total_borrows = out.total_borrows;
+        data.total_reserves = out.total_reserves;
         self._emit_accrue_interest_event(
             out.interest_accumulated,
             out.borrow_index.into(),
@@ -737,9 +741,9 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let idx = self._borrow_index();
 
         let rate_model = self._rate_model().ok_or(Error::InterestRateModelIsNotSet)?;
+
         let borrow_rate =
             InterestRateModelRef::get_borrow_rate(&rate_model, cash, borrows, reserves);
-
         calculate_interest(&CalculateInterestInput {
             total_borrows: borrows,
             total_reserves: reserves,
@@ -769,13 +773,21 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Err(PSP22Error::Custom(String::from("AccrueRewardFailed")))
         }
 
+        let accure_result = self.accrue_interest();
+        if accure_result.is_err() {
+            return Err(PSP22Error::Custom(String::from("AccrueInterestFailed")))
+        }
+
         if src == dst {
             return Err(PSP22Error::Custom(String::from("TransferNotAllowed")))
         }
 
         let contract_addr = Self::env().account_id();
+
+        // No need to check the error because interest has already updated.
+        let account_snapshot_result = self.get_account_snapshot(src);
         let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(src);
+            account_snapshot_result.unwrap();
         let pool_attribute = PoolAttributes {
             pool: Some(contract_addr),
             underlying: self._underlying(),
@@ -799,29 +811,21 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             Some(pool_attribute),
         )?;
 
-        let exchange_rate = self._exchange_rate_stored();
-        let psp22_transfer_amount = from_scaled_amount(
-            value,
-            Exp {
-                mantissa: exchange_rate.into(),
-            },
-        );
-
         if spender == src {
             // copied from PSP22#transfer
             // ref: https://github.com/Brushfam/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L75-L79
-            self._transfer_from_to(src, dst, psp22_transfer_amount, data)?;
+            self._transfer_from_to(src, dst, value, data)?;
         } else {
             // copied from PSP22#transfer_from
             // ref: https://github.com/Brushfam/openbrush-contracts/blob/868ee023727c49296b774327bee25db7b5160c49/contracts/src/token/psp22/psp22.rs#L81-L98
             let allowance = self._allowance(&src, &spender);
 
-            if allowance < psp22_transfer_amount {
+            if allowance < value {
                 return Err(PSP22Error::InsufficientAllowance)
             }
 
-            self._approve_from_to(src, spender, allowance - psp22_transfer_amount)?;
-            self._transfer_from_to(src, dst, psp22_transfer_amount, data)?;
+            self._approve_from_to(src, spender, allowance - value)?;
+            self._transfer_from_to(src, dst, value, data)?;
         }
 
         Ok(())
@@ -838,8 +842,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             .unwrap()
             .unwrap()?;
 
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
+        let current_block_timestamp = Self::env().block_timestamp();
+        if self._accrual_block_timestamp() != current_block_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         };
 
@@ -853,7 +857,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             .as_u128();
 
         // Check if it is first deposit.
-        let lp_balance = self._principal_balance_of(&minter);
+        let lp_balance = self._balance_of(&minter);
         if lp_balance == 0 {
             self._set_use_reserve_as_collateral(minter, true);
         }
@@ -875,8 +879,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         }
 
         let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
-        let (_, account_borrow_balance, exchange_rate) = self.get_account_snapshot(redeemer);
-        let account_balance = Internal::_balance_of(self, &redeemer);
+        let (_, account_borrow_balance, exchange_rate) = self.get_account_snapshot(redeemer)?;
+        let account_balance = self._balance_of(&redeemer);
         let contract_addr = Self::env().account_id();
 
         let pool_attribute = PoolAttributes {
@@ -896,8 +900,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             redeem_amount,
             Some(pool_attribute),
         )?;
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
+        let current_block_timestamp = Self::env().block_timestamp();
+        if self._accrual_block_timestamp() != current_block_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
 
@@ -905,62 +909,17 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Err(Error::RedeemTransferOutNotPossible)
         }
 
-        let lp_balance = Internal::_balance_of(self, &redeemer);
+        let lp_balance = self._balance_of(&redeemer);
         if lp_balance == redeem_amount {
             self._set_use_reserve_as_collateral(redeemer, false);
         }
 
-        self._burn_from(
-            redeemer,
-            scaled_amount_of(
-                redeem_amount,
-                Exp {
-                    mantissa: exchange_rate.into(),
-                },
-            ),
-        )?;
+        self._burn_from(redeemer, redeem_amount)?;
         self._transfer_underlying(redeemer, redeem_amount)?;
 
         self._emit_redeem_event(redeemer, redeem_amount);
 
         Ok(())
-    }
-
-    default fn _increase_debt(&mut self, borrower: AccountId, amount: Balance, neg: bool) {
-        let scaled = scaled_amount_of(
-            amount,
-            Exp {
-                mantissa: self._borrow_index(),
-            },
-        );
-        let account_borrows_prev = self
-            .data::<Data>()
-            .account_borrows
-            .get(&borrower)
-            .unwrap_or(0);
-        if neg {
-            // Check overflow
-            let borrow_amount = if account_borrows_prev >= scaled {
-                account_borrows_prev - scaled
-            } else {
-                0
-            };
-            let borrow_scaled_prev = self.data::<Data>().borrows_scaled;
-            let borrow_scaled_new = if borrow_scaled_prev >= scaled {
-                borrow_scaled_prev - scaled
-            } else {
-                0
-            };
-            self.data::<Data>()
-                .account_borrows
-                .insert(&borrower, &(borrow_amount));
-            self.data::<Data>().borrows_scaled = borrow_scaled_new;
-        } else {
-            self.data::<Data>()
-                .account_borrows
-                .insert(&borrower, &(account_borrows_prev + scaled));
-            self.data::<Data>().borrows_scaled += scaled
-        }
     }
 
     default fn _borrow(
@@ -975,7 +934,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let contract_addr = Self::env().account_id();
         let caller: ink_primitives::AccountId = Self::env().caller();
         let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(borrower);
+            self.get_account_snapshot(borrower)?;
 
         let pool_attribute = PoolAttributes {
             pool: Some(contract_addr),
@@ -996,8 +955,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             Some(pool_attribute),
         )?;
 
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
+        let current_block_timestamp = Self::env().block_timestamp();
+        if self._accrual_block_timestamp() != current_block_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         };
         if self._get_cash_prior() < borrow_amount {
@@ -1008,10 +967,20 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let account_borrows_new = account_borrows_prev + borrow_amount;
         let total_borrows_new = self._total_borrows() + borrow_amount;
 
+        let borrow_index = self._borrow_index();
+
+        self.data::<Data>().account_borrows.insert(
+            &borrower,
+            &BorrowSnapshot {
+                principal: account_borrows_new,
+                interest_index: borrow_index,
+            },
+        );
+        self.data::<Data>().total_borrows = total_borrows_new;
+
         if release_underlying {
             self._transfer_underlying(caller, borrow_amount)?;
         }
-        self._increase_debt(borrower, borrow_amount, false);
 
         self._emit_borrow_event(
             borrower,
@@ -1033,8 +1002,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         self._accrue_reward(payer)?;
         let contract_addr = Self::env().account_id();
 
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
+        let current_block_timestamp = Self::env().block_timestamp();
+        if self._accrual_block_timestamp() != current_block_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         };
 
@@ -1047,10 +1016,19 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
 
         self._transfer_underlying_from(payer, contract_addr, repay_amount_final)?;
 
-        self._increase_debt(borrower, repay_amount_final, true);
+        let account_borrows_new = account_borrow_prev - repay_amount_final;
+        let total_borrows_new = self._total_borrows() - repay_amount_final;
 
-        let account_borrows_new = self._borrow_balance_stored(borrower);
-        let total_borrows_new = self._total_borrows();
+        let borrow_index = self._borrow_index();
+
+        self.data::<Data>().account_borrows.insert(
+            &borrower,
+            &BorrowSnapshot {
+                principal: account_borrows_new,
+                interest_index: borrow_index,
+            },
+        );
+        self.data::<Data>().total_borrows = total_borrows_new;
 
         self._emit_repay_borrow_event(
             payer,
@@ -1076,7 +1054,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let controller = self._controller().ok_or(Error::ControllerIsNotSet)?;
         let contract_addr = Self::env().account_id();
         let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(borrower);
+            self.get_account_snapshot(borrower)?;
         let pool_attribute = PoolAttributes {
             pool: Some(contract_addr),
             underlying: self._underlying(),
@@ -1088,12 +1066,12 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             liquidation_threshold: self._liquidation_threshold(),
         };
 
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
+        let current_block_timestamp = Self::env().block_timestamp();
+        if self._accrual_block_timestamp() != current_block_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
         if collateral != contract_addr {
-            if PoolRef::get_accrual_block_timestamp(&collateral) != current_timestamp {
+            if PoolRef::get_accrual_block_timestamp(&collateral) != current_block_timestamp {
                 return Err(Error::AccrualBlockNumberIsNotFresh)
             }
         }
@@ -1210,12 +1188,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         let total_reserves_new = self._total_reserves() + protocol_seize_amount;
 
         // EFFECTS & INTERACTIONS
-        self.data::<Data>().reserves_scaled += scaled_amount_of(
-            protocol_seize_amount,
-            Exp {
-                mantissa: self._borrow_index(),
-            },
-        );
+        self.data::<Data>().total_reserves = total_reserves_new;
         self._burn_from(borrower, seize_tokens)?;
         self._mint_to(liquidator, liquidator_seize_tokens)?;
 
@@ -1236,8 +1209,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     ) -> Result<()> {
         self._accrue_interest()?;
 
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
+        let current_block_timestamp = Self::env().block_timestamp();
+        if self._accrual_block_timestamp() != current_block_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
 
@@ -1253,8 +1226,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         &mut self,
         new_interest_rate_model: AccountId,
     ) -> Result<()> {
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
+        let current_block_timestamp = Self::env().block_timestamp();
+        if self._accrual_block_timestamp() != current_block_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
 
@@ -1263,19 +1236,14 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _add_reserves(&mut self, amount: Balance) -> Result<()> {
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
+        let current_block_timestamp = Self::env().block_timestamp();
+        if self._accrual_block_timestamp() != current_block_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
 
         let total_reserves_new = self._total_reserves().add(amount);
 
-        self.data::<Data>().reserves_scaled += scaled_amount_of(
-            amount,
-            Exp {
-                mantissa: self._borrow_index(),
-            },
-        );
+        self.data::<Data>().total_reserves = total_reserves_new;
         let caller = Self::env().caller();
         self._transfer_underlying_from(caller, Self::env().account_id(), amount)?;
 
@@ -1286,8 +1254,8 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _reduce_reserves(&mut self, admin: AccountId, amount: Balance) -> Result<()> {
-        let current_timestamp = Self::env().block_timestamp();
-        if self._accrual_block_timestamp() != current_timestamp {
+        let current_block_timestamp = Self::env().block_timestamp();
+        if self._accrual_block_timestamp() != current_block_timestamp {
             return Err(Error::AccrualBlockNumberIsNotFresh)
         }
 
@@ -1298,13 +1266,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             return Err(Error::ReduceReservesCashValidation)
         }
         let total_reserves_new = self._total_reserves().sub(amount);
-        let mut data = self.data::<Data>();
-        data.reserves_scaled -= scaled_amount_of(
-            amount,
-            Exp {
-                mantissa: data.borrow_index,
-            },
-        );
+        self.data::<Data>().total_reserves = total_reserves_new;
         self._transfer_underlying(admin, amount)?;
 
         // event
@@ -1388,7 +1350,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _validate_set_use_reserve_as_collateral(
-        &self,
+        &mut self,
         user: AccountId,
         use_as_collateral: bool,
     ) -> Result<()> {
@@ -1397,7 +1359,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
         }
 
         let (account_balance, account_borrow_balance, exchange_rate) =
-            self.get_account_snapshot(user);
+            self.get_account_snapshot(user)?;
         if account_balance == 0 {
             return Err(Error::from(PSP22Error::InsufficientBalance))
         }
@@ -1431,9 +1393,9 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
             let handle_result = IncentivesControllerRef::handle_action(
                 &incentives_controller,
                 user,
-                self._principal_total_supply(),
+                self._total_supply(),
                 self._total_borrows(),
-                self._principal_balance_of(&user),
+                self._balance_of(&user),
                 self._borrow_balance_stored(user),
             );
 
@@ -1541,20 +1503,7 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _total_borrows(&self) -> Balance {
-        let borrows = self.data::<Data>().borrows_scaled;
-        if borrows == 0 {
-            return 0
-        };
-        from_scaled_amount(
-            self.data::<Data>().borrows_scaled.into(),
-            Exp {
-                mantissa: self._borrow_index(),
-            },
-        )
-    }
-
-    default fn _borrows_scaled(&self) -> Balance {
-        self.data::<Data>().borrows_scaled
+        self.data::<Data>().total_borrows
     }
 
     default fn _rate_model(&self) -> Option<AccountId> {
@@ -1595,80 +1544,41 @@ impl<T: Storage<Data> + Storage<psp22::Data> + Storage<psp22::extensions::metada
     }
 
     default fn _accrual_block_timestamp(&self) -> Timestamp {
-        Timestamp::from(self.data::<Data>().accrual_block_timestamp)
+        self.data::<Data>().accrual_block_timestamp
     }
 
     default fn _total_reserves(&self) -> Balance {
-        from_scaled_amount(
-            self.data::<Data>().reserves_scaled.into(),
-            Exp {
-                mantissa: self._borrow_index(),
-            },
-        )
+        self.data::<Data>().total_reserves
     }
-    default fn _reserves_scaled(&self) -> Balance {
-        self.data::<Data>().reserves_scaled
-    }
+
     default fn _borrow_index(&self) -> WrappedU256 {
         self.data::<Data>().borrow_index
     }
 
     default fn _borrow_balance_stored(&self, account: AccountId) -> Balance {
-        let snapshot = match self.data::<Data>().account_borrows.get(&account) {
-            Some(value) => {
-                match value {
-                    0 => return 0,
-                    _ => value,
-                }
-            }
-            None => return 0,
-        };
-        from_scaled_amount(
-            snapshot,
-            Exp {
-                mantissa: self._borrow_index(),
-            },
-        )
-    }
+        let snapshot = self
+            .data::<Data>()
+            .account_borrows
+            .get(&account)
+            .unwrap_or_default();
 
-    default fn _balance_of(&self, owner: &AccountId) -> Balance {
-        self._balance_of_underlying(*owner)
-    }
+        if snapshot.principal == 0 {
+            return 0
+        }
 
-    default fn _total_supply(&self) -> Balance {
-        let supply = self.data::<PSP22Data>().supply;
-        let interest = self
-            ._get_interest_at(Self::env().block_timestamp())
-            .unwrap();
-        let rate = exchange_rate(
-            supply.into(),
-            self._get_cash_prior(),
-            interest.total_borrows,
-            interest.total_reserves,
-            U256::from(self._initial_exchange_rate_mantissa()),
-        );
-        from_scaled_amount(
-            supply,
-            Exp {
-                mantissa: rate.into(),
-            },
-        )
+        let borrow_index = self._borrow_index();
+        let principal_times_index = U256::from(snapshot.principal).mul(U256::from(borrow_index));
+        principal_times_index
+            .div(U256::from(snapshot.interest_index))
+            .as_u128()
     }
 
     default fn _balance_of_underlying(&self, account: AccountId) -> Balance {
         let exchange_rate = Exp {
             mantissa: self._exchange_rate_stored().into(),
         };
-        let pool_token_balance = self._principal_balance_of(&account);
-        from_scaled_amount(pool_token_balance, exchange_rate)
-    }
-
-    default fn _principal_balance_of(&self, account: &AccountId) -> Balance {
-        psp22::Internal::_balance_of(self, account)
-    }
-
-    default fn _principal_total_supply(&self) -> Balance {
-        psp22::Internal::_total_supply(self)
+        let pool_token_balance = self._balance_of(&account);
+        underlying_balance(exchange_rate, pool_token_balance)
     }
 
     default fn _initial_exchange_rate_mantissa(&self) -> WrappedU256 {
@@ -1817,6 +1727,7 @@ impl From<controller::Error> for PSP22Error {
             controller::Error::MarketCountReachedToMaximum => {
                 convert("MarketCountReachedToMaximum")
             }
+            controller::Error::PoolError => convert("PoolError"),
         }
     }
 }

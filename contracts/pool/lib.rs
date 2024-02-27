@@ -161,6 +161,41 @@ pub mod contract {
         pub new: AccountId,
     }
 
+    #[ink(event)]
+    pub struct AccrueInterest {
+        pub interest_accumulated: Balance,
+        pub new_index: WrappedU256,
+        pub new_total_borrows: Balance,
+    }
+
+    #[ink(event)]
+    pub struct ReservesReduced {
+        pub reduce_amount: Balance,
+        pub total_reserves_new: Balance,
+    }
+
+    #[ink(event)]
+    pub struct NewController {
+        #[ink(topic)]
+        pub old: Option<AccountId>,
+        #[ink(topic)]
+        pub new: Option<AccountId>,
+    }
+
+    #[ink(event)]
+    pub struct NewInterestRateModel {
+        #[ink(topic)]
+        pub old: Option<AccountId>,
+        #[ink(topic)]
+        pub new: Option<AccountId>,
+    }
+
+    #[ink(event)]
+    pub struct NewReserveFactor {
+        pub old: WrappedU256,
+        pub new: WrappedU256,
+    }
+
     impl Pool for PoolContract {}
     impl Internal for PoolContract {
         fn _emit_mint_event(&self, minter: AccountId, mint_amount: Balance, mint_tokens: Balance) {
@@ -261,6 +296,46 @@ pub mod contract {
         fn _emit_manager_updated_event(&self, old: AccountId, new: AccountId) {
             self.env().emit_event(ManagerAddressUpdated { old, new })
         }
+
+        fn _emit_accrue_interest_event(
+            &self,
+            interest_accumulated: Balance,
+            new_index: WrappedU256,
+            new_total_borrows: Balance,
+        ) {
+            self.env().emit_event(AccrueInterest {
+                interest_accumulated,
+                new_index,
+                new_total_borrows,
+            })
+        }
+
+        fn _emit_reserves_reduced_event(
+            &self,
+            reduce_amount: Balance,
+            total_reserves_new: Balance,
+        ) {
+            self.env().emit_event(ReservesReduced {
+                reduce_amount,
+                total_reserves_new,
+            })
+        }
+
+        fn _emit_new_controller_event(&self, old: Option<AccountId>, new: Option<AccountId>) {
+            self.env().emit_event(NewController { old, new })
+        }
+
+        fn _emit_new_interest_rate_model_event(
+            &self,
+            old: Option<AccountId>,
+            new: Option<AccountId>,
+        ) {
+            self.env().emit_event(NewInterestRateModel { old, new })
+        }
+
+        fn _emit_new_reserve_factor_event(&self, old: WrappedU256, new: WrappedU256) {
+            self.env().emit_event(NewReserveFactor { old, new })
+        }
     }
 
     impl psp22::PSP22 for PoolContract {
@@ -284,16 +359,6 @@ pub mod contract {
             data: Vec<u8>,
         ) -> core::result::Result<(), PSP22Error> {
             self._transfer_tokens(self.env().caller(), from, to, value, data)
-        }
-
-        #[ink(message)]
-        fn balance_of(&self, owner: AccountId) -> Balance {
-            Internal::_balance_of(self, &owner)
-        }
-
-        #[ink(message)]
-        fn total_supply(&self) -> Balance {
-            Internal::_total_supply(self)
         }
     }
     impl psp22::Internal for PoolContract {

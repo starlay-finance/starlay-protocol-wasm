@@ -231,7 +231,7 @@ pub trait Controller {
 
     /// Returns a list of assets associated with a given account
     #[ink(message)]
-    fn account_assets(&self, account: AccountId) -> Vec<AccountId>;
+    fn account_assets(&self, account: AccountId) -> Result<Vec<AccountId>>;
 
     /// Returns User account data
     #[ink(message)]
@@ -344,6 +344,7 @@ pub enum Error {
     OracleIsNotSet,
     BalanceDecreaseNotAllowed,
     MarketCountReachedToMaximum,
+    PoolError,
 }
 
 pub type Result<T> = core::result::Result<T, Error>;

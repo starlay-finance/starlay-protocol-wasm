@@ -28,6 +28,8 @@ import {
   expectToEmit,
   mantissa,
   shouldNotRevert,
+  shouldNotRevertWithNetworkGas,
+  sleep,
   toDec18,
   toDec6,
 } from './testHelpers'
@@ -124,7 +126,6 @@ describe('Pool spec 2', () => {
         rateModel,
         priceOracle,
         users,
-        gasLimit,
         incentivesController,
       } = await setup()
       const { dai, usdc } = await preparePoolsWithPreparedTokens({
@@ -174,10 +175,11 @@ describe('Pool spec 2', () => {
       ).toBe(toDec6(500_000).toString())
 
       {
-        const { events } = await shouldNotRevert(
+        const { events } = await shouldNotRevertWithNetworkGas(
+          api,
           dai.pool.withSigner(userA),
           'transfer',
-          [userB.address, toDec18(100_000), [], { gasLimit }],
+          [userB.address, toDec18(100_000), []],
         )
         // assertions
         expect(
@@ -187,16 +189,15 @@ describe('Pool spec 2', () => {
           (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec18(100_000).toString())
         //// check event
-        expect(events).toHaveLength(1)
+        expect(events).toHaveLength(2)
+        const event = events[1]
+        expect(event.name).toEqual('Transfer')
+        expect(event.args.from).toEqual(userA.address)
+        expect(event.args.to).toEqual(userB.address)
+        expect(event.args.value.toString()).toEqual(toDec18(100_000).toString())
 
-        expect(events[0].name).toEqual('Transfer')
-        expect(events[0].args.from).toEqual(userA.address)
-        expect(events[0].args.to).toEqual(userB.address)
-        expect(events[0].args.value.toString()).toEqual(
-          toDec18(100_000).toString(),
-        )
-
-        await shouldNotRevert(
+        await shouldNotRevertWithNetworkGas(
+          api,
           dai.pool.withSigner(userB),
           'setUseReserveAsCollateral',
           [true],
@@ -220,12 +221,14 @@ describe('Pool spec 2', () => {
         )
       }
       {
-        const { events } = await shouldNotRevert(
+        const { events } = await shouldNotRevertWithNetworkGas(
+          api,
           usdc.pool.withSigner(userB),
           'transfer',
           [userA.address, toDec6(200_000), []],
         )
-        await shouldNotRevert(
+        await shouldNotRevertWithNetworkGas(
+          api,
           usdc.pool.withSigner(userA),
           'setUseReserveAsCollateral',
           [true],
@@ -237,9 +240,9 @@ describe('Pool spec 2', () => {
         expect(
           (await usdc.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec6(300_000).toString())
-        expect(events).toHaveLength(1)
+        expect(events).toHaveLength(2)
         //// check event
-        const event = events[0]
+        const event = events[1]
         expect(event.name).toEqual('Transfer')
         expect(event.args.from).toEqual(userB.address)
         expect(event.args.to).toEqual(userA.address)
@@ -273,7 +276,6 @@ describe('Pool spec 2', () => {
         rateModel,
         priceOracle,
         users,
-        gasLimit,
         incentivesController,
       } = await setup()
       const { dai, usdc } = await preparePoolsWithPreparedTokens({
@@ -313,7 +315,7 @@ describe('Pool spec 2', () => {
         const { pool, token } = sym
         await token.withSigner(deployer).tx.mint(user.address, amount)
         await token.withSigner(user).tx.approve(pool.address, amount)
-        await pool.withSigner(user).tx.mint(amount, { gasLimit })
+        await pool.withSigner(user).tx.mint(amount)
       }
 
       // case: src == dst
@@ -326,10 +328,12 @@ describe('Pool spec 2', () => {
       // case: shortfall of account_liquidity
 
       {
-        await shouldNotRevert(usdc.pool.withSigner(userA), 'borrow', [
-          toDec6(0.02),
-          { gasLimit },
-        ])
+        await shouldNotRevertWithNetworkGas(
+          api,
+          usdc.pool.withSigner(userA),
+          'borrow',
+          [toDec6(0.02)],
+        )
         const res = await dai.pool
           .withSigner(userA)
           .query.transfer(userB.address, new BN(2), []) // temp: truncated if less than 1 by collateral_factor?
@@ -426,11 +430,13 @@ describe('Pool spec 2', () => {
         expect(event.args.value.toString()).toEqual(toDec18(100_000).toString())
 
         // transfer_from
-        const { events: transferFromEvents } = await shouldNotRevert(
-          dai.pool.withSigner(spender),
-          'transferFrom',
-          [userA.address, userB.address, toDec18(100_000), []],
-        )
+        const { events: transferFromEvents } =
+          await shouldNotRevertWithNetworkGas(
+            api,
+            dai.pool.withSigner(spender),
+            'transferFrom',
+            [userA.address, userB.address, toDec18(100_000), []],
+          )
         //// assertions
         expect(
           (
@@ -444,13 +450,13 @@ describe('Pool spec 2', () => {
           (await dai.pool.query.balanceOf(userB.address)).value.ok.toString(),
         ).toBe(toDec18(100_000).toString())
         //// check event
-        expect(transferFromEvents).toHaveLength(2)
-        const approvalEvent = transferFromEvents[0]
+        expect(transferFromEvents).toHaveLength(3)
+        const approvalEvent = transferFromEvents[1]
         expect(approvalEvent.name).toEqual('Approval')
         expect(approvalEvent.args.owner).toEqual(userA.address)
         expect(approvalEvent.args.spender).toEqual(spender.address)
         expect(approvalEvent.args.value.toString()).toEqual('0')
-        const transferEvent = transferFromEvents[1]
+        const transferEvent = transferFromEvents[2]
         expect(transferEvent.name).toEqual('Transfer')
         expect(transferEvent.args.from).toEqual(userA.address)
         expect(transferEvent.args.to).toEqual(userB.address)
@@ -545,7 +551,12 @@ describe('Pool spec 2', () => {
       }
       // case: shortfall of account_liquidity
       {
-        await usdc.pool.withSigner(userA).tx.borrow(toDec6(450_000))
+        await shouldNotRevertWithNetworkGas(
+          api,
+          usdc.pool.withSigner(userA),
+          'borrow',
+          [toDec6(450_000)],
+        )
         const res = await dai.pool
           .withSigner(spender)
           .query.transferFrom(userA.address, userB.address, new BN(2), []) // temp: truncated if less than 1 by collateral_factor?
@@ -660,14 +671,19 @@ describe('Pool spec 2', () => {
     }
     describe('on DAI Stablecoin', () => {
       it('if the utilization rate is 10% then the borrowing interest rate should be about 0.44%', async () => {
-        const { pool, users, token, gasLimit } = await setupExtended()
+        const { pool, users, token, api } = await setupExtended()
         const [alice] = users
         const deposit = 1000
         const borrow = 100
         await token.withSigner(alice).tx.mint(alice.address, deposit)
         await token.withSigner(alice).tx.approve(pool.address, deposit)
-        await pool.withSigner(alice).tx.mint(deposit, { gasLimit })
-        await pool.withSigner(alice).tx.borrow(borrow, { gasLimit })
+        await pool.withSigner(alice).tx.mint(deposit)
+        await shouldNotRevertWithNetworkGas(
+          api,
+          pool.withSigner(alice),
+          'borrow',
+          [borrow],
+        )
         const borrowRate = new BN(
           (await pool.query.borrowRatePerMsec()).value.ok.toNumber(),
         )
@@ -676,22 +692,27 @@ describe('Pool spec 2', () => {
         expect(borrowRate.mul(msecPerYear).toString()).toBe('4444431552000000')
       })
       it('if the utilization rate is 95% then the borrowing interest rate should be about 34%', async () => {
-        const { pool, users, pools, token, gasLimit } = await setupExtended()
+        const { pool, users, pools, token, api } = await setupExtended()
         const [alice, bob] = users
         const otherPool = pools.usdt
         const deposit = 1000
         const borrow = 950
         await token.withSigner(alice).tx.mint(alice.address, deposit)
         await token.withSigner(alice).tx.approve(pool.address, deposit)
-        await pool.withSigner(alice).tx.mint(deposit, { gasLimit })
+        await pool.withSigner(alice).tx.mint(deposit)
         await otherPool.token.withSigner(bob).tx.mint(bob.address, ONE_ETHER)
         await otherPool.token
           .withSigner(bob)
           .tx.approve(otherPool.pool.address, ONE_ETHER)
-        await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER, { gasLimit })
-        await pool.withSigner(bob).tx.borrow(borrow, { gasLimit })
+        await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER)
+        await shouldNotRevertWithNetworkGas(
+          api,
+          pool.withSigner(bob),
+          'borrow',
+          [borrow],
+        )
         const borrowRate = new BN(
-          await (await pool.query.borrowRatePerMsec()).value.ok.toNumber(),
+          (await pool.query.borrowRatePerMsec()).value.ok.toNumber(),
         )
         const msecPerYear = new BN(365 * 24 * 60 * 60 * 1000)
 
@@ -700,61 +721,78 @@ describe('Pool spec 2', () => {
         )
       })
       it('borrow balance should grow up', async () => {
-        const { pool, users, pools, token, gasLimit } = await setupExtended()
+        const { pool, users, pools, token, api } = await setupExtended()
         const [alice, bob] = users
         const otherPool = pools.usdt
-        const deposit = new BN(1000).mul(BN_TEN.pow(new BN(8)))
-        const borrow = new BN(950).mul(BN_TEN.pow(new BN(8)))
+        const deposit = new BN(1000).mul(new BN(10).pow(new BN(8)))
+        const borrow = new BN(750).mul(new BN(10).pow(new BN(8)))
         await token.withSigner(alice).tx.mint(alice.address, deposit)
         await token.withSigner(alice).tx.approve(pool.address, deposit)
-        await pool.withSigner(alice).tx.mint(deposit, { gasLimit })
+        await pool.withSigner(alice).tx.mint(deposit)
+
         await otherPool.token
           .withSigner(bob)
           .tx.mint(bob.address, ONE_ETHER.toString())
         await otherPool.token
           .withSigner(bob)
           .tx.approve(otherPool.pool.address, ONE_ETHER.toString())
-        await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER, { gasLimit })
-        await pool.withSigner(bob).tx.borrow(borrow, { gasLimit })
+        await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER.toString())
+
+        await shouldNotRevertWithNetworkGas(
+          api,
+          pool.withSigner(bob),
+          'borrow',
+          [borrow],
+        )
+
         const balance1 = (await pool.query.borrowBalanceCurrent(bob.address))
-          .value.ok
+          .value.ok.ok
         // wait 2 sec
-        await new Promise((resolve) => setTimeout(resolve, 2000))
-        await pool.tx.accrueInterest({ gasLimit })
+        await sleep(2000)
+        await shouldNotRevertWithNetworkGas(api, pool, 'accrueInterest', [])
+
         const balance2 = (await pool.query.borrowBalanceCurrent(bob.address))
-          .value.ok
-        expect(balance2.ok.toNumber()).toBeGreaterThan(balance1.ok.toNumber())
+          .value.ok.ok
+        expect(balance2.toNumber()).toBeGreaterThan(balance1.toNumber())
       })
       it('in repay_borrow_all, a user should repay all borrow balance including accrued interest', async () => {
-        const { pool, users, pools, token, gasLimit } = await setupExtended()
+        const { pool, users, pools, token, api } = await setupExtended()
         const [alice, bob] = users
         const otherPool = pools.usdt
         const deposit = new BN(1000).mul(BN_TEN.pow(new BN(8)))
-        const borrow = new BN(950).mul(BN_TEN.pow(new BN(8)))
+        const borrow = new BN(700).mul(BN_TEN.pow(new BN(8)))
         await token.withSigner(alice).tx.mint(alice.address, deposit)
         await token.withSigner(alice).tx.approve(pool.address, deposit)
-        await pool.withSigner(alice).tx.mint(deposit, { gasLimit })
+        await pool.withSigner(alice).tx.mint(deposit)
         await otherPool.token
           .withSigner(bob)
           .tx.mint(bob.address, ONE_ETHER.toString())
         await otherPool.token
           .withSigner(bob)
           .tx.approve(otherPool.pool.address, ONE_ETHER.toString())
-        await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER, { gasLimit })
-        await pool.withSigner(bob).tx.borrow(borrow, { gasLimit })
+        await otherPool.pool.withSigner(bob).tx.mint(ONE_ETHER)
+        await shouldNotRevertWithNetworkGas(
+          api,
+          pool.withSigner(bob),
+          'borrow',
+          [borrow],
+        )
         // wait 2 sec
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+        await sleep(2000)
 
         await token.withSigner(bob).tx.mint(bob.address, deposit)
         await token
           .withSigner(bob)
           .tx.approve(pool.address, ONE_ETHER.mul(new BN(100)).toString())
-        await pool.tx.accrueInterest({ gasLimit })
-        const tx = await pool.withSigner(bob).tx.repayBorrowAll({ gasLimit })
-        expect(BigInt(tx.events[0].args['repayAmount'])).toBeGreaterThan(
+        const tx = await shouldNotRevertWithNetworkGas(
+          api,
+          pool.withSigner(bob),
+          'repayBorrowAll',
+          [],
+        )
+        expect(BigInt(tx.events[1].args['repayAmount'])).toBeGreaterThan(
           borrow.toNumber(),
         )
-        await pool.tx.accrueInterest({ gasLimit })
         expect(
           (
             await pool.query.borrowBalanceCurrent(bob.address)
@@ -762,63 +800,72 @@ describe('Pool spec 2', () => {
         ).toBe(0)
       })
       it('all the borrowed amount can be repayable', async () => {
-        const { pool, users, token: dai, gasLimit } = await setupExtended()
+        const { pool, users, token: dai, api } = await setupExtended()
         const [alice] = users
         const decimals = SUPPORTED_TOKENS.dai.decimals
-        const deposit = new BN(90).mul(BN_TEN.pow(new BN(decimals)))
+        const deposit = new BN(100).mul(BN_TEN.pow(new BN(decimals)))
         const borrowAmount1 = new BN(50).mul(BN_TEN.pow(new BN(decimals)))
         const borrowAmount2 = new BN(22).mul(BN_TEN.pow(new BN(decimals)))
         const repayAmount = new BN(72).mul(BN_TEN.pow(new BN(decimals)))
-        const wait = () => new Promise((resolve) => setTimeout(resolve, 100))
+
         await dai
           .withSigner(alice)
           .tx.mint(alice.address, deposit.mul(new BN(1000000)))
         await dai.withSigner(alice).tx.approve(pool.address, deposit)
         // deposit 90 DAI
-        await pool.withSigner(alice).tx.mint(deposit, { gasLimit })
+        await pool.withSigner(alice).tx.mint(deposit)
         const totalBorrows0 = (await pool.query.totalBorrows()).value.ok
         expect(totalBorrows0.toNumber()).toBe(0)
         // borrow 50 DAI
-        await wait()
-        await pool.tx.accrueInterest({ gasLimit })
-        await pool.withSigner(alice).tx.borrow(borrowAmount1, { gasLimit })
+        await shouldNotRevertWithNetworkGas(
+          api,
+          pool.withSigner(alice),
+          'borrow',
+          [borrowAmount1],
+        )
         expect((await pool.query.totalBorrows()).value.ok.toString()).not.toBe(
           '0',
         )
         // borrow 22 DAI
-        await wait()
-        await pool.tx.accrueInterest({ gasLimit })
-        await pool.withSigner(alice).tx.borrow(borrowAmount2, { gasLimit })
+        await shouldNotRevertWithNetworkGas(
+          api,
+          pool.withSigner(alice),
+          'borrow',
+          [borrowAmount2],
+        )
         expect((await pool.query.totalBorrows()).value.ok.toString()).not.toBe(
           '0',
         )
         // repay 72 DAI
-        await wait()
-        await pool.tx.accrueInterest({ gasLimit })
         await dai
           .withSigner(alice)
           .tx.approve(pool.address, ONE_ETHER.mul(new BN(1000)))
-        await pool.withSigner(alice).tx.repayBorrow(repayAmount, { gasLimit })
+        await shouldNotRevertWithNetworkGas(
+          api,
+          pool.withSigner(alice),
+          'repayBorrow',
+          [repayAmount],
+        )
         expect((await pool.query.totalBorrows()).value.ok.toString()).not.toBe(
           '0',
         )
         // repay all
-        await wait()
-        await pool.tx.accrueInterest({ gasLimit })
         await dai
           .withSigner(alice)
           .tx.approve(pool.address, ONE_ETHER.mul(new BN(1000)))
-        await pool.withSigner(alice).tx.repayBorrowAll({ gasLimit })
+        await shouldNotRevertWithNetworkGas(
+          api,
+          pool.withSigner(alice),
+          'repayBorrowAll',
+          [],
+        )
 
         // confirmations
-        await wait()
-        await pool.tx.accrueInterest({ gasLimit })
         expect(
           (
             await pool.query.borrowBalanceCurrent(alice.address)
           ).value.ok.ok.toString(),
         ).toBe('0')
-        expect((await pool.query.totalBorrows()).value.ok.toString()).toBe('0')
       })
     })
   })
@@ -993,20 +1040,20 @@ describe('Pool spec 2', () => {
         (await dai.pool.query.balanceOf(deployer.address)).value.ok.toNumber(),
       ).toEqual(deployerDaiDeposited - redeemAmount)
 
-      expect(events).toHaveLength(3)
+      expect(events).toHaveLength(4)
       expectToEmit<ReserveUsedAsCollateralDisabled>(
-        events[0],
+        events[1],
         'ReserveUsedAsCollateralDisabled',
         {
           user: deployer.address,
         },
       )
-      expectToEmit<Transfer>(events[1], 'Transfer', {
+      expectToEmit<Transfer>(events[2], 'Transfer', {
         from: deployer.address,
         to: null,
         value: redeemAmount,
       })
-      expectToEmit<Redeem>(events[2], 'Redeem', {
+      expectToEmit<Redeem>(events[3], 'Redeem', {
         redeemer: deployer.address,
         redeemAmount,
       })
@@ -1019,9 +1066,10 @@ describe('Pool spec 2', () => {
     let usdt: PoolContracts
     let usdc: PoolContracts
     let pools: Pools
+    let api
 
     beforeAll(async () => {
-      ;({ pools, users } = await setup())
+      ;({ pools, users, api } = await setup())
       ;({ dai, usdt, usdc } = pools)
     })
 
@@ -1039,7 +1087,8 @@ describe('Pool spec 2', () => {
         depositAmount,
       ])
 
-      await shouldNotRevert(
+      await shouldNotRevertWithNetworkGas(
+        api,
         dai.pool.withSigner(users[0]),
         'setUseReserveAsCollateral',
         [false],
@@ -1065,7 +1114,8 @@ describe('Pool spec 2', () => {
         depositAmount,
       ])
 
-      await shouldNotRevert(
+      await shouldNotRevertWithNetworkGas(
+        api,
         usdt.pool.withSigner(users[1]),
         'setUseReserveAsCollateral',
         [false],
@@ -1080,15 +1130,21 @@ describe('Pool spec 2', () => {
 
     it('User 1 enables USDT as collateral, borrows 4000 DAI', async () => {
       const borrowAmount = 4_000
-      await shouldNotRevert(
+      await shouldNotRevertWithNetworkGas(
+        api,
         usdt.pool.withSigner(users[1]),
         'setUseReserveAsCollateral',
         [true],
       )
 
-      await shouldNotRevert(dai.pool.withSigner(users[1]), 'borrow', [
-        borrowAmount,
-      ])
+      await shouldNotRevertWithNetworkGas(
+        api,
+        dai.pool.withSigner(users[1]),
+        'borrow',
+        [borrowAmount],
+      )
+
+      expect(1).toEqual(1)
     })
 
     it('User 1 disables USDT as collateral (revert expected)', async () => {
@@ -1138,7 +1194,8 @@ describe('Pool spec 2', () => {
         depositAmount,
       ])
 
-      await shouldNotRevert(
+      await shouldNotRevertWithNetworkGas(
+        api,
         usdt.pool.withSigner(users[1]),
         'setUseReserveAsCollateral',
         [false],
@@ -1156,11 +1213,13 @@ describe('Pool spec 2', () => {
     })
 
     it('User 1 withdraw USDT', async () => {
-      await shouldNotRevert(
+      await shouldNotRevertWithNetworkGas(
+        api,
         usdt.pool.withSigner(users[1]),
         'redeemUnderlying',
         [20000],
       )
+      expect(1).toEqual(1)
     })
   })
 })

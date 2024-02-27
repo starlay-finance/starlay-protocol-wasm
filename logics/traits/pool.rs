@@ -80,9 +80,6 @@ pub trait Pool: PSP22 + PSP22Metadata {
     #[ink(message)]
     fn repay_borrow_behalf(&mut self, borrower: AccountId, repay_amount: Balance) -> Result<()>;
 
-    #[ink(message)]
-    fn borrows_scaled(&self) -> Balance;
-
     /// The sender liquidates the borrowers collateral.
     #[ink(message)]
     fn liquidate_borrow(
@@ -190,9 +187,12 @@ pub trait Pool: PSP22 + PSP22Metadata {
     /// Total reserves in pool
     #[ink(message)]
     fn total_reserves(&self) -> Balance;
+    /// Get the underlying balance of the account
+    #[ink(message)]
+    fn balance_of_underlying(&self, account: AccountId) -> Balance;
     /// Get collateral detail of an account
     #[ink(message)]
-    fn get_account_snapshot(&self, account: AccountId) -> (Balance, Balance, U256);
+    fn get_account_snapshot(&mut self, account: AccountId) -> Result<(Balance, Balance, U256)>;
     /// Get user's borrow without interest
     #[ink(message)]
     fn borrow_balance_stored(&self, account: AccountId) -> Balance;
@@ -214,12 +214,6 @@ pub trait Pool: PSP22 + PSP22Metadata {
     /// Calculate the current exchange rate
     #[ink(message)]
     fn exchange_rate_current(&mut self) -> Result<WrappedU256>;
-    /// PSP22::balance_of
-    #[ink(message)]
-    fn principal_balance_of(&self, account: AccountId) -> Balance;
-    /// PSP22::total_supply
-    #[ink(message)]
-    fn principal_total_supply(&self) -> Balance;
     /// Get Initial Exchange rate.
     #[ink(message)]
     fn initial_exchange_rate_mantissa(&self) -> WrappedU256;

@@ -93,3 +93,6 @@ export const shouldNotRevertWithNetworkGas = async <
   await waitForTx(res)
   return res
 }
+
+export const sleep = (timeout: number) =>
+  new Promise((resolve) => setTimeout(resolve, timeout))

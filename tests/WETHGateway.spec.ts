@@ -169,7 +169,7 @@ describe('WETHGateway spec', () => {
 
     expect(
       (
-        await pool.query.principalBalanceOf(deployer.address)
+        await pool.query.balanceOfUnderlying(deployer.address)
       ).value.ok.toString(),
     ).toEqual(depositAmount.toString())
   })
