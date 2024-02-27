@@ -133,24 +133,43 @@ describe('Manager spec', () => {
       )
     })
     it('.set_borrow_cap', async () => {
-      const { deployer, manager, controller } = await setup()
+      const { deployer, manager, controller, priceOracle } = await setup()
       const poolAddr = encodeAddress(
         '0x0000000000000000000000000000000000000000000000000000000000000000',
       )
+
+      await shouldNotRevert(manager, 'grantRole', [
+        ROLE.CONTROLLER_ADMIN,
+        deployer.address,
+      ])
+      await shouldNotRevert(manager, 'supportMarket', [poolAddr, poolAddr])
+      await shouldNotRevert(priceOracle, 'setFixedPrice', [poolAddr, ONE_ETHER])
+
       const { value: value1 } = await manager.query.setBorrowCap(poolAddr, 10)
       expect(value1.ok.err).toStrictEqual({ accessControl: 'MissingRole' })
 
-      await manager.tx.grantRole(ROLE.BORROW_CAP_GUARDIAN, deployer.address)
-      await manager.tx.setBorrowCap(poolAddr, 10)
+      await shouldNotRevert(manager, 'grantRole', [
+        ROLE.BORROW_CAP_GUARDIAN,
+        deployer.address,
+      ])
+      await shouldNotRevert(manager, 'setBorrowCap', [poolAddr, 10])
 
       const { value: value2 } = await controller.query.borrowCap(poolAddr)
       expect(value2.ok).toEqual(10)
     })
     it('.set_mint_guardian_paused', async () => {
-      const { deployer, manager, controller } = await setup()
+      const { deployer, manager, controller, priceOracle } = await setup()
       const poolAddr = encodeAddress(
         '0x0000000000000000000000000000000000000000000000000000000000000000',
       )
+
+      await shouldNotRevert(manager, 'grantRole', [
+        ROLE.CONTROLLER_ADMIN,
+        deployer.address,
+      ])
+      await manager.tx.supportMarket(poolAddr, poolAddr)
+      await shouldNotRevert(priceOracle, 'setFixedPrice', [poolAddr, ONE_ETHER])
+
       const { value: value1 } = await manager.query.setMintGuardianPaused(
         poolAddr,
         true,
