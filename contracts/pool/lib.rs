@@ -163,7 +163,6 @@ pub mod contract {
 
     #[ink(event)]
     pub struct AccrueInterest {
-        pub cash_prior: Balance,
         pub interest_accumulated: Balance,
         pub new_index: WrappedU256,
         pub new_total_borrows: Balance,
@@ -300,13 +299,11 @@ pub mod contract {
 
         fn _emit_accrue_interest_event(
             &self,
-            cash_prior: Balance,
             interest_accumulated: Balance,
             new_index: WrappedU256,
             new_total_borrows: Balance,
         ) {
             self.env().emit_event(AccrueInterest {
-                cash_prior,
                 interest_accumulated,
                 new_index,
                 new_total_borrows,
@@ -502,7 +499,7 @@ pub mod contract {
             self.pool.rate_model = Some(rate_model);
             self.pool.initial_exchange_rate_mantissa = initial_exchange_rate_mantissa;
             self.pool.liquidation_threshold = liquidation_threshold;
-            self.pool.accrual_block_number = Self::env().block_number();
+            self.pool.accrual_block_timestamp = Self::env().block_timestamp();
             self.metadata.name = Some(name);
             self.metadata.symbol = Some(symbol);
             self.metadata.decimals = decimals;

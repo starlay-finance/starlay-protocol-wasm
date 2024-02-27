@@ -17,7 +17,7 @@ use openbrush::{
     traits::{
         AccountId,
         Balance,
-        BlockNumber,
+        Timestamp,
     },
 };
 use primitive_types::U256;
@@ -201,7 +201,7 @@ pub trait Pool: PSP22 + PSP22Metadata {
     fn borrow_balance_current(&mut self, account: AccountId) -> Result<Balance>;
     /// Get last block stamp of interest calculation process execution
     #[ink(message)]
-    fn get_accrual_block_number(&self) -> BlockNumber;
+    fn get_accrual_block_timestamp(&self) -> Timestamp;
     /// Calculates the current borrow interest rate per milliseconds
     #[ink(message)]
     fn borrow_rate_per_msec(&self) -> WrappedU256;

@@ -22,7 +22,7 @@ use core::ops::{
 };
 use openbrush::traits::{
     Balance,
-    BlockNumber,
+    Timestamp,
 };
 use primitive_types::U256;
 
@@ -45,8 +45,8 @@ pub struct CalculateInterestInput {
     pub total_reserves: Balance,
     pub borrow_index: U256,
     pub borrow_rate: U256,
-    pub old_block_number: BlockNumber,
-    pub new_block_number: BlockNumber,
+    pub old_block_timestamp: Timestamp,
+    pub new_block_timestamp: Timestamp,
     pub reserve_factor_mantissa: U256,
 }
 
@@ -96,7 +96,10 @@ pub fn calculate_interest(input: &CalculateInterestInput) -> Result<CalculateInt
     if input.borrow_rate.gt(&borrow_rate_max_mantissa()) {
         return Err(Error::BorrowRateIsAbsurdlyHigh)
     }
-    let delta = input.new_block_number.abs_diff(input.old_block_number);
+    let delta = input
+        .new_block_timestamp
+        .abs_diff(input.old_block_timestamp);
+
     let compound_interest_factor = compound_interest(
         &Exp {
             mantissa: input.borrow_rate.into(),
@@ -180,8 +183,8 @@ mod tests {
         let input = CalculateInterestInput {
             borrow_index: 0.into(),
             borrow_rate: U256::one().mul(U256::from(10)).pow(U256::from(18)),
-            new_block_number: BlockNumber::default(),
-            old_block_number: BlockNumber::default(),
+            new_block_timestamp: Timestamp::default(),
+            old_block_timestamp: Timestamp::default(),
             reserve_factor_mantissa: U256::zero(),
             total_borrows: Balance::default(),
             total_reserves: Balance::default(),
@@ -243,11 +246,11 @@ mod tests {
 
     #[test]
     fn test_calculate_interest() {
-        let old_block_number = BlockNumber::default();
+        let old_timestamp = BlockNumber::default();
         let inputs: &[CalculateInterestInput] = &[
             CalculateInterestInput {
-                old_block_number,
-                new_block_number: old_block_number + 1000 * 60 * 60 * 24 * 30 * 12, // 1 year
+                old_block_timestamp: old_timestamp,
+                new_block_timestamp: old_timestamp + 1000 * 60 * 60 * 24 * 30 * 12, // 1 year
                 borrow_index: 1.into(),
                 borrow_rate: mantissa().div(100000), // 0.001 %
                 reserve_factor_mantissa: mantissa().div(100), // 1 %
@@ -255,8 +258,8 @@ mod tests {
                 total_reserves: 10_000 * (10_u128.pow(18)),
             },
             CalculateInterestInput {
-                old_block_number,
-                new_block_number: old_block_number + 1000 * 60 * 60, // 1 hour
+                old_block_timestamp: old_timestamp,
+                new_block_timestamp: old_timestamp + 1000 * 60 * 60, // 1 hour
                 borrow_index: 123123123.into(),
                 borrow_rate: mantissa().div(1000000),
                 reserve_factor_mantissa: mantissa().div(10),
@@ -264,8 +267,8 @@ mod tests {
                 total_reserves: 1_000_000 * (10_u128.pow(18)),
             },
             CalculateInterestInput {
-                old_block_number,
-                new_block_number: old_block_number + 1000 * 60 * 60,
+                old_block_timestamp: old_timestamp,
+                new_block_timestamp: old_timestamp + 1000 * 60 * 60,
                 borrow_index: 123123123.into(),
                 borrow_rate: mantissa().div(123123),
                 reserve_factor_mantissa: mantissa().div(10).mul(2),
@@ -276,7 +279,9 @@ mod tests {
 
         for input in inputs {
             let got = calculate_interest(&input).unwrap();
-            let delta = input.new_block_number.abs_diff(input.old_block_number);
+            let delta = input
+                .new_block_timestamp
+                .abs_diff(input.old_block_timestamp);
             let simple_interest_factor = input.borrow_rate.mul(U256::from(delta));
             let simple_interest_accumulated = simple_interest_factor
                 .mul(U256::from(input.total_borrows))
