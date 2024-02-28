@@ -264,13 +264,14 @@ describe('WETHGateway spec', () => {
 
     await shouldNotRevert(pool, 'approve', [
       wethGateway.address,
-      withdrawAmount,
+      withdrawAmount * 3,
       { gasLimit },
     ])
 
     const {
       data: { free: beforeWethContractBalance },
     } = await api.query.system.account(weth.address)
+
     await shouldNotRevert(wethGateway, 'withdrawEth', [
       withdrawAmount,
       { gasLimit },
