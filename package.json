@@ -31,7 +31,9 @@
     "lint": "prettier --check . && eslint . && cargo check",
     "lint:fix": "prettier --write . && eslint . --fix && cargo fmt --all",
     "deploy:local": "yarn compile:release && ts-node scripts/deploy/index.ts local",
-    "deploy:shibuya": "yarn compile:release && ts-node scripts/deploy/index.ts shibuya"
+    "deploy:shibuya": "yarn compile:release && ts-node scripts/deploy/index.ts shibuya",
+    "deploy:azero": "yarn compile:release && ts-node scripts/deploy/index.ts azero",
+    "deploy:azero_testnet": "yarn compile:release && ts-node scripts/deploy/index.ts azeroTestnet"
   },
   "resolutions": {
     "@polkadot/api": "^10.9.1",

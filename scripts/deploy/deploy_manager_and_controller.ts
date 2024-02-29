@@ -34,9 +34,7 @@ export const deployManagerAndController: DeployManagerAndController = async ({
   const controller = await deployController({
     api,
     signer,
-    // FIXME unable to call supportMarketWithCollateralFactorMantissa via manager
-    // args: [manager.address],
-    args: [signer.address],
+    args: [manager.address],
   })
 
   await sendTxWithPreview(
@@ -54,19 +52,19 @@ export const deployManagerAndController: DeployManagerAndController = async ({
   }
 
   await sendTxWithPreview(
-    controller,
+    manager,
     'setPriceOracle',
     [priceOracle.address],
     option,
   )
   await sendTxWithPreview(
-    controller,
+    manager,
     'setCloseFactorMantissa',
     [[closeFactor]],
     option,
   )
   await sendTxWithPreview(
-    controller,
+    manager,
     'setLiquidationIncentiveMantissa',
     [[liquidationIncentive]],
     option,

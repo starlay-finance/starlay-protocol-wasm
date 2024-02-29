@@ -11,6 +11,8 @@ export interface EnvironmentParameter {
 export const ENV = {
   shibuya: 'shibuya',
   local: 'local',
+  azero: 'azero',
+  azeroTestnet: 'azeroTestnet',
 } as const
 
 export type Env = (typeof ENV)[keyof typeof ENV]
@@ -31,6 +33,12 @@ const ENV_PARAMS: Record<Env, EnvironmentParameter> = {
   },
   [ENV.local]: {
     rpc: 'ws://127.0.0.1:9944',
+  },
+  [ENV.azero]: {
+    rpc: 'wss://aleph-zero-rpc.dwellir.com',
+  },
+  [ENV.azeroTestnet]: {
+    rpc: '',
   },
 }
 

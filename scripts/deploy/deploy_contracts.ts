@@ -1,7 +1,7 @@
 import { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import { Config } from '../config'
-import { defaultOption } from '../helper/utils'
+import { defaultOption, sendTxWithPreview } from '../helper/utils'
 import { DummyToken } from '../tokens'
 import {
   deployFaucet,
@@ -52,6 +52,7 @@ export const deployContracts = async ({
     config,
     option,
     incentivesController,
+    manager: manager.address,
   })
 
   const wethGateway = await deployWETHGateway({
@@ -65,7 +66,10 @@ export const deployContracts = async ({
     signer,
     args: [controller.address],
   })
-  await controller.tx.setFlashloanGateway(flashloanGateway.address)
+
+  await sendTxWithPreview(manager, 'setFlashloanGateway', [
+    flashloanGateway.address,
+  ])
 
   const leverager = await deployLeverager({
     api,

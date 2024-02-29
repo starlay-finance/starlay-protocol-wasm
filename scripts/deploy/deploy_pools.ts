@@ -65,6 +65,7 @@ type SetupPoolArgs = {
   config: Config
   option: ReturnType<typeof defaultOption>
   incentivesController: string | null
+  manager: string
 }
 const deployAndSetupPool = async (
   api: ApiPromise,
@@ -76,6 +77,7 @@ const deployAndSetupPool = async (
     config: { collateralNamePrefix, collateralSymbolPrefix },
     option,
     incentivesController,
+    manager,
   }: SetupPoolArgs,
 ) => {
   console.log(
@@ -99,6 +101,7 @@ const deployAndSetupPool = async (
       token.address,
       controller.address,
       interestRateModel.address,
+      manager,
       [config.riskParameter.initialExchangeRateMantissa],
       config.riskParameter.liquidationThreshold,
       collateralNamePrefix + config.name,
