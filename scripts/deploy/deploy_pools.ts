@@ -2,6 +2,7 @@ import { ApiPromise } from '@polkadot/api'
 import type { KeyringPair } from '@polkadot/keyring/types'
 import Controller from '../../types/contracts/controller'
 import InterestRateModel from '../../types/contracts/default_interest_rate_model'
+import Manager from '../../types/contracts/manager'
 import Pool from '../../types/contracts/pool'
 import PriceOracle from '../../types/contracts/price_oracle'
 import PSP22Token from '../../types/contracts/psp22_token'
@@ -65,7 +66,7 @@ type SetupPoolArgs = {
   config: Config
   option: ReturnType<typeof defaultOption>
   incentivesController: string | null
-  manager: string
+  manager: Manager
 }
 const deployAndSetupPool = async (
   api: ApiPromise,
@@ -101,7 +102,7 @@ const deployAndSetupPool = async (
       token.address,
       controller.address,
       interestRateModel.address,
-      manager,
+      manager.address,
       [config.riskParameter.initialExchangeRateMantissa],
       config.riskParameter.liquidationThreshold,
       collateralNamePrefix + config.name,
@@ -118,17 +119,14 @@ const deployAndSetupPool = async (
   )
 
   await sendTxWithPreview(
-    controller,
+    manager,
     'supportMarketWithCollateralFactorMantissa',
     [pool.address, token.address, [config.riskParameter.collateralFactor]],
-    option,
   )
-  await sendTxWithPreview(
-    pool,
-    'setReserveFactorMantissa',
-    [[config.riskParameter.reserveFactor]],
-    option,
-  )
+  await sendTxWithPreview(manager, 'setReserveFactorMantissa', [
+    pool.address,
+    [config.riskParameter.reserveFactor],
+  ])
   console.log(`---------------- Finished ----------------`)
 
   return { pool, interestRateModel }

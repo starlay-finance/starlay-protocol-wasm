@@ -52,7 +52,7 @@ export const deployContracts = async ({
     config,
     option,
     incentivesController,
-    manager: manager.address,
+    manager,
   })
 
   const wethGateway = await deployWETHGateway({

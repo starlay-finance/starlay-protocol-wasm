@@ -17,9 +17,7 @@ export interface iAssetBase<T> {
   weth: T
   usdc: T
   usdt: T
-  wbtc: T
   wastr: T
-  wsdn: T
   dai: T
   matic: T
   bnb: T
@@ -99,22 +97,6 @@ export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
     rateModel: RATE_MODELS.wastr,
     riskParameter: RISK_PARAMETERS.wastr,
     price: price(6).div(new BN(100)),
-    decimals: 18,
-  },
-  wbtc: {
-    symbol: 'WBTC',
-    name: 'Wrapped Bitcoin',
-    rateModel: RATE_MODELS.wbtc,
-    riskParameter: RISK_PARAMETERS.wbtc,
-    price: price(28363),
-    decimals: 8,
-  },
-  wsdn: {
-    symbol: 'WSDN',
-    name: 'Wrapped SDN',
-    rateModel: RATE_MODELS.wsdn,
-    riskParameter: RISK_PARAMETERS.wsdn,
-    price: price(3).div(new BN(100)),
     decimals: 18,
   },
 }

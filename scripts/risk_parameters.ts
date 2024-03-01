@@ -25,8 +25,6 @@ export const RISK_PARAMETERS: iAssetBase<RiskParameter> = {
   usdt: param(80, 10, 85),
   dai: param(80, 10, 85),
   weth: param(80, 10, 85),
-  wbtc: param(70, 10, 75),
   matic: param(40, 20, 55),
   bnb: param(40, 20, 55),
-  wsdn: param(40, 20, 55),
 }

@@ -57,6 +57,4 @@ export const RATE_MODELS: iAssetBase<InterestRateModel> = {
   usdc: model(0, 4, 60, 90),
   usdt: model(0, 4, 60, 90),
   wastr: model(0, 7, 300, 45),
-  wbtc: model(0, 7, 100, 65),
-  wsdn: model(0, 7, 300, 45),
 }
