@@ -38,7 +38,7 @@ const ENV_PARAMS: Record<Env, EnvironmentParameter> = {
     rpc: 'wss://aleph-zero-rpc.dwellir.com',
   },
   [ENV.azeroTestnet]: {
-    rpc: '',
+    rpc: 'wss://ws.test.azero.dev',
   },
 }
 
