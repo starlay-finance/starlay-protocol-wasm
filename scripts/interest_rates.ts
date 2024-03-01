@@ -51,7 +51,6 @@ const model = (base: number, slope1: number, slope2: number, opt: number) => {
 export const RATE_MODELS: iAssetBase<InterestRateModel> = {
   weth: model(0, 8, 100, 65),
   bnb: model(0, 7, 300, 45),
-  busd: model(0, 4, 60, 90),
   dai: model(0, 4, 60, 90),
   dot: model(0, 7, 100, 65),
   matic: model(0, 7, 300, 45),
