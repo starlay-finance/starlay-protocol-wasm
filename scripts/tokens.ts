@@ -21,7 +21,6 @@ export interface iAssetBase<T> {
   wastr: T
   wsdn: T
   dai: T
-  busd: T
   matic: T
   bnb: T
   dot: T
@@ -78,18 +77,10 @@ export const SUPPORTED_TOKENS: iAssetBase<TokenConfig> = {
     price: ONE_ETHER,
     decimals: 6,
   },
-  busd: {
-    symbol: 'BUSD',
-    name: 'Binance USD',
-    rateModel: RATE_MODELS.busd,
-    riskParameter: RISK_PARAMETERS.busd,
-    price: ONE_ETHER,
-    decimals: 18,
-  },
   dot: {
     symbol: 'DOT',
     name: 'Polkadot',
-    rateModel: RATE_MODELS.busd,
+    rateModel: RATE_MODELS.dot,
     riskParameter: RISK_PARAMETERS.dot,
     price: price(6),
     decimals: 10,
